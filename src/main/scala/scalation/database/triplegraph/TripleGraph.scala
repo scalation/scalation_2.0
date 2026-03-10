@@ -136,9 +136,8 @@ case class TripleGraph (label: Array [ValueType],
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Print this triple-graph in a deep sense with all the information.
-     *  @param clip whether to clip out "Set(" and ")"
      */
-    def printG (clip: Boolean = true): Unit =
+    def printG (): Unit =
         println (s"TripleGraph ($name, $size")
         println ("Triples: ")
         for e <- triples do println (s"\t $e")

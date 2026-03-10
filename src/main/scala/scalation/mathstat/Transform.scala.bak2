@@ -1,0 +1,320 @@
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** @author  John Miller, Yousef Fekri Dabanloo
+ *  @version 2.0
+ *  @date    Thu Mar 13 14:06:11 EDT 2025
+ *  @see     LICENSE (MIT style license file).
+ *
+ *  @note    Support for Transformation Functions with their Inverse
+ *
+ *  https://www.infoq.com/news/2023/10/foreign-function-and-memory-api/
+ */
+
+package scalation
+package mathstat
+
+import scala.math._
+
+import VectorDOps._
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `⚬` extension method performs function composition f ⚬ g.
+ *  @see www.scala-lang.org/api/current/scala/Function1.html
+ *  @tparam A  the type to which function `g` can be applied
+ *  @tparam B  the type to which function `f` can be applied
+ *  @tparam R  the return type for f ⚬ g
+ */
+extension [A, B, R](f: B => R)
+
+    def ⚬ (g: A => B): A => R = f compose g
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `mu_sig` and `min_max` extend the methods defined for vectors and matrices
+ *  to work for types that are either `VectorD` or `MatrixD`.
+ *  @param x  the argument that is either a `VectorD` or `MatrixD`.
+ */
+extension (x: VectorD | MatrixD)
+
+    def mu_sig: VectorD | MatrixD =
+        x match
+            case xV: VectorD => xV.mu_sig
+            case xM: MatrixD => xM.mu_sig
+
+    def min_max: VectorD | MatrixD =
+        x match
+            case xV: VectorD => xV.min_max
+            case xM: MatrixD => xM.min_max
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `TranformT` enum defines the types of transforms.
+ *  @param name   the name of the transform
+ *  @param form   the class of the transform
+ *  @param w_l_u  the vectors of parameters and their bounds
+ */
+enum TransformT (val name: String, val form: VectorD => Transform, val w_l_u: TransformS):
+    case Pow  extends TransformT ("pow", x => PowForm (x),
+                      TransformS (VectorD (0.0, 1.5), VectorD (0.0, 1.1), VectorD (10.0, 3.0)))    // PowForm
+    case Root extends TransformT ("root", x => PowForm (x),
+                      TransformS (VectorD (0.0, 0.5), VectorD (0.0, 0.2), VectorD (10.0, 0.9)))    // RootForm (PowForm in 0.2, 0.9)
+    case Log  extends TransformT ("log", x => LogForm (x),
+                      TransformS (VectorD (0.0, 1.0), VectorD (0.0, 0.1), VectorD (10.0, 10.0)))   // LogForm
+    case Sin  extends TransformT ("sin", x => SinForm (x),
+                      TransformS (VectorD (0.0, 1.0), VectorD (0.0, 0.1), VectorD (10.0, 10.0)))   // SinForm
+    case Cos  extends TransformT ("cos", x => CosForm (x),
+                      TransformS (VectorD (0.0, 1.0), VectorD (0.0, 0.1), VectorD (10.0, 10.0)))   // CosForm
+end TransformT
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `TransformS` class is transform specification contains default values for the
+ *  parameters w and their bounds, e.g., w in x -> f(w_0 + w_1 * x)
+ *  @param w  the vector of two nonlinear parameters: shift w_0 and scale w_1 parameters
+ *  @param l  the vector containing the lower bounds of shift and scale parameters
+ *  @param u  the vector containing the upper bounds of shift and scale parameters
+ */
+case class TransformS (w: VectorD = VectorD (0.0, 1.0),
+                       l: VectorD = VectorD (0.0, 0.1),
+                       u: VectorD = VectorD (10.0, 10.0))
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `Transform` trait supports the use of transformation functions, such that it
+ *  is easy to take the inverse transform.  When a transformation uses arguments,
+ *  they are remembered for use by the inverse transformation.
+ *  @param w  the transform argument vector or matrix
+ */
+trait Transform (w: VectorD | MatrixD):
+
+    protected var lu: VectorD = VectorD (2, 5)                           // optional default range/bounds [l .. u]
+    protected val b: MatrixD  =                                          // transform argument matrix
+        w match
+            case wV: VectorD => MatrixD (wV).transpose
+            case wM: MatrixD => wM
+
+    inline def b_ : VectorD = b(?, 0)                                    // get 0-th column of the argument matrix
+    def setLU (_lu: VectorD): Unit = lu = _lu                            // set the default bounds
+    def f  (x: MatrixD): MatrixD                                         // transformation function
+    def fi (y: MatrixD): MatrixD                                         // inverse transformation function
+
+    val f:  FunctionV2V = (x: VectorD) => f(MatrixD(x).transpose)(?, 0)
+    val fi: FunctionV2V = (y: VectorD) => fi(MatrixD(y).transpose)(?, 0)
+
+    def df (x: VectorD): MatrixD = null                                  // partial derivative of f
+
+    def df (x: MatrixD): MatrixD =                                       // column-by-column partial derivative of f wrt to w
+        var jMatrix = df (x(?, 0))
+        for j <- 1 until x.dim2 do jMatrix = jMatrix ++^ df (x(?, j))
+        jMatrix
+    end df
+
+    def df (x: MatrixD, i: Int): MatrixD =                               // partial derivative of each column wrt wi
+        if i == 0 || i == 1 then
+            var jMatrix = MatrixD (df (x(?, 0))(?, i)).transpose
+            for j <- 1 until x.dim2 do jMatrix = jMatrix :^+ df (x(?, j))(?, i)
+            jMatrix
+        else
+            df(x)
+    end df
+
+end Transform
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `ZForm` class applies the z-transformation (subtract mean b(0) and divide by
+ *  standard deviation b(1)).
+ *  @param x_  the input vector or matrix to be transformed (needed to get w)
+ */
+class ZForm (x_ : VectorD | MatrixD) extends Transform (x_.mu_sig):
+    def f (x: MatrixD): MatrixD  = (x - b(0)) / b(1)
+    def fi (y: MatrixD): MatrixD = (y *~ b(1)) + b(0)
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `RangeForm` class transforms values to the default range/bounds lu.
+ *  @param x_  the input vector or matrix to be transformed (needed to get w)
+ */
+class RangeForm (x_ : VectorD | MatrixD) extends Transform (x_.min_max):
+    def f (x: MatrixD): MatrixD  = (x - b(0)) * (lu(1) - lu(0)) / (b(1) - b(0))  + lu(0)
+    def fi (y: MatrixD): MatrixD = (y - lu(0)) *~ (b(1) - b(0)) /(lu(1) - lu(0)) + b(0)
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `LogForm` class applies a shifted b_(0) and scaled b_(1) log-transformation.
+ *  Note: the default w = (0, 1) corresponds to log1p and its inverse to expm1.
+ *  @param w  the transform argument vector (w -> b)
+ */
+class LogForm (w: VectorD = VectorD (0, 1)) extends Transform (w):
+    def f (x: MatrixD): MatrixD  = x.map_ (z => log (z * b_(1) + b_(0)))
+    def fi (y: MatrixD): MatrixD = y.map_ (z => (exp (z) - b_(0)) / b_(1))
+    override def df (x: VectorD): MatrixD = MatrixD (x / (x * b_(1) + b_(0)),
+                                                     1 / (x * b_(1) + b_(0))).transpose
+
+// FIX - add ExpForm, BoxCoxForm, YeoJohnsonForm
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `CosForm` class applies a shifted b_(0) and scaled b_(1) cosine-transformation.
+ *  @param w  the transform argument vector (w -> b)
+ */
+class CosForm (w: VectorD = VectorD (0, 1)) extends Transform (w):
+    def f (x: MatrixD): MatrixD  = x.map_ (z => cos (z * (b_(1) * _2Pi) + b_(0)))
+    def fi (y: MatrixD): MatrixD = y.map_ (z => (acos (z) - b_(0)) / (b_(1) * _2Pi))
+    override def df (x: VectorD): MatrixD = MatrixD (x.map (z => -sin (z * b_(1) * _2Pi + b_(0))) * (_2Pi * x),
+                                                     x.map (z => -sin (z * b_(1) * _2Pi + b_(0))) * _2Pi).transpose
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `SinForm` class applies a shifted b_(0) and scaled b_(1) sine-transformation.
+ *  @param w  the transform argument vector (w -> b)
+ */
+class SinForm (w: VectorD = VectorD (0, 1)) extends Transform (w):
+    def f (x: MatrixD): MatrixD  = x.map_ (z => sin (z * (b_(1) * _2Pi) + b_(0)))
+    def fi (y: MatrixD): MatrixD = y.map_ (z => (asin (z) - b_(0)) / (b_(1) * _2Pi))
+    override def df (x: VectorD): MatrixD = MatrixD (x.map (z => cos (z * b_(1) * _2Pi + b_(0))) * (_2Pi * x),
+                                                     x.map (z => cos (z * b_(1) * _2Pi + b_(0))) * _2Pi).transpose
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `PowForm` class applies a shifted s = b_(0) and scaled p = b_(1) power-transformation,
+ *  (x + s)^p for power p > 1.  It defaults to x^2.
+ *  @param w  the transform argument vector (w -> b)
+ */
+class PowForm (w: VectorD = VectorD (0, 2)) extends Transform (w):
+    def f (x: MatrixD): MatrixD  = (x + b_(0)) ~^ b_(1)
+    def fi (y: MatrixD): MatrixD = y ~^ (1/b_(1)) - b_(0)
+    override def df (x: VectorD): MatrixD = MatrixD (((x + b_(0)) ~^ (b_(1) - 1)) * b_(1),
+                                                     f(x) * (x + b_(0)).map (z => log(z))).transpose
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `transformTest` tests the `Transform` class at the vector level.
+ *  > runMain scalation.mathstat.transformTest
+ */
+@main def transformTest (): Unit =
+
+    val x = VectorD (1, 2, 3)
+    println (s"x = $x")
+
+    banner ("ZForm Transformation")
+    val zForm = ZForm (x)
+    var y = zForm.f (x)
+    var z = zForm.fi (y)
+    println (s"y = $y, \nz = $z")
+
+    banner ("RangeForm Transformation")
+    val rangeForm = RangeForm (x)
+    y = rangeForm.f (x)
+    z = rangeForm.fi (y)
+    println (s"y = $y, \nz = $z")
+
+    banner ("LogForm Transformation")
+    val logForm = LogForm ()
+    y = logForm.f (x)
+    z = logForm.fi (y)
+    println (s"y = $y, \nz = $z")
+    println (s"df: ${logForm.df (x)}")
+
+    banner ("CosForm Transformation")
+    val cosForm = CosForm ()
+    y = cosForm.f (x)
+    z = cosForm.fi (y)
+    println (s"y = $y, \nz = $z")
+    println (s"df: ${cosForm.df (x)}")
+
+    banner ("SinForm Transformation")
+    val sinForm = SinForm ()
+    y = sinForm.f (x)
+    z = sinForm.fi (y)
+    println (s"y = $y, \nz = $z")
+    println (s"df: ${sinForm.df (x)}")
+
+    banner ("PowForm Transformation")
+    val powForm = PowForm ()
+    y = powForm.f (x)
+    z = powForm.fi (y)
+    println (s"y = $y, \nz = $z")
+    println (s"df: ${powForm.df (x)}")
+
+end transformTest
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `transformTest2` tests the `Transform` class at the matrix level.
+ *  > runMain scalation.mathstat.transformTest2
+ */
+@main def transformTest2 (): Unit =
+
+    val x = MatrixD ((3, 2), 3, 1,
+                             5, 2,
+                             6, 3)
+    println (s"x = $x")
+
+    banner ("ZForm Transformation")
+    val zForm = ZForm (x)
+    var y = zForm.f (x)
+    var z = zForm.fi (y)
+    println (s"y = $y, \nz = $z")
+
+    banner ("RangeForm Transformation")
+    val rangeForm = RangeForm (x)
+    y = rangeForm.f (x)
+    z = rangeForm.fi (y)
+    println (s"y = $y, \nz = $z")
+
+    banner("LogForm Transformation")
+    val logForm = LogForm ()
+    y = logForm.f(x)
+    z = logForm.fi(y)
+    println (s"y = $y, \nz = $z")
+    println (s"df: ${logForm.df (x)}")
+
+    banner ("CosForm Transformation")
+    val cosForm = CosForm ()
+    y = cosForm.f (x)
+    z = cosForm.fi (y)
+    println (s"y = $y, \nz = $z")
+    println (s"df: ${cosForm.df (x)}")
+
+    banner ("SinForm Transformation")
+    val sinForm = SinForm ()
+    y = sinForm.f (x)
+    z = sinForm.fi (y)
+    println (s"y = $y, \nz = $z")
+    println (s"df: ${sinForm.df(x)}")
+
+    banner ("PowForm Transformation")
+    val powForm = PowForm ()
+    y = powForm.f (x)
+    z = powForm.fi (y)
+    println (s"y = $y, \nz = $z")
+    println (s"df: ${powForm.df (x)}")
+
+end transformTest2
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `transformTest3` tests the `Transform` class' ability to compose transformations. 
+ *  > runMain scalation.mathstat.transformTest3
+ */
+@main def transformTest3 (): Unit =
+
+    val x = VectorD (3, 5, 6, 2, 1, 3, 2, 4, 6, 87, 1000)
+    println (s"x = $x")
+
+    banner ("ZForm Transformation")
+    val zForm = ZForm (x)
+    var y = zForm.f (x)
+    var z = zForm.fi (y)
+    println (s"y = $y, \nz = $z")
+
+    banner ("PowForm Transformation")
+    val powForm = PowForm ()
+    y = powForm.f (x)
+    z = powForm.fi (y)
+    println (s"y = $y, \nz = $z")
+
+    val fsc = (zForm.f(_: VectorD)) ⚬ (powForm.f(_: VectorD)) ⚬ (zForm.fi(_: VectorD))
+    val ysc = fsc (y)
+    println (s"ysc = ${ysc}")
+
+    val ysc2 = fsc (y(0 until 3))
+    println (s"ysc = ${ysc2}")
+
+end transformTest3
+

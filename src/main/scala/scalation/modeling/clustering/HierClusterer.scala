@@ -68,7 +68,6 @@ class HierClusterer (x: MatrixD, k: Int = 2)
             if d_ij < minDist then
                 minDist = d_ij                            // update minimum distance
                 si = clust(i); sj = clust(j)              // remember point sets i and j
-            end if
         end for
         (si, sj)
     end bestMerge

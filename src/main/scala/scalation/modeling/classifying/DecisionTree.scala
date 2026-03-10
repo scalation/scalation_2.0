@@ -94,7 +94,6 @@ trait DecisionTree:
             leaves += n                                          // add n to leaves
         else
             println (s"makeLeaf: node $n already is a leaf")
-        end if
     end makeLeaf
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -154,7 +153,7 @@ trait DecisionTree:
             val zj = z(n.j)
             try predictIrec (z, n.branch(zj))
             catch
-                case ex: NoSuchElementException => n.nu.argmax ()    // take consensus of node n
+                case _ : NoSuchElementException => n.nu.argmax ()    // take consensus of node n
         end if
     end predictIrec
 
@@ -172,7 +171,7 @@ trait DecisionTree:
                 if cont then predictIrecD (z, if zj <= n.thres then n.branch(0) else n.branch(1))
                 else predictIrecD (z, n.branch(zj.toInt))
             catch
-                case ex: NoSuchElementException => n.nu.argmax ()    // take consensus of node n
+                case _ : NoSuchElementException => n.nu.argmax ()    // take consensus of node n
         end if
     end predictIrecD
 
@@ -235,7 +234,6 @@ object Node:
             println ("\t" * level + "[ " + n)
             for c <- n.branch.values do printT (c, level + 1)
             println ("\t" * level + "]")
-        end if
     end printT
 
 end Node

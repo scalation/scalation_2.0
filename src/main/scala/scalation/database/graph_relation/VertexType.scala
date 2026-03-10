@@ -79,13 +79,11 @@ case class VertexType (name: String, schema: VEC [String], eschema: VEC [String]
                     if ! (schema contains pname) then
                         flaw ("check", s"error pname = $pname not found in schema")
                         matched = false
-                    end if
                 end for
                 for ename <- v.edge.keys do
                     if ! (eschema contains ename) then
                         flaw ("check", s"error ename = $ename not found in eschema")
                         matched = false
-                    end if
                 end for
                 if ! matched then break
             end for
@@ -101,7 +99,6 @@ case class VertexType (name: String, schema: VEC [String], eschema: VEC [String]
         if ! (schema contains pkey) then  
             flaw ("buildIndex", s"primary key property = $pkey is not in the schema")
             return
-        end if
         primaryKey = pkey
         for v <- verts do
             val key = v.prop(pkey)                                                      // the primary key

@@ -182,7 +182,7 @@ class QuadraticSimplex (a: MatrixD, b: VectorD, q: MatrixD, c: VectorD, var x_B:
         showTableau ()
 
         breakable {
-            for it <- 1 to MAX_IT do
+            for _ <- 0 until MAX_IT do
                 l = entering (); if l == -1 then break ()      // optimal solution found
                 k = leaving (l); if k == -1 then break ()      // solution is unbounded
                 pivot (k, l)                                   // pivot: k leaves and l enters

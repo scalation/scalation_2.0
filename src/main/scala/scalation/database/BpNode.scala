@@ -322,7 +322,7 @@ end BpNode
     val node    = new BpNode (0, true)                              // empty leaf node
     var right: BpNode = null
 
-    for i <- 1 to totKeys do
+    cfor (0, totKeys) { _ =>
         val key = rng.nextInt (mx)
         banner (s"put key = $key")
         node.add (key, 2 * key)
@@ -334,7 +334,7 @@ end BpNode
             right = rt
             println (s"AFTER split:  node = $node, dk = $dk, rt = $rt")
             node.showRef (); rt.showRef ()
-    end for
+    } // cfor
 
     banner ("Show Arrays")
     node.show ()
@@ -365,7 +365,7 @@ end bpNodeTest
     val rng     = new Random (seed)
     val node    = new BpNode (0, false)                             // empty internal node: false => not isLeaf
 
-    for i <- 1 to totKeys do
+    cfor (0, totKeys) { _ =>
         val key = rng.nextInt (mx)
         banner (s"put key = $key")
         node.add (key, 2 * key)
@@ -376,7 +376,7 @@ end bpNodeTest
             val (dk, rt) = node.splitI ()                           // splitI keys between node (2) and right (2)
             println (s"AFTER split:  node = $node, dk = $dk, rt = $rt")
             node.showRef (); rt.showRef ()
-    end for
+    } // cfor
 
     banner ("Show Arrays")
     node.show ()

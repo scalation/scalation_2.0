@@ -86,7 +86,7 @@ class SimpleAnimator2 (_title: String)
             try
                 Thread.sleep (tau)
             catch 
-                case ex: InterruptedException => println ("SimpleAnimator2.run: sleep failed")
+                case _ : InterruptedException => println ("SimpleAnimator2.run: sleep failed")
             end try
 
             repaint ()

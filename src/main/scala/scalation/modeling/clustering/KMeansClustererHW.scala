@@ -49,7 +49,6 @@ class KMeansClustererHW (x: MatrixD, k: Int, flags: Array [Boolean] = Array (fal
                         to_c(i) = c2                                        // reassign point x_i to cluster c2
                         done = false                                        // changed clusters => not done
                         if immediate then break ()                          // optionally return after first change
-                    end if
                 end if
             end for
         } // breakable

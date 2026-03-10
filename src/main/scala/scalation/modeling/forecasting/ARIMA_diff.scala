@@ -142,13 +142,14 @@ import ARIMA_diff._
 
     banner ("Test ARMA (2, 0) on Lake Level Dataset")
     hp("p") = 2; hp("q") = 0
-    val (yp, qof) = new ARMA (y, hh).trainNtest ()()
+    val yp = new ARMA (y, hh).trainNtest ()()._1
+    new Plot (null, y, yp, "ARMA y and yp vs. time", lines = true)
 
     banner ("Test Differenced ARMA (2, 0) on Lake Level Dataset")
     val v  = diff (y)                                               // first difference on y (size of v one less than y)
     val yy = undiff (v, y(0))                                       // reverse the diff
     Forecaster.differ (y, yy)                                       // verify recovery of original time series
-    val (vp_, qofv) = new ARMA (v, hh).trainNtest ()()              // predictions skip the first value (no past)
+    val vp_ = new ARMA (v, hh).trainNtest ()()._1                   // predictions skip the first value (no past)
 //  val vp = v(0) +: vp_                                            // prepend the first actual value (want same size as v)
     val vp = vp_                                                    // prepend the first actual value (want same size as v)
 
@@ -156,7 +157,6 @@ import ARIMA_diff._
     println (s"predictAll: y.dim = ${y.dim}, vp.dim = ${vp.dim}")
     val yp1 = undiff (vp, y(0))                                     // transform vp back to original (y) scale using undiff
     val yp2 = backform (vp, y)                                      // transform vp back to original (y) scale using backform
-
     
     banner ("Test Transformed-Back using undiff")
     println (tf.testDiagnose (y, yp1))                              // determine the quality of fit for yp1
@@ -177,4 +177,80 @@ import ARIMA_diff._
 */
     
 end aRIMA_diffTest
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `aRIMA_diffTest2` main function tests the `ARIMA_diff` object on real data:
+ *  Forecasting Covid-19 new deaths comparing ARMA, AR1MA, Differenced ARMA, Transformed-Back
+ *  Differenced ARMA.  Observe that `backform` is better than `undiff` on predictions.
+ *  @see cran.r-project.org/web/packages/fpp/fpp.pdf
+ * > runMain scalation.modeling.forecasting.aRIMA_diffTest2
+ */
+@main def aRIMA_diffTest2 (): Unit =
+
+    import Example_Covid.y
+    import AR.hp
+    val tf = new TestFit (y.dim)
+    val hh = 6
+
+    banner ("Test ARMA (2, 0) on Covid-19 Dataset")
+    hp("p") = 2; hp("q") = 0
+    val yp = new ARMA (y, hh).trainNtest ()()._1
+    new Plot (null, y, yp, "ARMA y and yp vs. time", lines = true)
+
+    banner ("Test Differenced ARMA (2, 0) on Covid-19 Dataset")
+    val v  = diff (y)                                               // first difference on y (size of v one less than y)
+    val yy = undiff (v, y(0))                                       // reverse the diff
+    Forecaster.differ (y, yy)                                       // verify recovery of original time series
+    val vp_ = new ARMA (v, hh).trainNtest ()()._1                   // predictions skip the first value (no past)
+//  val vp = v(0) +: vp_                                            // prepend the first actual value (want same size as v)
+    val vp = vp_                                                    // prepend the first actual value (want same size as v)
+
+    banner ("Test Transformed-Back Differenced ARMA (2, 0) on Covid-19 Dataset")
+    println (s"predictAll: y.dim = ${y.dim}, vp.dim = ${vp.dim}")
+    val yp1 = undiff (vp, y(0))                                     // transform vp back to original (y) scale using undiff
+    val yp2 = backform (vp, y)                                      // transform vp back to original (y) scale using backform
+
+    banner ("Test Transformed-Back using undiff")
+    println (tf.testDiagnose (y, yp1))                              // determine the quality of fit for yp1
+    banner ("Test Transformed-Back using backform")
+    println (tf.testDiagnose (y, yp2))                              // determine the quality of fit for yp2
+    new Plot (null, y, yp1, "undiff: y and yp1 vs. time", lines = true)
+    new Plot (null, y, yp2, "backform: y and yp2 vs. time", lines = true)
+    new Plot (null, yp1, yp2, "yp1 and yp2 vs. time", lines = true)
+
+end aRIMA_diffTest2
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `aRIMA_diffTest3` main function tests the `ARIMA_diff` object on real data:
+ *  Forecasting Covid-19 new deaths examining phase spece plots.
+ * > runMain scalation.modeling.forecasting.aRIMA_diffTest3
+ */
+@main def aRIMA_diffTest3 (): Unit =
+
+    import Example_Covid.y                                          // position: level of the time series
+
+    val v  = diff (y)                                               // velocity: first difference on y (size of v one less than y)
+
+    new Plot (y, v, null, "Phase Space: Velocity vs. Position", lines = true)
+    new Plot (null, y, v, "Phase Space: Velocity, Position vs. Time", lines = true)
+
+    // Standarize
+
+    val ys = y.standardize
+    val vs = v.standardize
+
+    new Plot (ys, vs, null, "Phase Space: Standardized Velocity vs. Position", lines = true)
+    new Plot (null, ys, vs, "Phase Space: Standardized Velocity, Position vs. Time", lines = true)
+
+    // Log transformation gives growth rates
+
+    val u = diff (y.log)
+    val us = u.standardize
+
+    new Plot (ys, us, null, "Phase Space: Standardized Growth-Rate vs. Position", lines = true)
+    new Plot (null, ys, us, "Phase Space: Standardized Growth-Rate, Position vs. Time", lines = true)
+
+end aRIMA_diffTest3
 

@@ -55,7 +55,7 @@ class RegressionWLS (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
     private val debug = debugf ("RegressionWLS", true)                       // debug function
     private val flaw  = flawf ("RegressionWLS")                              // flaw function
 
-    modelName = "RegressionWLS"
+    _modelName = "RegressionWLS"
 
     if w == null then w = RegressionWLS.weights                              // adjust weights
 
@@ -117,33 +117,33 @@ class RegressionWLS (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
         debug ("trainNTest", s"b = $b")
         val (yp, qof) = test (xx, yy)
         println (report (qof))
-        if DO_PLOT then
-           val (ryy, ryp) = orderByY (yy, yp)                                // order by yy
-           new Plot (null, ryy, ryp, s"$modelName: y actual, predicted")
-        end if
+        Predictor.plotPrediction (yy, yp, modelName)
         (yp, qof)
     end trainNtest
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /*  Use validation to compute test Quality of Fit (QoF) measures by dividing
-     *  the full dataset into a TESTING set and a TRAINING set.
-     *  The test set is defined by idx and the rest of the data is the training set.
+     *  the full dataset into a TESTING-set and a TRAINING-set.
+     *  The testing-set is defined by idx and the rest of the data is the training-set.
+     *  @see `modeling.Predictor.validate` about the RANDOM, FIRST, and LAST options
+     *  for selecting the testing-set.
      *  @param rando  flag indicating whether to use randomized or simple validation
-     *  @param ratio  the ratio of the TESTING set to the full dataset (most common 70-30, 80-20)
-     *  @param idx    the prescribed TESTING set indices
+     *  @param ratio  the ratio of the TESTING-set to the full dataset (most common 70-30 (.3), 80-20 (.2))
+     *  @param idx    the prescribed TESTING-set indices (default => generate)
      */
-    override def validate (rando: Boolean = true, ratio: Double = 0.2)
-                 (idx : IndexedSeq [Int] = testIndices ((ratio * y.dim).toInt, rando)): VectorD =
+    override def validate (rando: Boolean = true, ratio: Double = Model.TE_RATIO)
+//                        (idx: IndexedSeq [Int] = testIndices ((ratio * y.dim).toInt, rando)):
+                          (idx: IndexedSeq [Int] = testIndices (y.dim, (ratio * y.dim).toInt, rando)):
+                          (VectorD, VectorD) =
         val (x_e, x_) = (x(idx), getX.not(idx))                              // test, training data/input matrices
         val (y_e, y_) = (y(idx), getY.not(idx))                              // test, training response/output vectors
 
-        train (x_, y_)                                                       // train model on the training set
-        val qof = test (x_e, y_e)._2                                         // test on test-set and get QoF measures
-        if qof(QoF.sst.ordinal) <= 0.0 then                                  // requires variation in test-set
+        train (x_, y_)                                                       // train model on the TRAINING-set
+        val (yp, qof) = test (x_e, y_e)                                      // test on TESTING-set and get QoF measures
+        if qof(QoF.sst.ordinal) <= 0.0 then                                  // requires variation in TESTING-set
             flaw ("validate", "chosen testing set has no variability")
-        end if
         println (FitM.fitMap (qof, QoF.values.map (_.toString)))
-        qof
+        (yp, qof)
     end validate
 
 end RegressionWLS
@@ -227,7 +227,6 @@ object RegressionWLS:
             w      = rp.recip                                          // set weight vector for WLS to reciprocal of rp
         else
             w = w0                                                     // set weights using custom values
-        end if
         rootW = w.sqrt                                                 // set root of weight vector
     end setWeights
 
@@ -258,9 +257,8 @@ object RegressionWLS:
      *  @param x  the data matrix
      *  @param y  the response vector
      *  @param z  a vector to predict
-     *  @param w  the root weights 
      */
-    def test (x: MatrixD, y: VectorD, z: VectorD, w: VectorD = null): Unit =
+    def test (x: MatrixD, y: VectorD, z: VectorD): Unit =
         banner ("Fit the parameter vector b")
         val mod = new RegressionWLS (x, y)
         mod.trainNtest ()()                                            // train and test the model
@@ -305,10 +303,11 @@ end RegressionWLS
     test (x, y, z)                                                     // weights set internally
 
 //  val w0 = VectorD (0.106085, 0.0997944, 0.0831033, 0.160486, 0.171810)
-    val w0 = VectorD (0.318254, 0.299383,  0.249310,  0.481457, 0.515431)
+//  val w0 = VectorD (0.318254, 0.299383,  0.249310,  0.481457, 0.515431)
 
     banner ("custom weights")
-    test (x, y, z, w0)                                                 // custom weights explicitly given
+//  test (x, y, z, w0)                                                 // custom weights explicitly given - FIX: w0 not used yet
+    test (x, y, z)                                                     // custom weights explicitly given
 
 end regressionWLSTest
 

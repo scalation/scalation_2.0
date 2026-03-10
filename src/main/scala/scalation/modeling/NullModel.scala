@@ -25,10 +25,12 @@ import scalation.mathstat._
  */
 class NullModel (y: VectorD)
       extends Predictor (MatrixD.one (y.dim), y, Array ("one"), null)
-         with Fit (dfm = 0, df = y.dim-1)
+         with Fit (dfr = 0, df = y.dim-1)
          with NoSubModels:
 
-    modelName = "NullModel"
+    _modelName = "NullModel"
+
+    override def getBest: BestStep = super [NoSubModels].getBest
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Train the predictor by fitting the parameter vector (b-vector) in the

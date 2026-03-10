@@ -6,6 +6,7 @@
  *  @see     LICENSE (MIT style license file).
  *
  *  @note    Rank Revealing QR Matrix Factorization
+ *           Simple way to determine matrix a's rank:  Fac_QR_RR.rank (a)
  */
 
 package scalation
@@ -61,7 +62,6 @@ class Fac_QR_RR (aa: MatrixD, needQ: Boolean = true)
             if k_m != _rank then
                 at.swap (k_m, _rank)                               // swap rows in at (columns in a)
                 c.swap (k_m, _rank)                                // swap column lengths
-            end if
             colHouse (_rank)                                       // perform kth factoring step                  
             for j <- _rank+1 until n do c(j) -= at(j, _rank) ~^ 2
             _rank += 1
@@ -80,10 +80,24 @@ class Fac_QR_RR (aa: MatrixD, needQ: Boolean = true)
     end factor
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Return the rank (number of independent columns) in matrix 'aa'.
+    /** Return the rank (number of independent columns) of matrix 'aa'.
      */
     def rank: Int = _rank
 
+end Fac_QR_RR
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `Fac_QR_RR` object provides a convenient way to determine the rank of matrix.
+ */
+object Fac_QR_RR:
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the rank (number of independent columns) of matrix 'a'.
+     *  @param a  the matrix whose rank is to be determined
+     */
+    def rank (a: MatrixD): Int = new Fac_QR_RR (a, false).factor ().rank
+        
 end Fac_QR_RR
 
 import Fac_QR._

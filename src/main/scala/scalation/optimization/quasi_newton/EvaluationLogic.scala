@@ -30,9 +30,8 @@ trait EvaluationLogic:
     /** Evaluates the gradients and objective function according to the state of
      *  the variables during the minimization process.
      *
-     *  @param instance  user data provided by each call of the `lbfgsMain` method. Can
-     *                   have `Any` type defined by the user as long as the same type is
-     *                   utilized in other instances that rely on this `EvaluationLogic`
+     *  @param instance  an optional user data segment that may be provided when calling
+     *                   the `LBFGS.lbfgsMain` method (@see `OptimizationLogic`)
      *  @param x         `VectorD` with the current values of the variables
      *  @param n         the number of variables
      *  @param step      current step chosen by the line search routine.

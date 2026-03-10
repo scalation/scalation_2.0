@@ -31,7 +31,6 @@ def subSample (x: MatrixD, nSamp: Int, stream: Int): (MatrixD, VectorI) =
         val rsg   = RandomVecSample (x.dim, nSamp, stream)         // random sample generator
         val irows = rsg.igen                                       // select rows, e.g., 5, 3, 7
         (x(irows), irows)
-    end if
 end subSample
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -49,7 +48,6 @@ def subSample (x: MatrixD, y: VectorD, nSamp: Int, stream: Int): (MatrixD, Vecto
         val rsg   = RandomVecSample (x.dim, nSamp, stream)         // random sample generator
         val irows = rsg.igen                                       // select rows, e.g., 5, 3, 7
         (x(irows), y(irows), irows)
-    end if
 end subSample
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -67,7 +65,6 @@ def subSample (x: MatrixD, y: VectorI, nSamp: Int, stream: Int): (MatrixD, Vecto
         val rsg   = RandomVecSample (x.dim, nSamp, stream)         // random sample generator
         val irows = rsg.igen                                       // select rows, e.g., 5, 3, 7
         (x(irows), y(irows), irows)
-    end if
 end subSample
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

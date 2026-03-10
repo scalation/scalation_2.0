@@ -48,10 +48,8 @@ end StatTable
 
      println ("Create a StatTable called Test")
      val stats = VEC [Statistic] ()
-     for i <- 0 until 50 do stats += new Statistic ()
-     for j <- 0 until 50 do
-         for i <- 0 until 50 do stats(j).tally (i)
-     end for
+     cfor (0, 50) { _ => stats += new Statistic () }
+     for j <- 0 until 50; i <- 0 until 50 do stats(j).tally (i)
      new StatTable ("Test", stats)
 
 end statTableTest

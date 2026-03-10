@@ -41,5 +41,10 @@ trait MonitorLoss:
         new Plot (epoch, loss, null, s"loss vs epoch $optName")
     end plotLoss
 
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the best/minumum loss seen.
+     */
+    def getBestLoss: Double = losses.min
+
 end MonitorLoss
 

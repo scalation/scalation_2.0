@@ -60,6 +60,7 @@ class BpTreeMap [V: ClassTag] (name: String = "BpTreeMap")
      */
     def getFirst: V = first.ref(1).asInstanceOf [V]
     def getLast: V = last_.ref(last_.keys).asInstanceOf [V]
+
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** The `SortedMap` trait requires `Ordering` with a compare method to be defined.
      *  @see https://scala-lang.org/api/3.3.0/scala/math/Ordering.html
@@ -83,12 +84,12 @@ class BpTreeMap [V: ClassTag] (name: String = "BpTreeMap")
      *  @param js  the starting within node index (defaults to -1)
      */
     class TreeIterator (ns: BpNode = first, js: Int = -1) extends Iterator [(ValueType, V)]:
-        var (n, j) = (ns, js)
+        private var (n, j) = (ns, js)
 
         def hasNext: Boolean = j < n.keys-1 || n.ref(0) != null
 
         def next (): (ValueType, V) =
-            //          debug ("next", s"node n = $n, j = $j, n.keys = ${n.keys}")
+//          debug ("next", s"node n = $n, j = $j, n.keys = ${n.keys}")
             if j < n.keys-1 then j += 1
             else { n = n.ref(0).asInstanceOf [BpNode]; j = 0 }
             (n(j), n.ref(j+1).asInstanceOf [V])
@@ -604,13 +605,13 @@ end bpTreeMapTest
     val rng     = new Random (seed)
     val tree    = new BpTreeMap [Int] ("Test2")
 
-    for i <- 1 to totKeys do
+    cfor (0, totKeys) { _ =>
         val key = rng.nextInt (mx)
         banner (s"put ($key, ${2 * key})")
         tree.put (key, 2 * key)
         tree.show ()
         tree.showLink()
-    end for
+    } // cfor
 
     banner ("Print Statistics")
     println (s"size = ${tree.size}")
@@ -636,13 +637,13 @@ end bpTreeMapTest2
     val seed    = 1
     val rng     = new Random (seed)
     val tree    = new BpTreeMap [Int] ("Test3")
-    val tree2   = new TreeMap [ValueType, Int] ()(ValueTypeOrd)
+    val tree2   = new TreeMap [ValueType, Int] ()(using ValueTypeOrd)
 
-    for i <- 1 to totKeys do
+    cfor (0, totKeys) { _ =>
         val key = rng.nextInt (mx)
         tree.put (key, 2 * key)
         tree2.put (key, 2 * key)
-    end for
+    } // cfor
 
     var same = tree equals tree2
     println (s"tree equals tree2 = $same")

@@ -33,7 +33,7 @@ class DecisionTree_ID3wp (x: MatrixD, y: VectorI, fname_ : Array [String] = null
 
     private val debug = debugf ("DecisionTree_ID3wp", true)      // debug function
 
-    modelName = "DecisionTree_ID3wp"                             // name of the model
+    _modelName = "DecisionTree_ID3wp"                            // name of the model
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Prune nPrune nodes from the tree, the ones providing the least gain.
@@ -41,7 +41,7 @@ class DecisionTree_ID3wp (x: MatrixD, y: VectorI, fname_ : Array [String] = null
      *  @param threshold  cut-off for pruning (IG < threshold, then prune)
      */
     def prune (nPrune: Int = 1, threshold: Double = 0.98): Unit =
-        for i <- 0 until nPrune do
+        cfor (0, nPrune) { _ => 
             val can = candidates
             debug ("prune", s"can = $can")
             val (best, gn) = bestCandidate (can)
@@ -49,8 +49,7 @@ class DecisionTree_ID3wp (x: MatrixD, y: VectorI, fname_ : Array [String] = null
             if gn < threshold then
                 println (s"prune: make node $best with gain $gn into a leaf")
                 makeLeaf (best)
-            end if
-        end for
+        } // cfor
     end prune
 
 end DecisionTree_ID3wp
@@ -165,7 +164,6 @@ end decisionTree_ID3wpTest2
         else
             testData.set (testCount, xy(i))
             testCount  += 1
-        end if
     end for
 
     val testFeature = testData(0 until testData.dim2)

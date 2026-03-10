@@ -48,9 +48,9 @@ class NeuralNet_2L_Ck (x: MatrixD, y: MatrixI, fname_ : Array [String] = null,
       extends Classifier (x, y(0).toInt, fname_, y.dim2, cname_, hparam)       // FIX y(0) - may need a new trait
          with FitC ():
 
-    private val debug = debugf ("NeuralNet_2L_Ck", true)                 // debug function
+    private val debug = debugf ("NeuralNet_2L_Ck", true)                    // debug function
 
-    modelName = s"NeuralNet_2L_Ck_${nz}_${f.name}_softmax"                     // name of the model
+    _modelName = s"NeuralNet_2L_Ck_${nz}_${f.name}_softmax"                 // name of the model
 
     def predictI (z: VectorD): Int = ???
     def test (x_ : MatrixD, y_ : VectorI): (VectorI, VectorD) = ???

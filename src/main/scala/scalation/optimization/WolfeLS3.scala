@@ -115,7 +115,6 @@ class WolfeLS3 (f: FunctionV2S, var g: FunctionV2V, c1: Double = 0.0001, c2: Dou
             else
                 split = false
                 go = false
-            end if
             debug ("lsearch", s"(it = $it) after  a = $a in [$l, $u]")
         } // cfor
 

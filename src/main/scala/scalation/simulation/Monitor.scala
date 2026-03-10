@@ -53,7 +53,6 @@ case class Monitor (project: String = "simulation"):
                 ew.println (s"${who.me} \t $what \t at time $when.")
             else
                 ew.println (s"${who.me} \t $what \t ${whom.me} \t at time $when.")
-            end if
         end if
     end trace
 

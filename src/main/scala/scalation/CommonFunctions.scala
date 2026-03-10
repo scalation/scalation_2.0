@@ -23,9 +23,11 @@
  *  //def log10 (x: Double): Double
  *  def pow2 (x: Double): Double
  *  def pow10 (x: Double): Double
+ *  def pow (x: Double, a: Int, b: Int): Double
  *  //def log1p (x: Double): Double
  *  //def expm1 (x: Double): Double 
  *  def logb (b: Double, x: Double): Double
+ *  def ihs (x: Double): Double
  *
  *  Many common functions are also supplied by the `scala.math` package.
  */
@@ -125,6 +127,28 @@ inline def log2 (x: Double): Double = log (x) / log_2
 inline def log10 (x: Double): Double = log (x) / log_10
  */
 
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** Find the y-th root of x, i.e.,  x ~^ 1/y for Scala Longs.
+ *  r = x ~^ 1/y is largest long integer r such that r ~^ y <= x.
+ *  @see http://en.wikipedia.org/wiki/Shifting_nth_root_algorithm
+ *  @see http://stackoverflow.com/questions/8826822/calculate-nth-root-with-integer-arithmetic
+ *  @param x  the Long base parameter
+ *  @param y  the Long root level (reciprocal exponent) parameter
+ */
+def lroot (x: Long, y: Long): Long =
+    var r = 1L                               // initial guess for root
+
+    def step: Long = ((y-1) * r + x / r~^(y-1)) / y
+
+    var q = step                             // find better root
+    while
+        r = q
+        q = step
+        q < r
+    do ()     // repeat looking for better root
+    r
+end lroot
+
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The power base 2 function 2^x of type `FunctionS2S`.
  *  Its inverse function is log2.
@@ -138,6 +162,21 @@ inline def pow2 (x: Double): Double = pow (2.0, x)
  *  @param x  the value of the exponent 10^x
  */
 inline def pow10 (x: Double): Double = pow (10.0, x)
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** Raise x to a rational (fractional) power r = b/c where b and c are longs using logic to handle
+ *  the sign separately if the exponent is a simple fraction with an odd denominator. 
+ *  In particular, use `pow` when x is non-negative, else the identity (−a)^(b/c) = (−1)^b a^(b/c)
+ *  when c is odd, otherwise return Not-a-Number (NaN).
+ *  @see math.stackexchange.com/questions/317528/how-do-you-compute-negative-numbers-to-fractional-powers
+ *  @param x  the value of the base x^r
+ *  @param r  the rational `Rat` exponent: power/root, num/den, b/c
+ */
+def pow_ (x: Double, r: Rat): Double =
+    if x >= 0.0 then pow (x, r.toDouble)
+    else if r.den % 2 == 1 then pow (-1, r.num.toDouble) * pow (-x, r.toDouble)
+    else Double.NaN
+end pow_
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The power to p function x^p of type `FunctionS2S`.
@@ -232,6 +271,15 @@ inline def logb (b: Double, x: Double): Double = log (x) / log (b)
    banner (s"Test expm1 (log1p (x = $x))")
    println (s"expm1 (log1p ($x))   = ${expm1 (a)}")
    println (s"exp (log (1+$x)) - 1 = ${exp (b) - 1}")
+
+   banner (s"Test pow_ (xx, r)")
+   val xx = -8.0
+   println (s"pow_ ($xx, Rat (2, 3))) = ${pow_ (xx, Rat (2, 3))}")
+   println (s"pow_ ($xx, Rat (1, 3))) = ${pow_ (xx, Rat (1, 3))}")
+   println (s"pow_ ($xx, Rat (1, 2))) = ${pow_ (xx, Rat (1, 2))}")
+   println (s"pow ($xx, 2/3))   = ${pow (xx, 2.toDouble/3)}")
+   println (s"pow ($xx, 1/3))   = ${pow (xx, 1.toDouble/3)}")
+   println (s"pow ($xx, 1/2))   = ${pow (xx, 1.toDouble/ 2)}")
 
    banner (s"Test ihs (x = $x)")
    val u = ihs (x)

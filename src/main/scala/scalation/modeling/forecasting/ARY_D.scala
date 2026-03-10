@@ -12,10 +12,13 @@ package scalation
 package modeling
 package forecasting
 
+import scala.collection.mutable.{LinkedHashSet => LSET}
+
 import scalation.mathstat._
 import scalation.modeling.neuralnet.{RegressionMV => REGRESSION}
 
 import MakeMatrix4TS._
+import TransformT._
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `ARY_D` class provides basic time series analysis capabilities for
@@ -39,17 +42,17 @@ class ARY_D (x: MatrixD, y: MatrixD, hh: Int, fname: Array [String],
              tRng: Range = null, hparam: HyperParameter = hp,
              bakcast: Boolean = false,
              tForms: TransformMap = Map ("tForm_y" -> null))
-      extends Forecaster_D (x, y, hh, tRng, hparam, bakcast):
+      extends Forecaster_D (x, y, hh, fname, tRng, hparam, bakcast):
 
-    private val debug = debugf ("ARY_D", true)                          // debug function
-    private val p     = hparam("p").toInt                               // use the last p values (p lags)
-    private val spec  = hparam("spec").toInt                            // trend terms: 0 - none, 1 - constant, 2 - linear, 3 - quadratic
-                                                                        //              4 - sine, 5 cosine
-    private val nneg  = hparam("nneg").toInt == 1                       // 0 => unrestricted, 1 => predictions must be non-negative
-    private val reg   = new REGRESSION (x, y, fname, hparam)            // delegate training to multi-variate regression
+    private val debug = debugf ("ARY_D", true)                            // debug function
+    private val p     = hparam("p").toInt                                 // use the last p values (p lags)
+    private val spec  = hparam("spec").toInt                              // trend terms: 0 - none, 1 - constant, 2 - linear, 3 - quadratic
+                                                                          //              4 - sine, 5 cosine
+    private val nneg  = hparam("nneg").toInt == 1                         // 0 => unrestricted, 1 => predictions must be non-negative
+    private val reg   = new REGRESSION (x, y, fname, hparam)              // delegate training to multi-variate regression
 
-    modelName = s"ARY_D($p)"
-    yForm = tForms("tForm_y").asInstanceOf [Transform]
+    _modelName = s"ARY_D_$p"
+    yForm      = tForms("tForm_y").asInstanceOf [Transform]
 
     debug ("init", s"$modelName with additional term spec = $spec")
 //  debug ("init", s"[ x | y ] = ${x ++^ y}")
@@ -62,9 +65,11 @@ class ARY_D (x: MatrixD, y: MatrixD, hh: Int, fname: Array [String],
      *  @param y_  the training/full response vector (e.g., full y)
      */
     def train_x (x_ : MatrixD, y_ : MatrixD): Unit =
-        debug ("train", s"$modelName, x_.dim = ${x_.dim}, y_.dim = ${y_.dim}")
-        reg.train (x_, y_)                                              // train the multi-variate regression model
-        bb = reg.parameter                                              // coefficients from regression
+        debug ("train_x", s"$modelName, x_.dim = ${x_.dim}, y_.dim = ${y_.dim}")
+        val idx = y_(?, y.dim2-1).indexOf (NO_DOUBLE)                     // index of first non-value in the last column
+        val (x_t, y_t) = if idx < 0 then (x_, y_) else (x_(0 until idx), y_(0 until idx))
+        reg.train (x_t, y_t)                                              // train the multi-variate regression model
+        bb = reg.parameter                                                // coefficients from regression
     end train_x
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -75,9 +80,9 @@ class ARY_D (x: MatrixD, y: MatrixD, hh: Int, fname: Array [String],
      *  @param b_      the parameters/coefficients for the model
      *  @param vifs    the Variance Inflation Factors (VIFs)
      */
-    override def summary (x_ : MatrixD = getX, fname_ : Array [String] = reg.getFname,
+    override def summary (x_ : MatrixD = x, fname_ : Array [String] = reg.getFname,
                           b_ : VectorD = b, vifs: VectorD = reg.vif ()): String =
-        super.summary (x_, fname_, b_, vifs)                             // summary from `Fit`
+        super.summary (x_, fname_, b_, vifs)                              // summary from `Fit`
     end summary
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -103,9 +108,9 @@ class ARY_D (x: MatrixD, y: MatrixD, hh: Int, fname: Array [String],
      *  @param y_  the actual values to use in making predictions
      */
     override def forecast (t: Int, y_ : VectorD): VectorD =
-        val pred = predict (t, MatrixD (y_).transpose)
-        for h <- 1 to hh do yf(t, h) = pred(h-1)
-        pred                                                         // yh is pred
+        val pred = predict (t, MatrixD (y_).ᵀ)
+        yf(t, 1 until hh+1) = pred
+        pred                                                              // yh is pred
     end forecast
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -119,6 +124,25 @@ class ARY_D (x: MatrixD, y: MatrixD, hh: Int, fname: Array [String],
             for h <- 1 to hh do yf(t, h) = pred(h-1)
         yf
     end forecastAll
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Build an `ARY_D` model using the cols with the selected features.
+     *  @param cols  the cols of the input matrix with selected features
+     *  @param h     the number of the horizon
+     */
+    def getModel (cols: LSET [Int] = mcols): ARY_D =
+        new ARY_D (x(?, cols), y, hh, cols.toArray.map (fname (_)), tRng, hparam, bakcast, tForms)
+    end getModel
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Build a single-horizon `ARY` model using the cols with the selected features.
+     *  Note: uses `ARY` as it is the base model for ARY*_D.
+     *  @param cols  the cols of the input matrix with selected features
+     *  @param h     the number of the horizon
+     */
+    def getModel_h (cols: LSET [Int] = mcols, h: Int = 1): ARY =
+        new ARY (x(?, cols), y(?, h-1), 1, cols.toArray.map (fname (_)), tRng, hparam, bakcast, tForms)
+    end getModel_h
 
 end ARY_D
 
@@ -140,8 +164,9 @@ object ARY_D extends MakeMatrix4TSY:
     def apply (y: VectorD, hh: Int, fname_ : Array [String] = null,
                tRng: Range = null, hparam: HyperParameter = hp,
                bakcast: Boolean = false): ARY_D =
-        val p       = hparam("p").toInt                                 // use the last p values
-        val spec    = hparam("spec").toInt                              // 0 - none, 1 - constant, 2 - linear, 3 -quadratic, 4 - sin, 5 = cos
+
+        val p     = hparam("p").toInt                                   // use the last p values
+        val spec  = hparam("spec").toInt                                // 0 - none, 1 - constant, 2 - linear, 3 -quadratic, 4 - sin, 5 = cos
         val xy    = ARY.buildMatrix (y, hparam, bakcast)
         val yy    = makeMatrix4Y (y, hh, bakcast)
         val fname = if fname_ == null then formNames (spec, p) else fname_
@@ -157,23 +182,24 @@ object ARY_D extends MakeMatrix4TSY:
      *  @param tRng     the time range, if relevant (time index may suffice)
      *  @param hparam   the hyper-parameters
      *  @param bakcast  whether a backcasted value is prepended to the time series (defaults to false)
-     *  @param tForm    the z-transform (rescale to standard normal)
+     *  @param tFormT   the transform for rescaling endogenous and exogenous
      */
     def rescale (y: VectorD, hh: Int, fname_ : Array [String] = null,
                  tRng: Range = null, hparam: HyperParameter = hp,
                  bakcast: Boolean = false,
-                 tForm: VectorD | MatrixD => Transform = x => zForm(x)): ARY_D =
+                 tFormT: TransformT = MinMax): ARY_D =
+
+        if tFormT.name == "NormForm" then hparam("nneg") = 0
 
         val p       = hparam("p").toInt                                 // use the last p values
         val spec    = hparam("spec").toInt                              // 0 - none, 1 - constant, 2 - linear, 3 -quadratic, 4 - sin, 5 = cos
-        val tForm_y = tForm(y)
-        if tForm_y.getClass.getSimpleName == "zForm" then hparam("nneg") = 0
+        val tForm_y = tFormT.form(y)
         val y_scl   = tForm_y.f(y)
-        val tForms: TransformMap = Map ("tForm_y" -> tForm_y)
 
-        val xy    = ARY.buildMatrix (y_scl, hparam, bakcast)
-        val yy    = makeMatrix4Y (y_scl, hh, bakcast)
-        val fname = if fname_ == null then formNames (spec, p) else fname_
+        val tForms = Map ("tForm_y" -> tForm_y)
+        val xy     = ARY.buildMatrix (y_scl, hparam, bakcast)
+        val fname  = if fname_ == null then formNames (spec, p) else fname_
+        val yy     = makeMatrix4Y (y_scl, hh, bakcast)
         new ARY_D (xy, yy, hh, fname, tRng, hparam, bakcast, tForms)
     end rescale
 
@@ -193,11 +219,11 @@ import Example_LakeLevels.y
 
     val hh = 3                                                          // maximum forecasting horizon
     hp("p")    = 3                                                      // endo lags
-    hp("spec") = 2                                                      // trend specification: 0, 1, 2, 3, 5
+    hp("spec") = 1                                                      // trend specification: 0, 1, 2, 3, 5
 
     val mod = ARY_D (y, hh)                                             // create model for time series data
-    mod.inSampleTest ()                                                 // In-Sample Testing
-    println (mod.summary ())                                            // statistical summary
+    mod.inSample_Test ()                                                // In-Sample Testing
+//  println (mod.summary ())                                            // statistical summary  FIX -- crashes
 
 end aRY_DTest
 
@@ -220,7 +246,7 @@ end aRY_DTest
     mod.trainNtest_x ()()                                               // train and test on full dataset
 
     mod.rollValidate ()                                                 // TnT with Rolling Validation
-    mod.diagnoseAll (mod.getY, mod.getYf, Forecaster.teRng (y.dim), 0)   // only diagnose on the testing set
+    mod.diagnoseAll (mod.getY, mod.getYf, Forecaster.teRng (y.dim))     // only diagnose on the testing set
     println (s"Final TnT Forecast Matrix yf = ${mod.getYf}")
 
 end aRY_DTest2
@@ -242,8 +268,8 @@ end aRY_DTest2
     for p <- 1 to 6 do                                                  // number of lags
         hp("p") = p  
         val mod = ARY_D (y, hh)                                         // create model for time series data
-        mod.inSampleTest ()                                             // In-Sample Testing
-        println (mod.summary ())                                        // statictival summary
+        mod.inSample_Test ()                                            // In-Sample Testing
+//      println (mod.summary ())                                        // statistical summary -- FIX crashes
     end for
 
 end aRY_DTest3
@@ -262,12 +288,10 @@ end aRY_DTest3
     val y  = yy(0 until 116)                                            // clip the flat end
     val hh = 6                                                          // maximum forecasting horizon
 
-    for p <- 6 to 6; s <- 1 to 1 do                                     // number of lags; trend
+    for p <- 5 to 5; s <- 1 to 1 do                                     // number of lags; trend
         hp("p")    = p
         hp("spec") = s
-//        val mod = ARY_D (y, hh)                                         // create model for time series data
-        val mod = ARY_D.rescale(y, hh)                                  // create model for time series data
-
+        val mod = ARY_D (y, hh)                                         // create model for time series data
         banner (s"TnT Forecasts: ${mod.modelName} on COVID-19 Dataset")
         mod.trainNtest_x ()()                                           // use customized trainNtest_x
 

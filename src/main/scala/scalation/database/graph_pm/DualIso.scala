@@ -82,7 +82,6 @@ class DualIso (g: Graph, q: Graph)
             if ! φ.isEmpty then
                 matches += φ
                 if matches.size % CHECK == 0 then println ("saltzDualIso: matches so far = " + matches.size)
-            end if
         else if ! φ.isEmpty then
             breakable {
                 for i <- φ (depth) if ! contains (φ, depth, i) do

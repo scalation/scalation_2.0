@@ -16,6 +16,7 @@ package modeling
 import scala.runtime.ScalaRunTime.stringOf
 
 import scalation.mathstat._
+import scalation.theory.Variable
 
 type MatrixI = MatrixD             // MatrixI object exists, MatrixI class uses MatrixD
 
@@ -76,7 +77,7 @@ class RegressionCat (x_ : MatrixD, t: MatrixI, y: VectorD, fname_ : Array [Strin
     if x_.dim != m then flaw ("init", s"dimensions of x_ = ${x_.dim} and y = $m are incompatible")
     if t.dim  != m then flaw ("init", s"dimensions of t  = ${t.dim}  and y = $m are incompatible")
 
-    modelName = s"RegressionCat_${t.dim2}"
+    _modelName = s"RegressionCat_${t.dim2}"
 
     debug ("init", s"$modelName on x_t = $getX, y = $y")
 
@@ -174,15 +175,15 @@ object RegressionCat:
      *  @see `Variable`
      *  Note:  To maintain consistency `Variable` is the only place where values for
      *  dummy variables should be set.
-     *  @param t    the categorical/treatment vector
-     *  @param sht  the amount to shift the vector
-     *  @param tmx  the maximum vector categorical/treatment after shifting
+     *  @param t     the categorical/treatment vector
+     *  @param shft  the amount to shift the vector
+     *  @param tmx   the maximum vector categorical/treatment after shifting
      */
-    def dummyVar (t: VectorI, shf: VectorI = shift, tmx: VectorI = tmax): VectorD =
+    def dummyVar (t: VectorI, shft: VectorI = shift, tmx: VectorI = tmax): VectorD =
         val xd  = new VectorD (tmx.sum)
         var col = 0
         for j <- t.indices do
-            val td = Variable.dummyVar (t(j), shift(j), tmax(j))
+            val td = Variable.dummyVar (t(j), shft(j), tmax(j))
             for k <- td.indices do
                 xd(col) = td(k); col += 1
         end for
@@ -197,7 +198,7 @@ object RegressionCat:
     def stringVec2Dummy (svec: VectorS): MatrixD =
         val ivec = VectorS (svec).map2Int._1                         // VectorS to VectorI
         debug ("stringVec2Dummy", s"svec = $svec -> ivec = $ivec")
-        val imat = MatrixI (ivec).transpose                          // VectorI as column in MatrixI 
+        val imat = MatrixI (ivec).ᵀ                                  // VectorI as column in MatrixI 
         dummyVars (imat)                                             // MatrixD of dummy columns
     end stringVec2Dummy
 
@@ -313,7 +314,8 @@ end regressionCatTest2
 
     val x1 = VectorS ("English", "French", "German", "Spanish")
     val (xe, map) = x1.map2Int                                        // map strings to integers
-    val xm = MatrixI (xe).transpose                                   // form a matrix from vector
+    println (s"map = $map")
+    val xm = MatrixI (xe).ᵀ                                           // form a matrix from vector
     val xd = RegressionCat.dummyVars (xm)                             // make dummy variable columns
 
     println (s"encoded        xe = $xe")                              // encoded
@@ -350,8 +352,7 @@ import Example_AutoMPG.{oxr, y, oxr_fname}
         val (cols, rSq) = mod.selectFeatures (tech)                   // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${oxr.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for Regression with $tech", lines = true)
+        new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for Regression with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 
@@ -383,8 +384,7 @@ end regressionCatTest4
         val (cols, rSq) = mod.selectFeatures (tech)                   // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${oxr.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for RegressionCat with $tech", lines = true)
+        new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for RegressionCat with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 
@@ -424,7 +424,7 @@ end regressionCatTest5
 
     banner ("Encode Dummy Variables")
     val x_enc = VectorI (0, 0, 1, 1, 0)                               // encoded vector
-    val dm    = MatrixI (x_enc).transpose                             // form a dummy matrix (dummy columns) from encoded vector
+    val dm    = MatrixI (x_enc).ᵀ                                     // form a dummy matrix (dummy columns) from encoded vector
     val t     = RegressionCat.dummyVars (dm)
     println (s"encoded        x_enc = $x_enc")                        // encoded vector
     println (s"matrix encoded dm    = $dm")                           // matrix encoded column
@@ -468,7 +468,7 @@ end regressionCatTest6
     println (s"xs = ${stringOf (xs)}")                                // data containing strings
     println (s"y  = $y")                                              // response vector
 
-    val x   = MatrixD (for j <- 0 to 1 yield VectorD.fromValueTypes (xs(j))).transpose 
+    val x   = MatrixD (for j <- 0 to 1 yield VectorD.fromValueTypes (xs(j))).ᵀ 
     val xs2 = VectorS.fromValueTypes (xs(2))
     val dm  = RegressionCat.stringVec2Dummy (xs2)
 

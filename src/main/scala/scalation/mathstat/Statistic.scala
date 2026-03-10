@@ -6,6 +6,25 @@
  *  @see     LICENSE (MIT style license file).
  *
  *  @note    Sample Statistics Collection, Confidence Intervals and Significance Tests
+ *
+ *  Let F be the CDF for the Standard Normal Distribution, p be the probability, and
+ *  y be a critical values for the random variable Y
+ *      F(y) = P{Y <= y}
+ *      p = F(y)     = .975
+ *      y = F-inv(p) = 1.96
+ *  α, the significance level, is the probability of making a Type I error in hypothesis testing, i.e.,
+ *      α = P(reject null hypothesis | null hypothesis is true)
+ *  In ONE-TAIL hypothesis testing, .025 of the mass is in the right tail (unusually large)
+ *  Assuming the data follows the Standard Normal Distribution, how likely is it to see a value >= 1.96
+ *      α = .05
+ *      p = 1 - α = .95
+ *  In TWO-TAIL hypothesis testing, .025 of the mass is in the left tail and .025 is in right tail (unusually extreme)
+ *  Assuming the data follows the Standard Normal Distribution, how likely is it to see a value <= 1.96 or >= 1.96
+ *      α = .05
+ *      p = 1 - α/2 = .975
+ *--------------------------------------------------------------------------
+ *  The confidence level is the probability of NOT making a Type I error
+ *      p_ = 1 - α
  */
 
 package scalation
@@ -15,17 +34,27 @@ import scala.collection.mutable.{ArrayBuffer => VEC}
 //import scala.collection.mutable.{ListBuffer => VEC}
 import scala.math.{abs, sqrt}
 
-private val flaw = flawf ("top")                               // flaw function
+private val flaw = flawf ("top")                           // flaw function
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** Return the critical value for the z-distribution with a confidence level of p_.
+ *  Uses inverse CDF (iCDF) `Quantile.normalInv`.
+ *  @param p_  the confidence level (two tails)
+ */
+def z_crit (p_ : Double = .95): Double =
+    val p = 1.0 - (1.0 - p_) / 2.0                         // e.g., .95 --> .975 (two tails)
+    random.Quantile.normalInv (p)                          // e.g., should return ~ 1.96
+end z_crit
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** Compute the product of the critical value from the z-distribution (Standard
  *  Normal) and the standard deviation of the vector.
  *  @param sig  the standard deviation of the vector/sample
- *  @param p    the confidence level
+ *  @param p_   the confidence level (two tails)
  */
-def z_sigma (sig: Double, p: Double = .95): Double =
-    val pp = 1.0 - (1.0 - p) / 2.0                       // e.g., .95 --> .975 (two tails)
-    val z  = random.Quantile.normalInv (pp)
+def z_sigma (sig: Double, p_ : Double = .95): Double =
+    val p = 1.0 - (1.0 - p_) / 2.0                         // e.g., .95 --> .975 (two tails)
+    val z  = random.Quantile.normalInv (p)
     z * sig
 end z_sigma
 
@@ -34,10 +63,10 @@ end z_sigma
  *  using the z-distribution.
  *  @param sig  the standard deviation of the vector/sample
  *  @param n    the length of the vector/sample
- *  @param p    the confidence level
+ *  @param p_   the confidence level
  */
-def z_interval (sig: Double, n: Int, p: Double = .95): Double =
-    z_sigma (sig, p) / sqrt (n)
+def z_interval (sig: Double, n: Int, p_ : Double = .95): Double =
+    z_sigma (sig, p_) / sqrt (n)
 end z_interval
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -47,27 +76,40 @@ end z_interval
  *  @param mu    the estimated mean of the vector/sample
  *  @param sig   the standard deviation of the vector/sample
  *  @param n     the length of the vector/sample
- *  @param p     the significance/confidence level
+ *  @param p_    the confidence level
  *  @param show  whether to show details of the test
  */
-def z_meanTest (mu0: Double, mu: Double, sig: Double, n: Int, p: Double = .95,
+def z_meanTest (mu0: Double, mu: Double, sig: Double, n: Int, p_ : Double = .95,
                 show: Boolean = true): Boolean =
-    val ihw = z_interval (sig, n, p)
+    val ihw = z_interval (sig, n, p_)
     if show then println (s"z_meanTest: | $mu - $mu0 | <=? $ihw")
     abs (mu - mu0) <= ihw
 end z_meanTest
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** Return the critical value for the t-distribution with a confidence level of p_
+ *  and error degrees of freedom of df.
+ *  Uses inverse CDF (iCDF) `Quantile.studentTInv`.
+ *  @param df  the error degrees of freedom
+ *  @param p_  the confidence level (two tails)
+ */
+def t_crit (df: Int, p_ : Double = .95): Double =
+    if df < 1 then { flaw ("interval", "must have at least 2 observations"); return 0.0 }
+    val p = 1.0 - (1.0 - p_) / 2.0                         // e.g., .95 --> .975 (two tails)
+    random.Quantile.studentTInv (p, df)                    // e.g., @df = 10 should return ~ 2.228
+end t_crit
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** Compute the product of the critical value from the t-distribution and the
  *  standard deviation of the vector.
  *  @param sig  the standard deviation of the vector/sample
- *  @param df   the degrees of freedom
- *  @param p    the confidence level
+ *  @param df   the error degrees of freedom
+ *  @param p_   the confidence level (two tails)
  */
-def t_sigma (sig: Double, df: Int, p: Double = .95): Double =
+def t_sigma (sig: Double, df: Int, p_ : Double = .95): Double =
     if df < 1 then { flaw ("interval", "must have at least 2 observations"); return 0.0 }
-    val pp = 1.0 - (1.0 - p) / 2.0                       // e.g., .95 --> .975 (two tails)
-    val t  = random.Quantile.studentTInv (pp, df)
+    val p = 1.0 - (1.0 - p_) / 2.0                         // e.g., .95 --> .975 (two tails)
+    val t  = random.Quantile.studentTInv (p, df)
     t * sig
 end t_sigma
 
@@ -76,10 +118,10 @@ end t_sigma
  *  using the t-distribution.
  *  @param sig  the standard deviation of the vector/sample
  *  @param n    the length of the vector/sample
- *  @param p    the confidence level
+ *  @param p_   the confidence level
  */
-def t_interval (sig: Double, n: Int, p: Double = .95): Double =
-    t_sigma (sig, n-1, p) / sqrt (n)
+def t_interval (sig: Double, n: Int, p_ : Double = .95): Double =
+    t_sigma (sig, n-1, p_) / sqrt (n)
 end t_interval
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -89,12 +131,12 @@ end t_interval
  *  @param mu    the estimated mean of the vector/sample
  *  @param sig   the standard deviation of the vector/sample
  *  @param n     the length of the vector/sample
- *  @param p     the significance/confidence level
+ *  @param p_    the confidence level
  *  @param show  whether to show details of the test
  */
-def t_meanTest (mu0: Double, mu: Double, sig: Double, n: Int, p: Double = .95,
+def t_meanTest (mu0: Double, mu: Double, sig: Double, n: Int, p_ : Double = .95,
                 show: Boolean = true): Boolean =
-    val ihw = t_interval (sig, n, p)
+    val ihw = t_interval (sig, n, p_)
     if show then println (s"t_meanTest: | $mu - $mu0 | <=? $ihw")
     abs (mu - mu0) <= ihw
 end t_meanTest
@@ -106,6 +148,7 @@ end t_meanTest
  *  TimeStatistic.scala.
  *  @param name      the name for this statistic (e.g., 'waitingTime')
  *  @param unbiased  whether the estimators are restricted to be unbiased
+ *                       set to false for population (or MLE) statistics
  */
 class Statistic (val name: String = "stat", unbiased: Boolean = true):
 
@@ -177,12 +220,12 @@ class Statistic (val name: String = "stat", unbiased: Boolean = true):
     def tallyVec (v: VectorD): Unit = for x <- v do tally (x)
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Return the number of samples.
+    /** Return the number of instances in sample.
      */
     inline def num: Int = n
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Return the number of samples as a double.
+    /** Return the number of instances in sample as a double.
      */
     inline def nd: Double = n.toDouble
 
@@ -233,20 +276,20 @@ class Statistic (val name: String = "stat", unbiased: Boolean = true):
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute the confidence interval half-width for the given confidence level
      *  using the t-distribution.
-     *  @param p  the confidence level
+     *  @param p_  the confidence level
      */
-    def interval (p: Double = .95): Double =
+    def interval (p_ : Double = .95): Double =
         val df = n - 1                                        // degrees of freedom
-        t_sigma (stdev, df, p) / sqrt (nd)
+        t_sigma (stdev, df, p_) / sqrt (nd)
     end interval
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute the confidence interval half-width for the given confidence level
      *  using the z-distribution.
-     *  @param p  the confidence level
+     *  @param p_  the confidence level
      */
-    def interval_z (p: Double = .95): Double =
-        z_sigma (stdev, p) / sqrt (nd)
+    def interval_z (p_ : Double = .95): Double =
+        z_sigma (stdev, p_) / sqrt (nd)
     end interval_z
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -351,6 +394,7 @@ end Statistic
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `statisticTest` main function is used to test the `Statistic` class.
+ *  Test the collection of sample statistics.
  *  > runMain scalation.mathstat.statisticTest
  */
 @main def statisticTest (): Unit =
@@ -361,7 +405,7 @@ end Statistic
 
     banner ("Test sample statistics")
     val stat1 = new Statistic ()
-    for i <- 1 to 1000 do stat1.tally (rv.gen)
+    cfor (0, 1000) { _ => stat1.tally (rv.gen) }
 
     println (Statistic.labels)
     println (stat1)
@@ -369,4 +413,22 @@ end Statistic
     println (s"ma = ${stat1.ma}, rms = ${stat1.rms}")
 
 end statisticTest
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `statisticTest2` main function is used to test the `Statistic` class.
+ *  Show critical values for z- and t-distributions.
+ *  @see www.brockport.edu/live/files/6864-standardnormaldistributiontablepdf
+ *  @see www.stat.purdue.edu/~lfindsen/stat503/t-Dist.pdf
+ *  > runMain scalation.mathstat.statisticTest
+ */
+@main def statisticTest2 (): Unit =
+
+    banner ("Critical Values for z- and t-distributions at p_ = .90 and .95")
+    println ("z_crit (0.90)     = " + z_crit (0.90))
+    println ("z_crit ()         = " + z_crit ())
+    println ("t_crit (10, 0.90) = " + t_crit (10, 0.90))
+    println ("t_crit (10)       = " + t_crit (10))
+
+end statisticTest2
 

@@ -74,7 +74,6 @@ class Optimizer_Adam extends Optimizer:
                 go = false
             else
                 if epoch % ADJUST_PERIOD == 0 then eta *= ADJUST_FACTOR   // adjust the learning rate
-            end if
         } // cfor
 
         //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -89,7 +88,7 @@ class Optimizer_Adam extends Optimizer:
             val yp = f.fM(b * x)                                          // prediction: Yp = f(XB)
             val ε  = yp - y                                               // negative of error matrix
             val δ  = f.dM(yp) ⊙ ε                                         // delta matrix for y
-            val g  = x.𝐓 * δ                                              // + b.w * l -- gradient matrix (transpose (𝐓))
+            val g  = x.ᵀ * δ                                              // + b.w * l -- gradient matrix (transpose (ᵀ))
 
             p = g * (1 - β1) + p * β1                                     // update biased first moment estimate
             v = v * β2 + g ~^ 2 * (1 - β2)                                // update biased second raw moment estimate
@@ -162,7 +161,6 @@ class Optimizer_Adam extends Optimizer:
                 go = false
             else
                 if epoch % ADJUST_PERIOD == 0 then eta *= ADJUST_FACTOR   // adjust the learning rate
-            end if
         } // cfor
 
         //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -179,8 +177,8 @@ class Optimizer_Adam extends Optimizer:
             val δ1 = f1.dM(yp) ⊙ ε                                        // delta matrix for y
             val δ0 = f.dM(z) ⊙ (δ1 * b.w.transpose)                       // delta matrix for z
 
-            val gA = x.𝐓 * δ0                                             // gradient for a (transpose (𝐓))
-            val gB = z.𝐓 * δ1                                             // gradient for b
+            val gA = x.ᵀ * δ0                                             // gradient for a (transpose (ᵀ))
+            val gB = z.ᵀ * δ1                                             // gradient for b
 
             // Update biased first moment estimates for a and b
             pA = gA * (1 - β1) + pA * β1
@@ -284,7 +282,6 @@ class Optimizer_Adam extends Optimizer:
                 go = false
             else
                 if epoch % ADJUST_PERIOD == 0 then eta *= ADJUST_FACTOR   // adjust the learning rate
-            end if
         } // cfor
 
         //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -306,7 +303,7 @@ class Optimizer_Adam extends Optimizer:
             val α = eta / x.dim                                           // learning rate scaled by batch size
 
             for l <- layers do
-                val g = z(l).𝐓 * δ(l)                                     // compute the gradient for each layer (transpose (𝐓))
+                val g = z(l).ᵀ * δ(l)                                     // compute the gradient for each layer (transpose (ᵀ))
                 val g_bias = δ(l).mean                                    // compute the gradient for the biases
 
                 p(l) = g * (1 - β1) + p(l) * β1                           // update biased first moment estimates for weights

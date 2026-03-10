@@ -93,7 +93,7 @@ object Radau
         val lu    = ident - jacob * (root6 * h / 6.0)
 
         breakable {
-            for k <- 1 to MAX_ITER do
+            for _ <- 1 to MAX_ITER do
                 val fg = new VectorD (f.length)
                 for i <- fg.indices do fg(i) = f(i) (tn_1 + h1_3, gn)
                 val fy = new VectorD (f.length)

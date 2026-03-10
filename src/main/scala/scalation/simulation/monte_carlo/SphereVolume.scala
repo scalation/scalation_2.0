@@ -35,7 +35,7 @@ import scalation.random.Random
     val r     = Random ()
     var count = 0
 
-    for i <- 1 to n if inSphere (r.gen, r.gen, r.gen) do count += 1
+    cfor (0, n) { _ => if inSphere (r.gen, r.gen, r.gen) then count += 1 }
     println (s"Sphere Volume = ${(8.0 * count) / n.toDouble}")
 
 end sphereVolumeTest

@@ -19,9 +19,11 @@ import scala.math._
  */
 object Calc:
 
-//  def f(x: Double): Double = 6.67408E-11 * 5.97219E24 * x / 6.371E6~^2 + log (1.0)
+    def f(x: Double): Double = 6.67430E-11 * 5.97219E24 * x / 6.371E6~^2
 
-    def f(x: Double): Double = ceil (log10 (x / 9.0))
+    def f2(x: Double): Double = 6.67408E-11 * 5.97219E24 * x / 6.371E6~^2 + log (1.0)
+
+//  def f(x: Double): Double = ceil (log10 (x / 9.0))
 
 end Calc
 

@@ -264,7 +264,6 @@ object QCurve:
             val dist = bend * distance (p1.x, p1.y, p2.x, p2.y)
             if m.isInfinity then new R2 (mid.x + dist, mid.y)
             else new R2 (mid.x + dist * m / sqrt (1.0 + pow (m, 2)), mid.y - dist / sqrt (1.0 + pow (m, 2)))
-            end if
         end if
     end calcControlPoint
 

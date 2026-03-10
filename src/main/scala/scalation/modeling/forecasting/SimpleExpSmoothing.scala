@@ -41,17 +41,19 @@ import Example_LakeLevels.y
 class SimpleExpSmoothing (y: VectorD, hh: Int, tRng: Range = null,
                           hparam: HyperParameter = SimpleExpSmoothing.hp,
                           bakcast: Boolean = false)  
-      extends Forecaster (y, hh, tRng, hparam, bakcast):
+      extends Forecaster (y, hh, tRng, hparam, bakcast)
+         with Filter (y)
+         with NoSubModels:
 
     private val TOL   = 1E-4                                             // tolerance
     private val lo_up = makeBounds (1, 0.0, 1.05)                        // lower & upper bounds on α for optimizer (1.0 + slack)
 
-    private var α     = hparam ("α").toDouble                            // default value for the smoothing parameter
+    private var α     = hparam("α").toDouble                             // default value for the smoothing parameter
     private var s     = VectorD.nullv                                    // vector of smoothed/leveled values (state)
 //  private val sf    = new VectorD (y.dim)                              // to hold smooth values for a forecast horizon
-    private var opt   = true                                             // whehther to optimize the smoothing parameter
+    private var opt   = true                                             // whether to optimize the smoothing parameter
 
-    modelName = "SimpleExpSmoothing"
+    _modelName = "SimpleExpSmoothing"
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Reset the smoothing parameter α.
@@ -68,11 +70,11 @@ class SimpleExpSmoothing (y: VectorD, hh: Int, tRng: Range = null,
     /** Smooth the time-series data y, returning the leveled/smoothed data s.
      *  May be viewed as unoptimized training.
      *  @see Smoothing Equation in section 7.1.
-     *      s_t+1 = α y_t + (1 - α) s_t                                // smoothing equation
-     *  @param a   the smoothing parameter (decay rate for older values)
+     *      s_t+1 = α y_t + (1 - α) s_t                                  // smoothing equation
      *  @param y_  the response/output vector (training/full)
+     *  @param a   the smoothing parameter (decay rate for older values)
      */
-    def smooth (a: Double = α, y_ : VectorD = y): VectorD =
+    def smooth (y_ : VectorD = y, a: Double = α): VectorD =
         s = new VectorD (y_.dim)
         s(0) = y(0)
         for t <- 0 until y_.dim-1 do s(t+1) = a * y_(t) + (1 - a) * s(t)
@@ -87,15 +89,14 @@ class SimpleExpSmoothing (y: VectorD, hh: Int, tRng: Range = null,
      */
     override def train (x_null: MatrixD, y_ : VectorD): Unit =
 
-        def f_obj (x: VectorD): Double = (y_ - smooth (x(0), y_)).normSq   // only one parameter
+        def f_obj (x: VectorD): Double = (y_ - smooth (y_, x(0))).normSq   // only one parameter
 
         if opt then
             val optimizer = new Optimizer (f_obj, l_u = lo_up)             // Bounded Quasi-Newton optimizer
 //          val optimizer = new Optimizer (f_obj)                          // Quasi-Newton optimizer
             val opt = optimizer.solve (VectorD (α), toler = TOL)           // optimize value for α
             α = (opt._2)(0)                                                // pull α from vector result
-        end if
-        s = smooth (α)
+        s = smooth (y_, α)
     end train
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

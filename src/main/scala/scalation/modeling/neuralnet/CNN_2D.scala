@@ -17,6 +17,8 @@ package scalation
 package modeling
 package neuralnet
 
+import scala.collection.mutable.IndexedSeq
+
 import scalation.mathstat._
 
 import ActivationFun._
@@ -43,7 +45,7 @@ class CNN_2D (x: TensorD, y: MatrixD, fname_ : Array [String] = null,
               f: AFF = f_reLU, f1: AFF = f_reLU,
               val itran: FunctionM2M = null)
       extends Model                                         // FIX: need a trait like `PredictorMV` at the tensor level
-         with Fit (dfm = x.dim2 - 1, df = x.dim - x.dim2):
+         with Fit (dfr = x.dim2 - 1, df = x.dim - x.dim2):
 
     private val debug     = debugf ("CNN_2D", true)                       // debug function
     private val flaw      = flawf ("CNN_2D")                              // flaw function
@@ -62,7 +64,7 @@ class CNN_2D (x: TensorD, y: MatrixD, fname_ : Array [String] = null,
     private val fT = tensorize (f.f_)                                     // activation function at tensor level
     private val dT = tensorize (f.d)                                      // activation derivative at tensor level
 
-    modelName = s"CNN_2D_${f.name}_${f1.name}"
+    _modelName = s"CNN_2D_${f.name}_${f1.name}"
 
     println (s"Create a CNN_2D with $n input, $nf filters and $ny output nodes")
 
@@ -74,29 +76,35 @@ class CNN_2D (x: TensorD, y: MatrixD, fname_ : Array [String] = null,
      *  For convenience, these are usable as stub implementations.
      *  FIX - put in new trait
      */
-    def crossValidate(k: Int, rando: Boolean): Array[scalation.mathstat.Statistic] = ???
-    def getFname: Array[String] = ???
-    def getX: scalation.mathstat.MatrixD = ???
-    def getY: scalation.mathstat.VectorD = ???
-    def hparameter: scalation.HyperParameter = ???
-    def parameter: scalation.mathstat.VectorD | scalation.mathstat.MatrixD = ???
-    def predict(z: scalation.mathstat.VectorD): Double | scalation.mathstat.VectorD = ???
-    def test (x_ : scalation.mathstat.MatrixD, y_ : scalation.mathstat.VectorD): (
-        scalation.mathstat.VectorD, scalation.mathstat.VectorD) = ???
-    def train(x_ : scalation.mathstat.MatrixD, y_ : scalation.mathstat.VectorD): Unit = ???
+    def crossValidate (k: Int, rando: Boolean): Array [Statistic] = ???
+    def getBest: BestStep = ???
+    def getFname: Array [String] = ???
+    def getX: MatrixD = ???
+    def getY: VectorD = ???
+    def hparameter: HyperParameter = ???
+    def parameter: VectorD | MatrixD = ???
+    def predict (z: VectorD): Double | VectorD = ???
+    def test (x_ : MatrixD, y_ : VectorD): (VectorD, VectorD) = ???
+    def train (x_ : MatrixD, y_ : VectorD): Unit = ???
+    def inSample_Test(skip: Int, showYp: Boolean): Unit = ???
+    def validate (rando: Boolean, ratio: Double) (idx: IndexedSeq [Int]):
+                 (VectorD | MatrixD, VectorD | MatrixD) = ???
+
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Filter the i-th input vector with the f-th filter.
      *  @param i  the index of the i-th row of the matrix
      *  @param f  the index of the f-th filter
      */
-    def filter (i: Int, f: Int): MatrixD =
+    def filter (i: Int, f: Int): MatrixD = ???
+/*
         val xi = x(i)
 //      val ft = filt(f)
         val xf = new MatrixD (xi.dim - nc + 1, xi.dim - nc + 1)
 //      for j <- xf.indices fo xf(j) = ft.dot (xi, j)
         xf
     end filter
+*/
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Update filter f's parameters.
@@ -129,7 +137,7 @@ class CNN_2D (x: TensorD, y: MatrixD, fname_ : Array [String] = null,
             val yp = f1.fM (b * z)                                        // Yp = f1(ZB)
             val ε  = yp - y                                               // negative error E  = Yp - Y
             val δ1 = f1.dM (yp) ⊙ ε                                       // delta matrix for y
-            val δ0 = dT (φ).flatten ⊙ (δ1 * b.w.𝐓)                        // delta matrix for φ (transpose (𝐓))
+            val δ0 = dT (φ).flatten ⊙ (δ1 * b.w.ᵀ)                        // delta matrix for φ (transpose (ᵀ))
             CNN_2D.updateParam (x_, z, δ0, δ1, eta, c, b)
 
             val sse = (y_ - yp).normFSq                                   // loss = sum of squared errors
@@ -149,11 +157,13 @@ class CNN_2D (x: TensorD, y: MatrixD, fname_ : Array [String] = null,
      *  @param x_  the training/full data/input matrix
      *  @param y_  the training/full response/output matrix
      */
-    def train2 (x_ : TensorD = x, y_ : MatrixD = y): Unit =
+    def train2 (x_ : TensorD = x, y_ : MatrixD = y): Unit = ???
+/*
         val epochs = 0 // optimize3 (x_, y_, c, b, eta, bSize, maxEpochs, f, f1)    // FIX: optimize parameters c, b
         println (s"ending epoch = $epochs")
 //      estat.tally (epochs._2)
     end train2
+*/
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Test a predictive model y_ = f(x_) + e and return its QoF vector.
@@ -167,7 +177,8 @@ class CNN_2D (x: TensorD, y: MatrixD, fname_ : Array [String] = null,
         val yp = predict (x_)                                             // make predictions
         val yy = if itran == null then y_ else itran (y_)                 // undo scaling, if used
         e = yy - yp                                                       // RECORD the residuals/errors (@see `Predictor`)
-        val qof = MatrixD (for k <- yy.indices2 yield diagnose (yy(?, k), yp(?, k))).𝐓   // transpose (𝐓)
+        debug ("test", s"e = $e")
+        val qof = MatrixD (for k <- yy.indices2 yield diagnose (yy(?, k), yp(?, k))).ᵀ   // transpose (ᵀ)
         (yp, qof)                                                         // return predictions and QoF vector
     end test
 
@@ -186,9 +197,10 @@ class CNN_2D (x: TensorD, y: MatrixD, fname_ : Array [String] = null,
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Build a sub-model that is restricted to the given columns of the data matrix.
      *  @param x_cols  the columns that the new model is restricted to
+     *  @param fname2  the variable/feature names for the new model (defaults to null)
      */
-    def buildModel (x_cols: TensorD): CNN_2D =
-        new CNN_2D (x_cols, y, null, nf, nc, hparam, f, f1, itran)
+    def buildModel (x_cols: TensorD, fname2: Array [String] = null): CNN_2D =
+        new CNN_2D (x_cols, y, fname2, nf, nc, hparam, f, f1, itran)
     end buildModel
 
 end CNN_2D
@@ -237,15 +249,17 @@ object CNN_2D extends Scaling:
      *  @param c   the convolution filter matrix
      *  @param b   the fully-connectd layer parameters
      */
-    def updateParam (x_ : TensorD, z: MatrixD, δ0: MatrixD, δ1: MatrixD, η: Double, c: MatrixD, b: NetParam) =
+    def updateParam (x_ : TensorD, z: MatrixD, δ0: MatrixD, δ1: MatrixD, η: Double, c: MatrixD, b: NetParam) = ???
+/*
         for j <- c.indices do
             var sum = 0.0
             sum += 0                                                      // remove after FIX
 //          for i <- x_.indices; h <- z.indices2 do sum += x_(i, h+j) * δ0(i, h)  // FIX: c now a matrix, x_ a tensor
             c(j) -= (sum / x_.dim) * η                                    // update c weights in conv filter 
         end for
-        b -= (z.𝐓 * δ1 * η, δ1.mean * η)                                  // update b weights & biases (transpose 𝐓)
+        b -= (z.ᵀ * δ1 * η, δ1.mean * η)                                  // update b weights & biases (transpose ᵀ)
     end updateParam
+*/
 
 end CNN_2D
 
@@ -290,7 +304,7 @@ end CNN_2D
         val yp = f1.fM (φ *: b)                                           // Yp = f1(φB)  -- use *: as b is NetParam
         val ε  = yp - y                                                   // negative error E  = Yp - Y
         val δ1 = f1.dM (yp) ⊙ ε                                           // delta matrix for y
-        val δ0 = f.dM (φ) ⊙ (δ1 * b.w.𝐓)                                  // delta matrix for φ (transpose (𝐓))
+        val δ0 = f.dM (φ) ⊙ (δ1 * b.w.ᵀ)                                  // delta matrix for φ (transpose (ᵀ))
 
         println (s"feature map φ  = $φ")
         println (s"response    yp = $yp")
@@ -379,4 +393,82 @@ end cNN_2DTest2
     println ("TBD")
 
 end cNN_2DTest3
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `cNN_2DTest4` main function is used to test the `CNN_2D` class.
+ *  It counts the number of learnable parameters in a CCN. 
+ *  > runMain scalation.modeling.neuralnet.cNN_2DTest4
+ */
+@main def cNN_2DTest4 (): Unit =
+
+    var isize = 0
+
+    def clayer (nfilter: Int, sfilter: Int, nchan: Int): Int =
+        val np = nfilter * (sfilter~^2 * nchan + 1)
+        println (s"clayer ($nfilter, $sfilter, $nchan) = $np")
+        np
+
+    def fclayer (isize: Int, osize: Int): Int =
+        val np = (isize + 1) * osize
+        println (s"fclayer ($isize, $osize) = $np")
+        np
+
+    banner ("1.  clayer1 -> fclayer1: 1476")
+    isize = 12~^2
+    println (clayer (1, 5, 1) + fclayer (isize, 10))
+
+    banner ("2.  clayer1 -> clayer2 -> fclayer1 -> fclayer2: 1199882")
+    isize = 64 * 12~^2
+    println (clayer (32, 3, 1) + clayer (64, 3, 32) + fclayer (isize, 128) + fclayer (128, 10))
+
+    banner ("3.  clayer1 -> clayer2 -> fclayer1 -> fclayer2: 421642")
+    isize = 64 * 7~^2
+    println (clayer (32, 3, 1) + clayer (64, 3, 32) + fclayer (isize, 128) + fclayer (128, 10))
+
+    banner ("4.  clayer1 -> clayer2 -> fclayer1 -> fclayer2: 503562")
+    isize = 64 * 7~^2
+    println (clayer (32, 3, 1) + clayer (64, 7, 32) + fclayer (isize, 128) + fclayer (128, 10))
+
+    banner ("5.  clayer1 -> clayer2 -> fclayer1 -> fclayer2: 52138")
+    isize = 16 * 7~^2
+    println (clayer (8, 3, 1) + clayer (16, 3, 8) + fclayer (isize, 64) + fclayer (64, 10))
+
+    banner ("6.  clayer1 -> clayer2 -> fclayer1 -> fclayer2: 105194")
+    isize = 16 * 7~^2
+    println (clayer (8, 5, 1) + clayer (16, 5, 8) + fclayer (isize, 128) + fclayer (128, 10))
+
+    banner ("7.  clayer1 -> clayer2 -> fclayer1 -> fclayer2: 68714")
+    isize = 20 * 7~^2
+    println (clayer (10, 5, 1) + clayer (20, 5, 10) + fclayer (isize, 64) + fclayer (64, 10))
+
+    banner ("8.  clayer1 -> clayer2 -> fclayer1 -> fclayer2: 454922")
+    isize = 64 * 7~^2
+    println (clayer (32, 5, 1) + clayer (64, 5, 32) + fclayer (isize, 128) + fclayer (128, 10))
+
+    banner ("9.  clayer1 -> clayer2 -> fclayer1: 83466")
+    isize = 64 * 7~^2
+    println (clayer (32, 5, 1) + clayer (64, 5, 32) + fclayer (isize, 10))
+
+    banner ("10. clayer1 -> fclayer1: 23466")
+    isize = 16 * 12~^2
+    println (clayer (16, 5, 1) + fclayer (isize, 10))
+
+    banner ("11. clayer1 -> fclayer1: 15770")
+    isize = 8 * 14~^2
+    println (clayer (8, 3, 1) + fclayer (isize, 10))
+
+    banner ("12. clayer1 -> clayer2 -> fclayer1: 34794")
+    isize = 32 * 7~^2
+    println (clayer (64, 3, 1) + clayer (32, 3, 64) + fclayer (isize, 10))
+
+    banner ("13.  clayer1 -> clayer2 -> fclayer1 -> fclayer2: 225034")
+    isize = 64 * 5~^2
+    println (clayer (32, 3, 1) + clayer (64, 3, 32) + fclayer (isize, 128) + fclayer (128, 10))
+
+    banner ("14.  clayer1 -> clayer2 -> fclayer1 -> fclayer2: 52138")
+    isize = 16 * 7~^2
+    println (clayer (8, 3, 1) + clayer (16, 3, 8) + fclayer (isize, 128) + fclayer (128, 10))
+
+end cNN_2DTest4
 

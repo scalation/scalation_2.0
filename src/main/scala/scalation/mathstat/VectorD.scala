@@ -17,10 +17,9 @@ package mathstat
 //import java.lang.foreign.ValueLayout.JAVA_DOUBLE
 import java.util.Arrays.copyOf
 
-import scala.collection.immutable.{IndexedSeq => IIndexedSeq}
-import scala.collection.immutable.Set
-import scala.collection.generic._
-import scala.collection.mutable._
+import scala.collection.generic.DefaultSerializable
+import scala.collection.immutable.{IndexedSeq => IIndexedSeq, Set}
+import scala.collection.mutable.{ArrayBuffer, IndexedSeq}
 import scala.runtime.ScalaRunTime.stringOf
 import scala.util.control.Breaks.{break, breakable}
 
@@ -57,7 +56,6 @@ class VectorD (val dim: Int,
     else if dim > v.length then
         flaw ("init", s"vector dimension is larger than space: dim = $dim > v.length = ${v.length}")
         assert (dim <= v.length)                                  // make this a fatal flaw
-    end if
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the length of this vector.
@@ -149,6 +147,13 @@ class VectorD (val dim: Int,
     override def drop (n: Int = 1): VectorD = new VectorD (dim - n, v.drop (n))
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return a vector containing all but the last n elements of this vector.
+     *  @author Yousef Fekri Dabanloo
+     *  @param n  the number of elements to be dropped
+     */
+    override def dropRight (n: Int = 1): VectorD = new VectorD (dim - n, v.dropRight (n))
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Split the elements from this vector to form two vectors:  one from the elements in
      *  idx (e.g., testing set) and the other from elements not in idx (e.g., training set).
      *  Note split and split_ produce different element orders.
@@ -216,24 +221,35 @@ class VectorD (val dim: Int,
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Update the i-th element (or in range) of this vector.
      *  @param i  the index of the element to update
-     *  @param a  the updated value to assign
+     *  @param a  the updated value to be assigned
      */
     def update (i: Int, a: Double): Unit = v(i) = a
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Update the i-th element (or in range) of this vector.
      *  @param i  the index of the element to update
-     *  @param a  the update value to assign
+     *  @param a  the update value to be assigned
      */
     def update (r: Range, a: Double): Unit = cfor (r) { i => v(i) = a }
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Update the i-th element (or in range) of this vector.
      *  @param i  the index of the element to update
-     *  @param y  the update vector/indexed sequence to assign
+     *  @param y  the update vector/indexed sequence to be assigned
      */
     def update (r: Range, y: VectorD): Unit = cfor (r) { i => v(i) = y.v(i) }
     def update (r: Range, y: IndexedSeq [Double]): Unit = cfor (r) { i => v(i) = y(i) }
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Update all the element of this vector and return this updated vector.
+     *  @param y  the other vector to be assigned
+     *
+    def := (y: VectorD): VectorD = 
+       if y.dim != dim then flaw (":=", s"dimension dim = $dim != y.dim = ${y.dim}")
+       v = y.v
+       this
+    end :=
+     */
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Set all elements in this vector to scalar zero.
@@ -335,10 +351,10 @@ class VectorD (val dim: Int,
     /** Compute the element-wise sum (or difference, product, quotient) of this and scalar a.
      *  @param a  the scalar second operand
      */
-    def + (a: Double): VectorD = new VectorD (dim, cfor (dim) { i => v(i) + a })
-    def - (a: Double): VectorD = new VectorD (dim, cfor (dim) { i => v(i) - a })
-    def * (a: Double): VectorD = new VectorD (dim, cfor (dim) { i => v(i) * a })
-    def / (a: Double): VectorD = new VectorD (dim, cfor (dim) { i => v(i) / a })
+    inline def + (a: Double): VectorD = new VectorD (dim, cfor (dim) { i => v(i) + a })
+    inline def - (a: Double): VectorD = new VectorD (dim, cfor (dim) { i => v(i) - a })
+    inline def * (a: Double): VectorD = new VectorD (dim, cfor (dim) { i => v(i) * a })
+    inline def / (a: Double): VectorD = new VectorD (dim, cfor (dim) { i => v(i) / a })
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute the element-wise sum (or difference, product, quotient) of vectors this and y.
@@ -381,9 +397,16 @@ class VectorD (val dim: Int,
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute the element-wise power function of this vector raised to scalar a.
-     *  @param  the scalar second operand
+     *  @param a  the scalar second operand (double)
      */
     def ~^ (a: Double): VectorD = new VectorD (dim, cfor (dim) { i => v(i) ~^ a })
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the element-wise power function of this vector raised to scalar a.
+     *  Extended to handle a negative base.
+     *  @param a  the scalar second operand (rational number)
+     */
+    def ↑ (a: Rat): VectorD = new VectorD (dim, cfor (dim) { i => v(i) ↑ a })
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Determine whether this vector and vector y are nearly equal.
@@ -528,18 +551,18 @@ class VectorD (val dim: Int,
         sum
     end dot
 
-    inline def ∙ (y: VectorD): Double = dot (y)                 // unicode bullet point
+    inline def ∙ (y: VectorD): Double = dot (y)                 // Unicode bullet point
 
-    inline def ∙ (y: IndexedSeq [Double]): Double = dot (y)     // unicode bullet point
+    inline def ∙ (y: IndexedSeq [Double]): Double = dot (y)     // Unicode bullet point
 
-    inline def ∙ (y: IIndexedSeq [Double]): Double = dot (y)    // unicode bullet point
+    inline def ∙ (y: IIndexedSeq [Double]): Double = dot (y)    // Unicode bullet point
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the 'valid' (no padding) convolution of cofilter vector c and input vector x.
      *  Take the dot product of c (this) with a slice of x, shift by one and repeat.
      *  Usage:  c conv x
      *  Caveat:  does not include reversal.
-     *  @see `scalation.modeling.neuralnet.CoFilter_1D
+     *  @see `scalation.modeling.neuralnet.CoFilter_1D`
      *  @param x  the input/data vector
      */
     infix def conv (x: VectorD): VectorD =
@@ -560,15 +583,16 @@ class VectorD (val dim: Int,
     inline infix def conv_ (x: VectorD): VectorD = reverse.conv (x)
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Return the 'same' (with padding) convolution of cofilter vector c and input vector x.
+    /** Return the 'same' (with zero padding) convolution of cofilter vector c and
+     *  input vector x.
      *  Same means that the size of the result is the same as the input.
      *  Usage:  c convs x
      *  @param x  the input/data vector
-     */
+     */  
     infix def convs (x: VectorD): VectorD =
         val y = new VectorD (x.dim)
         cfor (y.indices) { k =>
-            y(k) = Σ (indices) { j => if k-j in (0, x.dim-1) then v(j) * x(k-j) else 0.0 }
+            cfor (indices) { j => if k+j > 0 && k+j <= x.dim then y(k) += v(j) * x(k+j-1) }
         } // cfor
         y
     end convs
@@ -577,6 +601,7 @@ class VectorD (val dim: Int,
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the 'full' convolution of cofilter vector c and input vector x.
+     *  @note:  `convf` is less common than `conv` or convs`
      *  @param x  the input/data vector
      */
     infix def convf (x: VectorD): VectorD =
@@ -722,6 +747,17 @@ class VectorD (val dim: Int,
     def norm1: Double = v.fold (0.0)((s, e) => s + math.abs (e))
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the q-norm (with the root) of this vector, i.e., ||x||_q^q
+     *  @param q  the power (^q) to apply to each element e
+     */
+    def norm_qq (q: Double): Double = v.fold (0.0)((s, e) => s + math.abs (e~^q))
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the infinity norm (max absolute value) of this vector.
+     */
+    def normInf: Double = math.max (math.abs (min), math.abs (max))
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the vector that is the element-wise absolute value of this vector.
      */
     def abs: VectorD = map (math.abs (_))
@@ -756,6 +792,26 @@ class VectorD (val dim: Int,
     /** Exp transform this vector by using math.expm1 (the inverse of log1p).
      */
     def expm1: VectorD = map (math.expm1 (_))
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Cos transform this vector by using math.cos (the inverse of acos).
+     */
+    def cos: VectorD = map (math.cos (_))
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Inverse cos transform this vector by using math.acos (the inverse of cos).
+     */
+    def acos: VectorD = map (math.acos (_))
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Sin transform this vector by using math.sin (the inverse of asin).
+     */
+    def sin: VectorD = map (math.sin (_))
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Inverse sin transform this vector by using math.asin (the inverse of sin).
+     */
+    def asin: VectorD = map (math.asin (_))
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the vector containing the mid-points between adjacent elements.
@@ -874,6 +930,11 @@ class VectorD (val dim: Int,
     end quantile
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the first Q1 (1/4) and third Q3 (3/4) quartiles.  Note: IQR = Q3 - Q1.
+     */
+    def q1_q3: VectorD = VectorD (quantile (0.25), quantile (0.75)) 
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute the averaged median, which is the median when dim is odd and
      *  the average of the median and the next k-median when dim is even.
      */
@@ -903,7 +964,7 @@ class VectorD (val dim: Int,
             var (p_, r_) = (p, r)                          // use local cursors
             while p_ < r_ do
                 val pivot = ipartition (rk, p_, r_)        // partition into left (<=) and right (>=)
-                if pivot - p_ < r_ - pivot then            // recurse on the smaller subarray
+                if pivot - p_ < r_ - pivot then            // recurse on the smaller sub-array
                     iqsort (rk, p_, pivot - 1)             // recursively sort left partition
                     p_ = pivot + 1
                 else
@@ -994,7 +1055,6 @@ class VectorD (val dim: Int,
             if v(j) < v(k) then j else if v(i) < v(k) then k else i
         else
             if v(j) > v(k) then j else if v(i) > v(k) then k else i
-        end if
     end med3
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -1280,6 +1340,12 @@ object VectorD:
     def apply (x: Double, xs: Double*): VectorD = new VectorD (xs.size + 1, x +: xs.toArray)
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Create a `VectorD` from a 2-tuple of doubles (`Double`, `Double`).
+     *  @param x_y  the 2-tuple of doubles
+     */
+    def apply (x_y: (Double, Double)): VectorD = new VectorD (2, Array (x_y._1, x_y._2))
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Create a `VectorD` from one or more values (repeated values String*).
      *  For numeric types, assign missing value indicator upon format failure.
      *  @param x   the first string
@@ -1364,17 +1430,18 @@ end VectorD
  *  operations, so that one can write 2.0 + x as well as x + 2.0.
  */
 object VectorDOps:
-    extension (a: Double)
 
-        //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-        /** Compute the element-wise sum (or difference, product, quotient) of scalar a and vector x.
-         *  @param a  the scalar first operand
-         *  @param x  the vector second operand
-         */
-        def + (x: VectorD): VectorD = x + a
-        def - (x: VectorD): VectorD = -x + a
-        def * (x: VectorD): VectorD = x * a
-        def / (x: VectorD): VectorD = x.recip * a
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Extension methods for `Double` <+> `VectorD`.  Compute the element-wise sum
+     *  (or difference, product, quotient) of scalar a and vector x.
+     *  @param a  the scalar first operand
+     *  @param x  the vector second operand
+     */
+    extension (a: Double)
+        inline def + (x: VectorD): VectorD = x + a
+        inline def - (x: VectorD): VectorD = -x + a
+        inline def * (x: VectorD): VectorD = x * a
+        inline def / (x: VectorD): VectorD = x.recip * a
 
 end VectorDOps
 

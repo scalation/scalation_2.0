@@ -59,7 +59,6 @@ class MarkovClusterer (t: MatrixD, k: Int = 2, r: Double = 2.0)
                     clustr(j) = group                              // assign node j to this group
                     force(j) = t(i, j)                             // make t(i, j) the new force
                     found = true                                   // a group was found for this row
-                end if
             end for
             if found then group += 1                               // increment the group number
         end for
@@ -126,7 +125,6 @@ class MarkovClusterer (t: MatrixD, k: Int = 2, r: Double = 2.0)
                     sum   += t(i, j)                    // collect sum
                     sumSq += t(i, j) * t(i, j)          // collect sum of squares
                     n += 1.0
-                end if
             end for
 
             for i <- t.indices do t(i, j) /= sum                    // normalize

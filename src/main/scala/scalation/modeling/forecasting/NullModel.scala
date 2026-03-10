@@ -35,9 +35,10 @@ import Example_LakeLevels.y
 class NullModel (y: VectorD, hh: Int, tRng: Range = null,
                  hparam: HyperParameter = null,
                  bakcast: Boolean = false)
-      extends Forecaster (y, hh, tRng, hparam, bakcast):
+      extends Forecaster (y, hh, tRng, hparam, bakcast)
+         with NoSubModels:
 
-    modelName = s"NullModel"
+    _modelName = "NullModel"
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Given a time series y_, train the forecasting function y_ = f(lags (y_)) + e,

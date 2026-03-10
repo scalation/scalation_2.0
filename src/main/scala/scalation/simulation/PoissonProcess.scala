@@ -5,7 +5,7 @@
  *  @date    Wed Aug 25 15:38:28 EDT 2021
  *  @see     LICENSE (MIT style license file).
  *
- *  @note    Poisson Process
+ *  @note    Poisson Process (Counting Process with Exponential Inter-arrival Times)
  */
 
 package scalation

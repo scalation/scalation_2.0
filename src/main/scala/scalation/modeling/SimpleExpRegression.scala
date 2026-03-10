@@ -11,6 +11,8 @@
 package scalation
 package modeling
 
+// FIX -- option to include intercept and improve model accuracy
+
 import scala.math.exp
 
 import scalation.mathstat._
@@ -29,7 +31,7 @@ import scalation.mathstat._
 class SimpleExpRegression (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
                            hparam: HyperParameter = null, nonneg: Boolean = true)
       extends Predictor (x, y, fname_, hparam)
-         with Fit (dfm = 1, df = x.dim - 2)
+         with Fit (dfr = 1, df = x.dim - 2)
          with NoSubModels:
 
     private val debug     = debugf ("SimpleExpRegression", true)         // debug function
@@ -37,12 +39,14 @@ class SimpleExpRegression (x: MatrixD, y: VectorD, fname_ : Array [String] = nul
     private val cutoff    = 1E-5                                         // cutoff threshold
     private val eta       = 0.00005                                      // the learning/convergence rate (requires adjustment)
     private val maxEpochs = 1000                                         // the maximum number of training epcochs/iterations
-//  private val eta       = hparam ("eta")                               // the learning/convergence rate (requires adjustment)
-//  private val maxEpochs = hparam ("maxEpochs").toInt                   // the maximum number of training epcochs/iterations
+//  private val eta       = hparam("eta")                                // the learning/convergence rate (requires adjustment)
+//  private val maxEpochs = hparam("maxEpochs").toInt                    // the maximum number of training epcochs/iterations
 
-    modelName = "SimpleExpRegression"
+    _modelName = "SimpleExpRegression"
 
     if nonneg && ! y.isNonnegative then flaw ("init", "response vector y must be nonnegative")
+
+    override def getBest: BestStep = super [NoSubModels].getBest
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** The estimated response value at point xi.
@@ -182,6 +186,7 @@ end SimpleExpRegression
     println (s"x_ = $x_")
 
     val mod = new SimpleExpRegression (x_, y)                            // create a model
+//  val mod = new SimpleExpRegression (x, y)                             // create a model -- with intercept
     mod.trainNtest ()()                                                  // train and test the model
 
     val yp = mod.predict (x_)
@@ -208,10 +213,10 @@ end simpleExpRegressionTest
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Test `SimpleExpRegression` by simulating n-many observations.
-     *  @param n  number of observations
-     *  @param k  number of variables
+     *  @param n  number of observations (e.g., 10000)
+     *  @param k  number of variables (e.g., 5)
      */
-    def test (n: Int = 10000, k: Int = 5): Unit =
+    def test (n: Int, k: Int): Unit =
         val u = new Uniform (0, 1)                                       // uniform random
         val e = new Exponential (1)                                      // exponential error
         val r = new Random ()

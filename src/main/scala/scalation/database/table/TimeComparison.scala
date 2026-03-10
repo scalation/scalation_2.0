@@ -48,13 +48,9 @@ import scalation.mathstat.{Plot, VectorD}
         val limitedDeposit  = deposit.limit (sz)
         limitedCustomer.create_index()
 
-        var tableSortMerge, tableEquiIndex: Table = null
-        var tableThetaJoin, tableEquiJoin: Table = null
-
         if selectedJoins.contains ("SortMerge") then
             println ("SortMerge Join")
-            rTime_SortMergeJoin(i) = timed (5, true) {
-                tableSortMerge = limitedDeposit._join_ (("cname", limitedCustomer)) }._2
+            rTime_SortMergeJoin(i) = timed (5, true) { limitedDeposit._join_ (("cname", limitedCustomer)) }._2
 
         if selectedJoins.contains ("Natural") then
             println ("Natural Join")
@@ -63,18 +59,15 @@ import scalation.mathstat.{Plot, VectorD}
 
         if selectedJoins.contains ("Theta") then
             println ("Theta Join")
-            rTime_ThetaJoin(i) = timed (5, true) {
-                tableThetaJoin = limitedCustomer.join (("cname == cname"), limitedDeposit) }._2
+            rTime_ThetaJoin(i) = timed (5, true) { limitedCustomer.join (("cname == cname"), limitedDeposit) }._2
 
         if selectedJoins.contains ("Index") then
             println ("Equi join with Index")
-            rTime_IndexJoin(i) = timed (5, true) {
-                tableEquiIndex = limitedDeposit.join (("cname", limitedCustomer)) }._2
+            rTime_IndexJoin(i) = timed (5, true) { limitedDeposit.join (("cname", limitedCustomer)) }._2
 
         if selectedJoins.contains ("Equi") then
             println ("Equi join")
-            rTime_EquiJoin(i) = timed (5, true) {
-                tableEquiJoin = limitedCustomer.join (Array("cname"), Array("cname"), limitedDeposit) }._2
+            rTime_EquiJoin(i) = timed (5, true) { limitedCustomer.join (Array("cname"), Array("cname"), limitedDeposit) }._2
 
         if selectedJoins.contains ("Predicate") then
             println ("Predicate Join")

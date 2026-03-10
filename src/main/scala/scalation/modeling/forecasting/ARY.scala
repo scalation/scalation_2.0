@@ -15,9 +15,12 @@ package scalation
 package modeling
 package forecasting
 
+import scala.collection.mutable.{LinkedHashSet => LSET}
+
 import scalation.mathstat._
 
 import MakeMatrix4TS._
+import TransformT._
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `ARY` class provides basic time series analysis capabilities for ARY models.
@@ -47,8 +50,8 @@ class ARY (x: MatrixD, y: VectorD, hh: Int, fname: Array [String],
     protected val p    = hparam("p").toInt                              // use the last p values (p lags)
     protected val spec = hparam("spec").toInt                           // trend terms: 0 - none, 1 - constant, 2 - linear, 3 - quadratic
                                                                         //              4 - sine, 5 cosine
-    modelName = s"ARY($p)"
-    yForm = tForms("tForm_y").asInstanceOf [Transform]
+    _modelName = s"ARY_$p"
+    yForm      = tForms("tForm_y").asInstanceOf [Transform]             // yForm defined in `Fit` via hierarchy
 
     debug ("init", s"$modelName with additional term spec = $spec")
 //  debug ("init", s"[ x | y ] = ${x :^+ y}")
@@ -69,6 +72,14 @@ class ARY (x: MatrixD, y: VectorD, hh: Int, fname: Array [String],
 
         x_trend ++ x_act ++ x_fcast
     end forge
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Build an `ARY` model using the cols with the selected features.
+     *  @param cols  the cols of the input matrix with selected features
+     */
+    def convertReg2Forc (cols: LSET [Int] = mcols): ARY =
+        new ARY (getX(?, cols), getY, hh, cols.toArray.map (fname(_)), tRng, hparam, bakcast, tForms)
+    end convertReg2Forc
 
 end ARY
 
@@ -107,17 +118,22 @@ object ARY extends MakeMatrix4TSY:
      *  @param tRng     the time range, if relevant (time index may suffice)
      *  @param hparam   the hyper-parameters
      *  @param bakcast  whether a backcasted value is prepended to the time series (defaults to false)
-     *  @param tForm    the z-transform (rescale to standard normal)
+     *  @param tFormT   the transform for rescaling endogenous and exogenous
      */
     def rescale (y: VectorD, hh: Int, fname_ : Array [String] = null,
                  tRng: Range = null, hparam: HyperParameter = hp,
                  bakcast: Boolean = false,
-                 tForm: VectorD | MatrixD => Transform = x => zForm(x)): ARY =
+                 tFormT: TransformT = MinMax): ARY =
+
+        if tFormT.name == "NormForm" then hparam("nneg") = 0
 
         val p     = hparam("p").toInt                                   // use the last p values
         val spec  = hparam("spec").toInt                                // 0 - none, 1 - constant, 2 - linear, 3 -quadratic, 4 - sin, 5 = cos
-        val tForm_y = tForm(y)
-        if tForm_y.getClass.getSimpleName == "zForm" then hparam("nneg") = 0
+
+        val tr_size = Model.trSize (y.dim)
+        val tForm_y = tFormT.form(y(0 until tr_size))                   // use (mean, std) of training set for both In-sample and TnT
+//      val tForm_y = tForm(y)                                          // use full dataset
+
         val y_scl   = tForm_y.f(y)
         val tForms  = Map ("tForm_y" -> tForm_y)
 
@@ -145,7 +161,7 @@ object ARY extends MakeMatrix4TSY:
      */
     def ary1 (y: VectorD): SimpleRegression =
         val x = WeightedMovingAverage.backcast (y) +: y(0 until y.dim-1)
-        println (MatrixD (x, y).transpose)
+        println (MatrixD (x, y).ᵀ)
         SimpleRegression (x, y, null)
     end ary1
 
@@ -168,7 +184,7 @@ import Example_LakeLevels.y
     hp("spec") = 2                                                      // trend specification: 0, 1, 2, 3, 5
 
     val mod = ARY (y, hh)                                               // create model for time series data
-    mod.inSampleTest ()                                                 // In-Sample Testing
+    mod.inSample_Test ()                                                // In-Sample Testing
     println (mod.summary ())                                            // statistical summary
 
 end aRYTest
@@ -216,7 +232,7 @@ end aRYTest2
         hp("spec") = s                                                  // trend specification: 0, 1, 2, 3, 5
 
         val mod = ARY (y, hh)                                           // create model for time series data
-        mod.inSampleTest ()                                             // In-Sample Testing
+        mod.inSample_Test ()                                            // In-Sample Testing
         println (mod.summary ())                                        // statistical summary of fit
     end for
 
@@ -240,16 +256,14 @@ end aRYTest3
     for p <- 6 to 6; s <- 1 to 1 do                                     // number of lags; trend
         hp("p")     = p                                                 // endo lags
         hp("spec")  = s                                                 // trend specification: 0, 1, 2, 3, 5
-//        val mod = ARY (y, hh)                                           // create model for time series data
-        val mod = ARY.rescale (y, hh)                                 // create model for time series data
-
+        val mod = ARY (y, hh)                                           // create model for time series data
         banner (s"TnT Forecasts: ${mod.modelName} on COVID-19 Dataset")
         mod.trainNtest_x ()()                                           // use customized trainNtest_x
 
         mod.setSkip (0)
         mod.rollValidate (rc = 2)                                       // TnT with Rolling Validation
         println (s"After Roll TnT Forecast Matrix yf = ${mod.getYf}")
-        mod.diagnoseAll (mod.getY, mod.getYf, Forecaster.teRng (y.dim), 0)   // only diagnose on the testing set
+        mod.diagnoseAll (mod.getY, mod.getYf, Forecaster.teRng (y.dim))   // only diagnose on the testing set
 //      println (s"Final TnT Forecast Matrix yf = ${mod.getYf}")
     end for
 
@@ -274,7 +288,7 @@ end aRYTest4
     hp("lwave") = 20                                                    // wavelength (distance between peaks)
 
     val mod = ARY (y, hh)                                               // create model for time series data
-    mod.inSampleTest ()                                                 // In-Sample Testing
+    mod.inSample_Test ()                                                // In-Sample Testing
     println (mod.summary ())                                            // statistical summary of fit
 
     banner ("Feature Selection Technique: Forward")
@@ -282,8 +296,7 @@ end aRYTest4
 //  val (cols, rSq) = mod.backwardElimAll ()                            // R^2, R^2 bar, sMAPE, R^2 cv
     val k = cols.size
     println (s"k = $k")
-    new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "sMAPE", "R^2 cv"),
-               s"R^2 vs n for ${mod.modelName}", lines = true)
+    new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for ${mod.modelName}", lines = true)
     println (s"rSq = $rSq")
 
 end aRYTest5

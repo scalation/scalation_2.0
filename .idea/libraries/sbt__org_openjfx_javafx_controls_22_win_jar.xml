@@ -1,9 +1,0 @@
-<component name="libraryTable">
-  <library name="sbt: org.openjfx:javafx-controls:22:win:jar" external-system-id="SBT">
-    <CLASSES>
-      <root url="jar://$USER_HOME$/AppData/Local/Coursier/cache/v1/https/repo1.maven.org/maven2/org/openjfx/javafx-controls/22/javafx-controls-22-win.jar!/" />
-    </CLASSES>
-    <JAVADOC />
-    <SOURCES />
-  </library>
-</component>

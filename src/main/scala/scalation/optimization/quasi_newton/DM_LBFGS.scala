@@ -69,7 +69,7 @@ object DM_LBFGS extends PathMonitor:
             if 0 < params.past then pf = new VectorD(params.past)          // allocate space for storing previous obj func values
 
             // Evaluate the function value and its gradient
-            val evaluationResults = cd.evaluationLogic.evaluate (cd.instance, x, cd.n, 0)
+            val evaluationResults = cd.evalLogic.evaluate (cd.instance, x, cd.n, 0)
             fx = evaluationResults.objFunctionValue
             g  = evaluationResults.gradientVector
 
@@ -126,7 +126,6 @@ object DM_LBFGS extends PathMonitor:
                 if useOrthantWiseLogic then
                     val orthantWisePrms = params.orthantWise.get
                     pg = orthantWisePrms.pseudoGradient (xNew, g)
-                end if
 
                 // Compute x and g norms
                 xnorm = xNew.norm
@@ -184,23 +183,23 @@ object DM_LBFGS extends PathMonitor:
                 d = if ! useOrthantWiseLogic then -g else -pg
 
                 j = end
-                for i <- 0 until bound do
+                cfor (0, bound) { _ =>
                     j = (j + m - 1) % m                              // if (--j == -1) j = m-1
                     val it = lm(j)
                     it.alpha = it.s dot d                            // \alpha_{j} = \rho_{j} s^{t}_{j} \cdot q_{k+1}
                     it.alpha = it.alpha / it.ys
                     d += (it.y * (-it.alpha))                        // q_{i} = q_{i+1} - \alpha_{i} y_{i}
-                end for
+                } // cfor
 
                 d *= (ys / yy)
 
-                for i <- 0 until bound do
+                cfor (0, bound) { _ =>
                     val it = lm(j)
                     beta = it.y dot d                                // \beta_{j} = \rho_{j} y^t_{j} \cdot \gamma_{i}
                     beta /= it.ys
                     d += it.s * (it.alpha - beta)                    // \gamma_{i+1} = \gamma_{i} + (\alpha_{j} - \beta_{j}) s_{j}
                     j = (j + 1) % m                                  // if (++j == m) j = 0
-                end for
+                } // cfor
 
                 // Constrain the search direction for orthant-wise updates
                 if useOrthantWiseLogic then
@@ -217,7 +216,7 @@ object DM_LBFGS extends PathMonitor:
 
             LBFGSResults (LBFGSReturnCode.UnknownError, xNew, Some(fx), None)
         catch
-            case e: OutOfMemoryError => LBFGSResults (LBFGSReturnCode.OutOfMemory, x, None, None)
+            case _ : OutOfMemoryError => LBFGSResults (LBFGSReturnCode.OutOfMemory, x, None, None)
 
     end dmlbfgsMain
 

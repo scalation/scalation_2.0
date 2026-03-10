@@ -13,6 +13,8 @@ package modeling
 package forecasting
 package multivar
 
+import scala.collection.mutable.IndexedSeq
+
 import scalation.mathstat._
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -26,15 +28,30 @@ import scalation.mathstat._
  */
 class AR_Star (y: MatrixD, hh: Int, fname: Array [String] = null, tRng: Range = null,
                hparam: HyperParameter = AR.hp)
-      extends Diagnoser (dfm = 1, df = y.dim - 1)
-         with ForecastTensor (y, hh, tRng):
+      extends Diagnoser (dfr = 1, df = y.dim - 1)
+         with ForecastTensor (y, hh, tRng)
+         with Forecast
+         with NoSubModels:
 
     private val debug = debugf ("AR_Star", true)                          // debug function
     private val yf    = makeForecastTensor (y, hh)                        // make the forecast tensor
 
-    val modelName = s"AR_Star${y.dim2} on $fname"
+    _modelName = s"AR_Star_${y.dim2}"
 
     private val mod = (for j <- y.indices2 yield new AR (y(?, j), hh, tRng, hparam)).toArray
+
+    def getY: VectorD = y(?, 0)
+    def hparameter: HyperParameter = hparam
+    def inSample_Test (skip: Int, showYp: Boolean): Unit = ???
+    def parameter: VectorD | MatrixD = ???
+    def test (x_ : MatrixD, y_ : VectorD): (VectorD, VectorD) = ???
+    def validate (rando: Boolean, ratio: Double) (idx: IndexedSeq [Int]): 
+                 (VectorD | MatrixD, VectorD | MatrixD) = ???
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the feature/variable names.  Overrides definition in `Forecast` trait.
+     */
+    override def getFname: Array [String] = fname
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Train and test each forecasting model y_ = f(y-past) + e and report its QoF
@@ -93,6 +110,7 @@ object AR_Star:
      */
     def apply (y: MatrixD, hh: Int, fname: Array [String], tRng: Range = null,
                hparam: HyperParameter = AR.hp): Array [AR] =
+        println (s"apply: create a AR model for each $fname")
         (for j <- y.indices2 yield new AR (y(?, j), hh, tRng, hparam)).toArray
     end apply
 

@@ -86,7 +86,6 @@ class SumSqQueue (q: Int = 5):
             val yy = queue.dequeue ()
             sum   -= yy
             sumSq -= yy ~^ 2
-        end if
         sum   += y
         sumSq += y ~^ 2
         queue += y

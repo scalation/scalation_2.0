@@ -11,23 +11,69 @@
 package scalation
 package modeling
 
-import scala.collection.mutable.Set
+import scala.collection.mutable.{LinkedHashSet => LSET}
 
 import scalation.mathstat._
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `SymRidgeRegression` object supports symbolic ridge regression that allows
+/** The `SymRidgeRegression` class supports symbolic ridge regression that allows
  *  variables/columns to be raised to various powers, e.g., x^2, x^3, x^.5.
  *  Note, x~^p is a column-wise power function (each column raised to p-th power).
  *  IMPORTANT:  must not include INTERCEPT (column of ones) in initial data matrix),
  *  i.e., DO NOT include a column of ones in x (will cause singularity in expanded matrix).
  *  Method signatures are the as same as for `SymbolicRegression`, except there is
  *  NO intercept ARGUMENT.
+ *  @param xx      the expanded data/input m-by-n matrix
+ *  @param y       the response/output m-vector
+ *  @param fname   the feature/variable names
+ *  @param powers  the set of powers to raise matrix x to
+ *  @param hparam  the hyper-parameters (use Regression.hp for default)
+ */
+class SymRidgeRegression (xx: MatrixD, y: VectorD, fname: Array [String],
+                          powers: LSET [Double], hparam: HyperParameter = Regression.hp)
+      extends RidgeRegression (xx, y, fname, hparam):
+
+    _modelName = s"SymRidgeRegression_$powers"
+
+end SymRidgeRegression
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `SymRidgeRegression` object provides several factory methods.
  */
 object SymRidgeRegression:
 
+    private val debug = debugf ("SymbolicRegression", true)               // debug function
+
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Create a `RidgeRegression` object from a data matrix and a response vector.
+    /** Search for a good symbolic regression model by trying several combinations
+     *  of powers.
+     *  @param x          the initial data/input m-by-n matrix (before expansion)
+     *                        must not include an intercept column of all ones
+     *  @param y          the response/output m-vector
+     *  @param fname      the feature/variable names (defaults to null)
+     *  @param cross      whether to include 2-way cross/interaction terms x_i x_j (defaults to true)
+     *  @param cross3     whether to include 3-way cross/interaction terms x_i x_j x_k (defaults to false)
+     *  @param hparam     the hyper-parameters (use Regression.hp for default)
+     *  @param terms      custom terms to add into the model, e.g., Array ((0, 1.0), (1, -2.0))
+     *                        adds x0 x1^(-2)
+     */
+    def searchSR (x: MatrixD, y: VectorD, fname: Array [String] = null,
+                  cross: Boolean = true, cross3: Boolean = false,
+                  hparam: HyperParameter = RidgeRegression.hp,
+                  terms: Array [Xj2p]*): BestStep =
+        var best = BestStep ()()                                          // best step so far
+        for k <- 2 to 3; pwr <- SymbolicRegression.powers.subsets (k) do  // grid search
+            val mod = apply (x, y, fname, pwr, cross, cross3, hparam, terms*)
+            val (_, qof) = mod.trainNtest ()()                            // train and test the model
+            println (mod.summary ())                                      // parameter/coefficient statistics
+            best = best.better (-1, qof, mod, mod.mcols)                  // which is better (-1 => all columns)
+        end for
+        best                                                              // return the best model
+    end searchSR
+
+    //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Create a `SymRidgeRegression` object from a data matrix and a response vector.
      *  Partial support for "Symbolic Ridge Regression" as matrix x can be raised
      *  to several powers (e.g., x^1 and x^2).  Note, x^1 is automatically included.
      *  NOTE, Ridge Regression will NOT have an INTERCEPT column.
@@ -44,24 +90,21 @@ object SymRidgeRegression:
      *                     adds x0 x1^(-2)
      */
     def apply (x: MatrixD, y: VectorD, fname: Array [String] = null,
-               powers: Set [Double] = null, cross: Boolean = true, cross3: Boolean = false,
+               powers: LSET [Double] = null, cross: Boolean = true, cross3: Boolean = false,
                hparam: HyperParameter = RidgeRegression.hp,
-               terms: Array [Xj2p]*): RidgeRegression =
+               terms: Array [Xj2p]*): SymRidgeRegression =
         val fname_ = if fname != null then fname
                      else x.indices2.map ("x" + _).toArray                // default feature/variable names
 
-        val (xx, f_name) = SymbolicRegression.buildMatrix (x, fname_, powers,
+        val (xx, f_name) = SymbolicRegression.buildMatrix (x, fname_, powers, null,
                                                            false, cross, cross3, terms*)
-//      val mod       = new RidgeRegression (xx, y, f_name, hparam)       // user must center
-        val mod       = RidgeRegression.center (xx, y, f_name, hparam)    // automatically centers the data
-        mod.modelName = "SymRidgeRegression" + (if cross then "X" else "") +
-                                               (if cross3 then "XX" else "")
-        mod
+        new SymRidgeRegression (xx, y, f_name, powers, hparam)            // user must center
+//      SymRidgeRegression.center (xx, y, f_name, powers, hparam)         // FIX -- automatically centers the data
     end apply
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Create a `SymRidgeRegression` object from a data matrix and a response vector.
-     *  This method provides data rescaling.
+     *  This method provides data rescaling via normalization (z-transform).
      *  NOTE, Ridge Regression will NOT have an INTERCEPT column.
      *  @param x       the data/input m-by-n matrix
      *                     (augment with a first column of ones to include intercept in model)
@@ -75,16 +118,39 @@ object SymRidgeRegression:
      *                     adds x0 x1^(-2)
      */
     def rescale (x: MatrixD, y: VectorD, fname: Array [String] = null,
-                 powers: Set [Double] = null, cross: Boolean = true, cross3: Boolean = false,
+                 powers: LSET [Double] = null, cross: Boolean = true, cross3: Boolean = false,
                  hparam: HyperParameter = RidgeRegression.hp,
-                 terms: Array [Xj2p]*): RidgeRegression =
+                 terms: Array [Xj2p]*): SymRidgeRegression =
         val xn = normalize ((x.mean, x.stdev)) (x)
-        println (s"rescale: xn = $xn")
+        debug ("rescale", s"rescaled via z-transform: xn = $xn")
         apply (xn, y, fname, powers, cross, cross3, hparam, terms*)
     end rescale
 
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Create a `SymRidgeRegression` object from a data matrix and a response vector.
+     *  This method provides data rescaling via min-max-transform.
+     *  @param x       the data/input m-by-n matrix
+     *                     (augment with a first column of ones to include intercept in model)
+     *  @param y       the response/output m-vector
+     *  @param fname   the feature/variable names (defaults to null)
+     *  @param powers  the set of powers to raise matrix x to
+     *  @param cross   whether to include 2-way cross/interaction terms x_i x_j (defaults to true)
+     *  @param cross3  whether to include 3-way cross/interaction terms x_i x_j x_k (defaults to false)
+     *  @param hparam  the hyper-parameters (use Regression.hp for default)
+     *  @param terms   custom terms to add into the model, e.g., Array ((0, 1.0), (1, -2.0))
+     *                     adds x0 x1^(-2)
+     */
+    def rescale2 (x: MatrixD, y: VectorD, fname: Array [String] = null,
+                 powers: LSET [Double] = null, cross: Boolean = true, cross3: Boolean = false,
+                 hparam: HyperParameter = RidgeRegression.hp,
+                 terms: Array [Xj2p]*): SymRidgeRegression =
+        val xn = scale (extreme (x)) (x)
+        debug ("rescale2", s"rescaled via min-max-transform: xn = $xn")
+        apply (xn, y, fname, powers, cross, cross3, hparam, terms*)
+    end rescale2
+
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Create a `RidgeRegression` object that uses multiple regression to fit a quadratic
+    /** Create a `SymRidgeRegression` object that uses multiple regression to fit a quadratic
      *  surface to the data.  For example in 2D, the quadratic regression equation is
      *      y  =  b dot x + e  =  [b_0, ... b_k] dot [x_0, x_0^2, x_1, x_1^2] + e
      *  NOTE, Ridge Regression will NOT have an INTERCEPT column.
@@ -97,14 +163,12 @@ object SymRidgeRegression:
      */
     def quadratic (x: MatrixD, y: VectorD, fname: Array [String] = null,
                    cross: Boolean = false,
-                   hparam: HyperParameter = RidgeRegression.hp): RidgeRegression =
-        val mod       = apply (x, y, fname, Set (1, 2), cross, false, hparam)
-        mod.modelName = "SymRidgeRegression.quadratic" + (if cross then "X" else "")
-        mod
+                   hparam: HyperParameter = RidgeRegression.hp): SymRidgeRegression =
+        apply (x, y, fname, LSET (1, 2), cross, false, hparam)
     end quadratic
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Create a `RidgeRegression` object that uses multiple regression to fit a cubic
+    /** Create a `SymRidgeRegression` object that uses multiple regression to fit a cubic
      *  surface to the data.  For example in 2D, the cubic regression equation is
      *      y  =  b dot x + e  =  [b_0, ... b_k] dot [x_0, x_0^2, x_0^3,
      *                                                x_1, x_1^2, x_1^3,
@@ -120,11 +184,8 @@ object SymRidgeRegression:
      */
     def cubic (x: MatrixD, y: VectorD, fname: Array [String] = null,
                cross: Boolean = false, cross3: Boolean = false,
-               hparam: HyperParameter = RidgeRegression.hp): RidgeRegression =
-        val mod       = apply (x, y, fname, Set (1, 2, 3), cross, cross3, hparam)
-        mod.modelName = "SymRidgeRegression.cubic" + (if cross then "X" else "") +
-                                                     (if cross3 then "X" else "")
-        mod
+               hparam: HyperParameter = RidgeRegression.hp): SymRidgeRegression =
+        apply (x, y, fname, LSET (1, 2, 3), cross, cross3, hparam)
     end cubic
 
 end SymRidgeRegression
@@ -134,7 +195,7 @@ import Example_AutoMPG._
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `symRidgeRegressionTest` main function tests the `SymRidgeRegression`
  *  object using the AutoMPG dataset.  Assumes no missing values.
- *  It tests custom "Symbolic Ridge Regression", with powers specified in "Set (...)" and
+ *  It tests custom "Symbolic Ridge Regression", with powers specified in "LSET (...)" and
  *  applies forward selection, backward elimination, or stepwise regression.
  *  > runMain scalation.modeling.symRidgeRegressionTest
  */
@@ -144,7 +205,7 @@ import Example_AutoMPG._
 //  println (s"y = $y")
 
     banner ("AutoMPG Symbolic Ridge Regression")
-    val mod = SymRidgeRegression (x, y, x_fname, Set (-2, -1, 0.5, 2))    // add cross-terms and given powers
+    val mod = SymRidgeRegression (x, y, x_fname, LSET (-2, -1, 0.5, 2))   // add cross-terms and given powers
     mod.trainNtest ()()                                                   // train and test the model
     println (mod.summary ())                                              // parameter/coefficient statistics
 
@@ -153,10 +214,13 @@ import Example_AutoMPG._
         val (cols, rSq) = mod.selectFeatures (tech)                       // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for Symbolic Ridge Regression with $tech", lines = true)
+        new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for Symbolic Ridge Regression with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
+
+    FitM.showQofStatTable (mod.crossValidate ())                          // cross-validation for full model
+    val modBest = mod.getBest.mod                                         // FIX - check this is really the best model
+    FitM.showQofStatTable (modBest.crossValidate ())                      // cross-validation for best model
 
 end symRidgeRegressionTest
 
@@ -183,8 +247,7 @@ end symRidgeRegressionTest
         val (cols, rSq) = mod.selectFeatures (tech)                       // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for Quadratic Ridge Regression with $tech", lines = true)
+        new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for Quadratic Ridge Regression with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 
@@ -213,8 +276,7 @@ end symRidgeRegressionTest2
         val (cols, rSq) = mod.selectFeatures (tech)                       // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for Quadratic X Ridge Regression with $tech", lines = true)
+        new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for Quadratic X Ridge Regression with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 
@@ -243,8 +305,7 @@ end symRidgeRegressionTest3
         val (cols, rSq) = mod.selectFeatures (tech)                       // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for Cubic Ridge Regression with $tech", lines = true)
+        new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for Cubic Ridge Regression with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 
@@ -273,8 +334,7 @@ end symRidgeRegressionTest4
         val (cols, rSq) = mod.selectFeatures (tech)                       // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for Cubic X Ridge Regression with $tech", lines = true)
+        new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for Cubic X Ridge Regression with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 
@@ -305,8 +365,7 @@ end symRidgeRegressionTest5
         val (cols, rSq) = mod.selectFeatures (tech)                     // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for Cubic XX Ridge Regression with $tech", lines = true)
+        new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for Cubic XX Ridge Regression with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 
@@ -316,7 +375,7 @@ end symRidgeRegressionTest6
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `symRidgeRegressionTest7` main function tests the `SymRidgeRegression`
  *  object using the AutoMPG dataset.  Assumes no missing values.
- *  It tests custom "Symbolic Ridge Regression", with powers specified in "Set (...)" and
+ *  It tests custom "Symbolic Ridge Regression", with powers specified in "LSET (...)" and
  *  applies forward selection, backward elimination, or stepwise regression.
  *  This test case performs data rescaling.
  *  > runMain scalation.modeling.symRidgeRegressionTest7
@@ -331,9 +390,9 @@ end symRidgeRegressionTest6
     banner ("AutoMPG Symbolic Ridge Regression")
     val mod =
     if RESCALE then
-        SymRidgeRegression.rescale (x, y, x_fname, Set (-2, -1, 2))      // add cross-terms and given powers & rescale (0.5 -> NaN)
+        SymRidgeRegression.rescale (x, y, x_fname, LSET (-2, -1, 2))     // add cross-terms and given powers & rescale (0.5 -> NaN)
     else
-        SymRidgeRegression (x, y, x_fname, Set (-2, -1, 0.5, 2))         // add cross-terms and given powers
+        SymRidgeRegression (x, y, x_fname, LSET (-2, -1, 0.5, 2))        // add cross-terms and given powers
     mod.trainNtest ()()                                                  // train and test the model
     println (mod.summary ())                                             // parameter/coefficient statistics
 
@@ -342,8 +401,7 @@ end symRidgeRegressionTest6
         val (cols, rSq) = mod.selectFeatures (tech)                      // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for Symbolic Ridge Regression with $tech", lines = true)
+        new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for Symbolic Ridge Regression with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 
@@ -407,7 +465,7 @@ end symRidgeRegressionTest8
     val mu_y = y.mean                                                      // center the response data
     val y_c  = y - mu_y
 
-    val xx = MatrixD (x).transpose
+    val xx = MatrixD (x).ᵀ
     val fname = Array ("x")
 
     banner ("Ridge Regression")
@@ -438,4 +496,31 @@ end symRidgeRegressionTest8
     new Plot (null, y,  yp2, s"${mod.modelName} y vs yp2", lines = true)
 
 end symRidgeRegressionTest9
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `symRidgeRegressionTest14` main function tests the `SymRidgeRegression`
+ *  object using the AutoMPG dataset.  Assumes no missing values.
+ *  It tests custom "Symbolic Regression", with powers specified in "LSET (...)" and
+ *  applies forward selection, backward elimination, or stepwise regression.
+ *  This test case performs data rescaling.
+ *  > runMain scalation.modeling.symRidgeRegressionTest14
+ */
+@main def symRidgeRegressionTest14 (): Unit =
+
+//  println (s"x = $x")
+//  println (s"y = $y")
+
+    banner ("AutoMPG Symbolic Regression")
+    val best = SymbolicRegression.searchSR (x, y, x_fname)                   // return best model from search
+    banner (s"Best Full Model: ${best.mod.modelName}, qof = ${best.qof}")
+
+    banner (s"Feature Selection Technique: Stepwise")
+    val (cols, rSq) = best.mod.selectFeatures (SelectionTech.Stepwise, "one")  // R^2, R^2 bar, R^2 cv
+    val k = cols.size
+    println (s"k = $k, n = ${x.dim2}")
+    new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for Symbolic Regression with Stepwise", lines = true)
+    println (s"Stepwise: rSq = $rSq")
+
+end symRidgeRegressionTest14
 

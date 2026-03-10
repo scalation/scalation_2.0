@@ -67,7 +67,6 @@ class Optimizer_SGD extends Optimizer:
                 go = false
             else
                 if epoch % ADJUST_PERIOD == 0 then η *= ADJUST_FACTOR     // adjust the learning rate
-            end if
         } // cfor
 
         //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -82,7 +81,7 @@ class Optimizer_SGD extends Optimizer:
             val ε  = yp - y                                               // negative of error matrix
             val δ  = f.dM (yp) ⊙ ε                                        // delta matrix for y
 
-            x.𝐓 * δ * α                                                   // return change in parameters (transpose (𝐓))
+            x.ᵀ * δ * α                                                   // return change in parameters (transpose (ᵀ))
         end updateWeight
 
         debug ("optimize2", s"parameters b = $b")
@@ -133,7 +132,6 @@ class Optimizer_SGD extends Optimizer:
                 go = false
             else
                 if epoch % ADJUST_PERIOD == 0 then η *= ADJUST_FACTOR     // adjust the learning rate
-            end if
         } // cfor
 
         //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -148,10 +146,10 @@ class Optimizer_SGD extends Optimizer:
             val yp = f1.fM (b * z)                                        // prediction:   Yp = f(ZB)
             val ε  = yp - y                                               // negative of the error matrix
             val δ1 = f1.dM (yp) ⊙ ε                                       // delta matrix for y
-            val δ0 = f.dM (z) ⊙ (δ1 * b.w.𝐓)                              // delta matrix for z (transpose (𝐓))
+            val δ0 = f.dM (z) ⊙ (δ1 * b.w.ᵀ)                              // delta matrix for z (transpose (ᵀ))
     
-            (NetParam (x.𝐓 * δ0 * α, δ0.mean * η),                        // change to a parameters (weights and biases)
-             NetParam (z.𝐓 * δ1 * α, δ1.mean * η))                        // change to b parameters (weights and biases)
+            (NetParam (x.ᵀ * δ0 * α, δ0.mean * η),                        // change to a parameters (weights and biases)
+             NetParam (z.ᵀ * δ1 * α, δ1.mean * η))                        // change to b parameters (weights and biases)
         end updateWeight
 
         debug ("optimize3", s"parameters a = $a \n b = $b")
@@ -203,7 +201,6 @@ class Optimizer_SGD extends Optimizer:
                 go = false
             else
                 if epoch % ADJUST_PERIOD == 0 then η *= ADJUST_FACTOR     // adjust the learning rate
-            end if
         } // cfor
 
         //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -221,11 +218,11 @@ class Optimizer_SGD extends Optimizer:
             val ε   = yp - y                                              // -E where E is the error matrix
             δ(nl-1) = f.last.dM (yp) ⊙ ε                                  // delta for the last layer before output
             for l <- nl-2 to 0 by -1 do
-                δ(l) = f(l).dM (z(l+1)) ⊙ (δ(l+1) * b(l+1).w.𝐓)           // deltas for all previous hidden layers (transpose (𝐓))
+                δ(l) = f(l).dM (z(l+1)) ⊙ (δ(l+1) * b(l+1).w.ᵀ)           // deltas for all previous hidden layers (transpose (ᵀ))
             end for
 
             for l <- layers do
-                b(l) -= (z(l).𝐓 * δ(l) * α,                               // update parameters (weights
+                b(l) -= (z(l).ᵀ * δ(l) * α,                               // update parameters (weights
                          δ(l).mean * η)                                   // and biases
             end for
 

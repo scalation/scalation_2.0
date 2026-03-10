@@ -22,14 +22,13 @@ package scala2d
 class VizFrame (title: String, canvas: Panel, w: Int = 800, h: Int = 700, o: Int = 100)
       extends Frame (title):
 
-    println ("Run + title")
+    println (s"VizFrame: run $title")
     setLocation (o, o)
     setSize (new Dimension (w, h))
 
     if canvas != null then                     // may need to set these later
         getContentPane ().add (canvas)
         setVisible (true)
-    end if
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::s
     /** Get the width of the frame.

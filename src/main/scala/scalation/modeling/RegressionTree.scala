@@ -125,7 +125,7 @@ object RegressionTree:
      *  @param ssy    the sum of squared y-values
      *  @param sse_t  the sum of squared errors total (left + right)
      */
-     def check (d: Int, j: Int, xj: VectorD, y: VectorD, thr: Double, ssy: Double, sse_t: Double): Boolean =
+    def check (d: Int, j: Int, xj: VectorD, y: VectorD, thr: Double, ssy: Double, sse_t: Double): Boolean =
         val (xj_lo, xj_hi) = (xj.min, xj.max)
         if thr < xj_lo || xj_hi < thr then flaw ("check", s"thr = $thr outside range of x$j: [$xj_lo, $xj_hi]")
         val sse_t_ = sse_LR (xj, y, thr, ssy)
@@ -207,18 +207,18 @@ class RegressionTree (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
                       feature: Int = -1, use_r_fb: Boolean = false,
                       leaves: Counter = Counter ())
       extends Predictor (x, y, fname_, hparam)
-         with Fit (dfm = x.dim2 - 1, df = x.dim - x.dim2):              // call resetDF once tree is built
+         with Fit (dfr = x.dim2 - 1, df = x.dim - x.dim2):              // call resetDF once tree is built
 
     private val debug     = debugf ("RegressionTree", false)            // debug function
-    private val depth     = hparam ("maxDepth").toInt                   // the depth limit for tree
-    private val thres     = hparam ("threshold").toDouble               // the threshold for the tree's parent node, @see buildTree
-    private val fbRatio   = hparam ("fbRatio").toDouble                 // the feature bagging ratio
+    private val depth     = hparam("maxDepth").toInt                    // the depth limit for tree
+    private val thres     = hparam("threshold").toDouble                // the threshold for the tree's parent node, @see buildTree
+    private val fbRatio   = hparam("fbRatio").toDouble                  // the feature bagging ratio
     private val threshold = new VectorD (x.dim2)                        // store best splitting threshold for each feature
     private val score     = new VectorD (x.dim2)                        // store best splitting score for each feature
 
     private var root: Node = null                                       // root node   
 
-    modelName = s"RegressionTree ($depth)"
+    _modelName = s"RegressionTree_$depth"
 
     debug ("init", s"Construct a Regression Tree: curDepth = $curDepth")
 
@@ -380,11 +380,11 @@ class RegressionTree (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
         while ! queue.isEmpty do
             val size = queue.size
             level   += 1
-            for i <- 0 until size do
+            cfor (0, size) { _ =>
                 val nod = queue.dequeue ()
                 println ("\t" * level + "[ " + nod + " ]")
                 for cnode <- nod.child do queue += cnode
-            end for
+            } // cfor
             println ()
         end while
     end printTree2
@@ -412,9 +412,11 @@ class RegressionTree (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Build a sub-model that is restricted to the given columns of the data matrix.
      *  @param x_cols  the columns that the new model is restricted to
+     *  @param fname2  the variable/feature names for the new model (defaults to null)
      */
-    override def buildModel (x_cols: MatrixD): RegressionTree =
-        new RegressionTree (x_cols, y, null, hparam)
+    def buildModel (x_cols: MatrixD, fname2: Array [String] = null): RegressionTree =
+        debug ("buildModel", s"${x_cols.dim} by ${x_cols.dim2}")
+        new RegressionTree (x_cols, y, fname2, hparam)
     end buildModel
 
 end RegressionTree
@@ -492,12 +494,12 @@ end regressionTreeTest
 //      println (mod.summary ())                                        // parameter/coefficient statistics
       
         banner (s"AutoMPG Regression Tree with d = $d Validation")
-        val qof2 = mod.validate ()()                                    // out-of-sampling testing
+        val qof2 = mod.validate ()()._2                                 // out-of-sampling testing
         val iq = QoF.rSq.ordinal                                        // index for rSq
         qual (d-1) = VectorD (qof(iq), qof(iq+1), qof2(iq))             // R^2, R^2 bar, R^2 os
     end for
 
-    new PlotM (VectorD.range (1, dmax+1), qual.transpose, Array ("R^2", "R^2 bar", "R^2 os"),
+    new PlotM (VectorD.range (1, dmax+1), qual.ᵀ, Array ("R^2", "R^2 bar", "R^2 os"),
                "RegressionTree in-sample, out-of-sample QoF vs. depth", lines = true)
     println (s"RegressionTree: qual = $qual")
 
@@ -530,8 +532,7 @@ end regressionTreeTest2
         val (cols, rSq) = mod.selectFeatures (tech)                     // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for Regression Tree with $tech", lines = true)
+        new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for Regression Tree with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 

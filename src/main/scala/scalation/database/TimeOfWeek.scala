@@ -156,7 +156,6 @@ case class TimeOfWeek (day: Int, second: Long):
             f"$E%s $HH%02d:$mm%02d:$ss%02d"
         else
             f"$E%s $HH%02d:$mm%02d"
-        end if
     end format
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

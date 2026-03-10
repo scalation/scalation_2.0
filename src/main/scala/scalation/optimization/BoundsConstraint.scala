@@ -30,11 +30,9 @@ trait BoundsConstraint (lower: VectorD = null, upper: VectorD = null):
         if lower != null then
             for i <- lower.indices if x(i) < lower(i) do
                 x(i) = if lower(i) < 0 then lower(i) * 0.95 else lower(i) * 1.05
-        end if
         if upper != null then
             for i <- upper.indices if x(i) > upper(i) do
                 x(i) = if upper(i) > 0 then upper(i) * 0.95 else upper(i) * 1.05
-            end for
         end if
     end constrain
 

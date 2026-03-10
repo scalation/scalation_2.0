@@ -28,8 +28,7 @@ import scalation.mathstat._
  *  a bias vector.
  *  @see `NetParam`
  *  @param x       the input/data m-by-n matrix
- *                     (augment with a first column of ones to include intercept in model
- *                      or use bias)
+ *                     (augment with a first column of ones to include intercept in model or use bias)
  *  @param y       the response/output m-by-ny matrix
  *  @param fname   the feature/variable names (if null, use x_j's)
  *  @param hparam  the hyper-parameters for the model/network
@@ -45,9 +44,9 @@ trait PredictorMV (x: MatrixD, y: MatrixD, protected var fname: Array [String],
 
     if x != null then
         if x.dim != y.dim then flaw ("init", "row dimensions of x and y are incompatible")
+        if x.dim2 < 1 then flaw ("init", s"dim2 = ${x.dim2} of the x matrix must be at least 1")
         if x.dim <= x.dim2 then
             flaw ("init", s"PredictorMV requires more rows ${x.dim} than columns ${x.dim2}")
-    end if
 
     private val MIN_FOLDS = 3                                                // minimum number of folds for cross validation
     private val stream    = 0                                                // random number stream to use
@@ -57,6 +56,11 @@ trait PredictorMV (x: MatrixD, y: MatrixD, protected var fname: Array [String],
     protected var e: MatrixD            = null                               // residual/error matrix
 
     if x != null && fname == null then fname = x.indices2.map ("x" + _).toArray  // default feature/variable names
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the set of columns (numbers) for the features in this model.
+     */
+    def mcols: LSET [Int] = LSET.range (0, getX.dim2)  
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the used data matrix x.  Mainly for derived classes where x is expanded
@@ -172,8 +176,7 @@ trait PredictorMV (x: MatrixD, y: MatrixD, protected var fname: Array [String],
     def makePlots (yy: MatrixD, yp: MatrixD): Unit =
         val (ryy, ryp) = orderByYY (yy, yp)                               // order by yy
         for k <- ryy.indices2 do
-            new Plot (null, ryy(?, k), ryp(?, k), s"$modelName: y$k black/actual vs. red/predicted")
-        end for
+            new Plot (null, ryy(?, k), ryp(?, k), s"$modelName: y$k black/actual vs. red/predicted", lines = true)
     end makePlots
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -192,7 +195,7 @@ REPORT
     ----------------------------------------------------------------------------
     parameter  bb  = ${stringOf (parameters)}
     ----------------------------------------------------------------------------
-    fitMap     qof = ${FitM.showFitMap (ftMat, QoF.values.map (_.toString))}
+    fitMap     qof = ${Fit.showFitMap (ftMat)}
     ----------------------------------------------------------------------------
         """
     end report
@@ -245,14 +248,20 @@ REPORT
 
 //  F E A T U R E   S E L E C T I O N
 
+    // @see givens in `modeling.FeatureSelection`
+
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Build a sub-model that is restricted to the given columns of the data matrix.
      *  Override for models that support feature section.
      *  @param x_cols  the columns that the new model is restricted to
+     *  @param fname2  the variable/feature names for the new model (defaults to null)
      */
-    def buildModel (x_cols: MatrixD): PredictorMV & Fit
+    def buildModel (x_cols: MatrixD, fname2: Array [String] = null): PredictorMV & Fit
 
-    private var theBest = BestStep ()()                                      // record the best model from feature selection
+    protected val USE_MEAN = true                                             // use mean vs. first of qof for feature selection
+    private   var theBest  = BestStep ()()                                    // record the best model from feature selection
+    private   val t_rng   = if fullset_FS then 0 until y.dim                  // use full dataset for Feature Selection (FS)
+                            else 0 until Model.trSize (y.dim)                 // use training set for Feature Selection (FS)
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Reset the best-step to default
@@ -283,15 +292,14 @@ REPORT
      *  @param fit_l  the fit vector for the l-th iteration
      *  @param mod_l  the predictive model for the l-th iteration
      *  // FIX - wrong param & can remove?
-     */
     private def updateQoF (rSq: MatrixD, l: Int, cross: Boolean, best: BestStep): Unit =
         rSq(l) =
             if cross then
                 Fit.qofVector (best.qof, best.mod.crossValidate ())           // results for model mod_l, with cross-validation
             else
                 Fit.qofVector (best.qof, null)                                // results for model mod_l, no cross-validation
-            end if
     end updateQoF
+     */
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Perform forward selection to find the most predictive variable to add the
@@ -307,30 +315,35 @@ REPORT
         for j <- x.indices2 if ! (cols contains j) do
             val cols_j = cols union LSET (j)                                  // try adding variable/column x_j
             val x_cols = x(?, cols_j)                                         // x projected onto cols_j columns
-            val mod_j  = buildModel (x_cols)                                  // regress with x_j added
-            mod_j.train ()                                                    // train model
-            best = best.better (j, mod_j.test ()._2(?, 0), mod_j)             // which is better
+            val mod_j  = buildModel (x_cols, newFname (fname, cols_j))        // regress with x_j added
+
+            val (x_tr, y_tr) = (x_cols(t_rng), y(t_rng))                      // get full/training data
+            mod_j.train (x_tr, y_tr)                                          // train model
+            val qof = mod_j.test (x_tr, y_tr)._2                              // get test qof for mod_j
+            if USE_MEAN then
+                best = best.better (j, qof.meanRow, mod_j, cols_j)            // which is better based on mean of all targets
+            else
+                best = best.better (j, qof(?, 0), mod_j, cols_j)              // which is better based of first target
         end for
 
         if best.col == -1 then
             flaw ("forwardSel", "could not find a variable x_j to add: best.col = -1")
-        end if
         best
     end forwardSel
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Perform forward selection to find the most predictive variables to have
+    /** Perform FORWARD SELECTION to find the MOST predictive variables to have
      *  in the model, returning the variables added and the new Quality of Fit (QoF)
      *  measures for all steps.
      *  @see `Fit` for index of QoF measures.
-     *  @param cross  whether to include the cross-validation QoF measure
+     *  @param cross  indicator to include the cross-validation/validation QoF measure (defaults to "many")
      *  @param qk     index of Quality of Fit (QoF) to use for comparing quality
      */
-    def forwardSelAll (cross: Boolean = true)(using qk: Int): (LSET [Int], MatrixD) =
+    def forwardSelAll (cross: String = "many")(using qk: Int): (LSET [Int], MatrixD) =
         resetBest ()
-        val rSq  = new MatrixD (x.dim2 - 1, Fit.qofVectorSize)             // QoF: R^2, R^2 Bar, smape, R^2 cv
-        val cols = LSET (0)                                                // start with x_0 in model
-//      updateQoF (rSq, 0, cross, select0 (qk))                            // update Qof results for 0-th variable FIX?
+        val rSq  = new MatrixD (x.dim2 - 1, Fit.qofVectorSize)                // QoF: R^2, R^2 Bar, smape, R^2 cv
+        val cols = LSET (0)                                                   // start with x_0 in model
+//      updateQoF (rSq, 0, cross, select0 (qk))                               // update Qof results for 0-th variable FIX?
 
         banner (s"forwardSelAll: (l = 0) INITIAL variable (0, ${fname(0)}) => cols = $cols")
 
@@ -365,14 +378,19 @@ REPORT
         for j <- first until x.dim2 if cols contains j do
             val cols_j = cols diff LSET (j)                                   // try removing variable/column x_j
             val x_cols = x(?, cols_j)                                         // x projected onto cols_j columns
-            val mod_j  = buildModel (x_cols)                                  // regress with x_j added
-            mod_j.train ()                                                    // train model
-            best = best.better (j, mod_j.test ()._2(?, 0), mod_j)             // which is better
+            val mod_j  = buildModel (x_cols, newFname (fname, cols_j))        // regress with x_j added
+
+            val (x_tr, y_tr) = (x_cols(t_rng), y(t_rng))                      // get full/training data
+            mod_j.train (x_tr, y_tr)                                          // train model
+            val qof = mod_j.test (x_tr, y_tr)._2                              // get test qof for mod_j
+            if USE_MEAN then
+                best = best.better (j, qof.meanRow, mod_j, cols_j)            // which is better based on mean of all targets
+            else
+                best = best.better (j, qof(?, 0), mod_j, cols_j)              // which is better based of first target
         end for
 
         if best.col == -1 then
             flaw ("backwardElim", "could not find a variable x_j to eliminate: best.col = -1")
-        end if
         best
     end backwardElim
 
@@ -381,22 +399,28 @@ REPORT
      *  backward elimination.
      */
     private def fullModel (qk: Int): BestStep =
-        val mod_a = buildModel (x)                                            // regress with all variables x_j
-        mod_a.train ()                                                        // train model
-        val qof_a = mod_a.test ()._2(?, 0)
-        BestStep (-1, qof_a, mod_a)(qof_a(qk))                                // results for full model
+        val mod_a = buildModel (x, fname)                                     // regress with all variables x_j
+
+        val (x_tr, y_tr) = (x(t_rng), y(t_rng))                               // get full/training data
+        mod_a.train (x_tr, y_tr)                                              // train model
+        val qof_a = mod_a.test (x_tr, y_tr)._2                                // get test qof for mod_a
+        val qof_ = if USE_MEAN then
+            qof_a.meanRow                                                     // results for full model based on mean of all targets
+        else
+            qof_a(?, 0)                                                       // results for full model based of first target
+        BestStep (-1, qof_, mod_a)(qof_(qk))                                  // return best step
     end fullModel
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Perform backward elimination to find the least predictive variables to remove
+    /** Perform BACKWARD ELIMINATION to find the LEAST predictive variables to remove
      *  from the full model, returning the variables left and the new Quality of Fit (QoF)
      *  measures for all steps.
      *  @see `Fit` for index of QoF measures.
      *  @param first  first variable to consider for elimination
-     *  @param cross  whether to include the cross-validation QoF measure
+     *  @param cross  indicator to include the cross-validation/validation QoF measure (defaults to "many")
      *  @param qk     index of Quality of Fit (QoF) to use for comparing quality
      */
-    def backwardElimAll (first: Int = 1, cross: Boolean = true)(using qk: Int): (LSET [Int], MatrixD) =
+    def backwardElimAll (first: Int = 1, cross: String = "many")(using qk: Int): (LSET [Int], MatrixD) =
         resetBest ()
         val rSq  = new MatrixD (x.dim2 - 1, Fit.qofVectorSize)                // R^2, R^2 Bar, smape, R^2 cv
         val cols = LSET.range (0, x.dim2)                                     // start with all x_j in model
@@ -422,15 +446,15 @@ REPORT
     end backwardElimAll 
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Perform stepwise regression to find the most predictive variables to have
-     *  in the model, returning the variables left and the new Quality of Fit (QoF)
+    /** Perform STEPWISE SELECTION to find a GOOD COMBINATION of predictive variables to have
+     *  in the model, returning the variables selected and the new Quality of Fit (QoF)
      *  measures for all steps.  At each step it calls 'forwardSel' and 'backwardElim'
      *  and takes the best of the two actions.  Stops when neither action yields improvement.
      *  @see `Fit` for index of QoF measures.
-     *  @param cross  whether to include the cross-validation QoF measure
+     *  @param cross  indicator to include the cross-validation/validation QoF measure (defaults to "many")
      *  @param qk     index of Quality of Fit (QoF) to use for comparing quality
      */
-    def stepwiseSelAll (cross: Boolean = true, swap: Boolean = true)(using qk: Int):
+    def stepwiseSelAll (cross: String = "many", swap: Boolean = true)(using qk: Int):
                        (LSET [Int], MatrixD) =
         resetBest ()
         val rSq    = new MatrixD (x.dim2 - 1, Fit.qofVectorSize)              // QoF: R^2, R^2 Bar, smape, R^2 cv
@@ -482,7 +506,6 @@ REPORT
                         println (s"\nstepwiseSelAll: (l = $l) SWAP variable $bestb with $bestf")
                     else
                         break ()                                              // can't find a better model -> quit
-                    end if
                 end if
             end for
         } // breakable
@@ -501,13 +524,32 @@ REPORT
      *  @param in    the variable to swap in
      */
     private def swapVars (cols: LSET [Int], out: Int, in: Int, qk: Int): BestStep =
-        val cols_  = cols diff LSET (out) union LSET (in)   // swap out var with in var
+        val cols_  = cols diff LSET (out) union LSET (in)                     // swap out var with in var
         val x_cols = x(?, cols_)                                              // x projected onto cols_j columns
-        val mod_j  = buildModel (x_cols)                                      // regress with x_out removed and x_in added
+        val mod_j  = buildModel (x_cols, newFname (fname, cols_))             // regress with x_out removed and x_in added
         mod_j.train ()                                                        // train model
         val qof_in = mod_j.test ()._2(?, 0)
         BestStep (in, qof_in, mod_j)(qof_in(qk))                              // candidate step
     end swapVars
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Perform BEAM SEARCH SELECTION to find a GOOD COMBINATION of predictive features/variables to
+     *  have in the model, returning the top k sets of features/variables selected and the new Quality of
+     *  Fit (QoF) measures/metrics for all steps.  At each step, iterate over the models in the beam
+     *  (top k) and create candidates by adding features (phase 1) and then removing (phase 2).
+     *  From all the candidates, keep the best k and start a new iteration.  Stops when there is
+     *  no improvement in any of top k (or the maximum number of features is reached.
+     *  @see `Fit` for index of QoF measures/metrics.
+     *  @param cross  indicator to include the cross-validation/validation QoF measure (defaults to "many")
+     *  @param bk     the beam width holding the top k models (defaults to 3)
+     *  @param qk     index of Quality of Fit (QoF) to use for comparing quality
+     */
+    def beamSelAll (cross: String = "many", bk: Int = 3)(using qk: Int): (LSET [Int], MatrixD) =
+
+        // FIX -- to be implemented
+
+        null
+    end beamSelAll
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute the Variance Inflation Factor (VIF) for each variable to test
@@ -532,6 +574,20 @@ REPORT
         vifV
     end vif
 
+//  T E S T I N G   S C E N A R I O S
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Perform In-Sample Testing, i.e., train and test on the full data set.
+     *  @param skip    the number of initial data points to skip (due to insufficient information)
+     *  @param showYp  whether to show the prediction vector
+     */
+    def inSample_Test (skip: Int = 0, showYp: Boolean = false): Unit =
+        val (x_, y_) = (x.drop (skip), y.drop (skip))
+        val yp = trainNtest (x_, y_)(x_, y_)._1
+        if showYp then
+            println (s"Final In-Sample Prediction Vector yp = $yp")
+    end inSample_Test
+
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the indices for the test-set.
      *  @see `scalation.mathstat.TnT_Split`
@@ -543,24 +599,52 @@ REPORT
     end testIndices
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /*  Use validation to compute test Quality of Fit (QoF) measures by dividing
-     *  the full dataset into a TESTING set and a TRAINING set.
-     *  The test set is defined by idx and the rest of the data is the training set.
-     *  @param rando  flag indicating whether to use randomized or simple validation
-     *  @param ratio  the ratio of the TESTING set to the full dataset (most common 70-30, 80-20)
-     *  @param idx    the prescribed TESTING set indices
+    /** Return the indices for the test-set for (1) RANDONLY or (3) LAST
+     *  @see `scalation.mathstat.TnT_Split`
+     *  @param n_total  the size of full dataset
+     *  @param n_test   the size of test-set
+     *  @param rando    whether to select indices randomly or in blocks
      */
-    def validate (rando: Boolean = true, ratio: Double = 0.2)
-                 (idx : IndexedSeq [Int] = testIndices ((ratio * y.dim).toInt, rando)): MatrixD =
+    inline def testIndices (n_total: Int, n_test: Int, rando: Boolean): IndexedSeq [Int] =
+        TnT_Split.testIndices (permGen, n_total, n_test, rando)
+    end testIndices
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /*  Use validation to compute test Quality of Fit (QoF) measures by dividing
+     *  the full dataset into a TESTING-set and a TRAINING-set.
+     *  The test set is defined by idx and the rest of the data is the training set.
+     *  @see `modeling.Predictor.validate` about the RANDOM, FIRST, and LAST options
+     *  for selecting the testing-set.
+     *  @param rando  flag indicating whether to use randomized or simple validation
+     *  @param ratio  the ratio of the TESTING-set to the full dataset (most common 70-30, 80-20)
+     *  @param idx    the prescribed TESTING-set indices (default => generate)
+     */
+    def validate (rando: Boolean = true, ratio: Double = Model.TE_RATIO)
+//               (idx: IndexedSeq [Int] = testIndices ((ratio * y.dim).toInt, rando)):
+                 (idx: IndexedSeq [Int] = testIndices (y.dim, (ratio * y.dim).toInt, rando)):
+                 (MatrixD, MatrixD) =
+        debug ("validate", s"n_test = ${(ratio * y.dim).toInt}, rando = $rando")
         val (x_e, x_, y_e, y_) = TnT_Split (x, y, idx)                        // Test-n-Train Split
 
         train (x_, y_)                                                        // train model on the training set
-        val qof = test (x_e, y_e)._2                                          // test on test-set and get QoF measures
+        val (yp, qof) = test (x_e, y_e)                                       // test on test-set and get QoF measures
         if qof(QoF.sst.ordinal)(0) <= 0.0 then                                // requires variation in test-set
             flaw ("validate", "chosen testing set has no variability")
-        end if
-        qof
+//      println (FitM.fitMap (qof, QoF.values.map (_.toString)))
+        (yp, qof)
     end validate
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Convert QoF results into an array (of size 1) of `Statistic` for compatibility
+     *  with the `crossValidate` method.
+     *  @param qof  the Quality of Fit (QoF) results
+    def qof2Stat (qof: MatrixD): Array [Statistic] =
+        val stats = Fit.qofStatTable                                          // create table for QoF measures
+        if qof(QoF.sst.ordinal)(0) > 0.0 then                                 // requires variation in test-set
+            for q <- qof.indices do stats(q).tally (qof(q)(0))                // tally these QoF measures
+        stats
+    end qof2Stat
+     */
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /*  Use k-fold cross-validation to compute test Quality of Fit (QoF) measures
@@ -581,11 +665,10 @@ REPORT
         for fold <- 0 until k do
             val idx = fullIdx (fold * sz until (fold+1) * sz).toMuIndexedSeq  // instance indices for this fold
             debug ("crossValidate", s"fold $fold: test set size = $sz")
-            val qof = validate (rando, ratio)(idx)
+            val qof = validate (rando, ratio)(idx)._2
             debug ("crossValidate", s"fold $fold: qof = $qof")
             if qof(QoF.sst.ordinal)(0) > 0.0 then                             // requires variation in test-set
                 for q <- qof.indices do stats(q).tally (qof(q)(0))            // tally these QoF measures
-            end if
         end for
 
         stats
@@ -611,12 +694,12 @@ object PredictorMV:
     def test (mod: PredictorMV, ext: String = "", check: Boolean = true): Unit =
         val iq = QoF.rSq.ordinal
         banner (s"Test ${mod.modelName} $ext")
-        val (yp, qof) = mod.trainNtest ()()                                   // train and test the model on full dataset (in-sample)
+        val qof = mod.trainNtest ()()._2                                      // train and test the model on full dataset (in-sample)
 
         println ("Validate: Out-of-Sample Testing")
-        val qof2 = mod.validate ()()                                          // train on training set, test on testing set
+        val qof2 = mod.validate ()()._2                                       // train on training set, test on testing set
         if check then assert (rel_diff (qof(iq)(0), qof2(iq)(0)) < 0.2)       // check agreement of in-sample and out-of-sample results
-        println (FitM.showFitMap (mod.validate ()(), QoF.values.map (_.toString)))
+        println (Fit.showFitMap (qof2))
     end test
 
 end PredictorMV

@@ -34,6 +34,11 @@ class CoFilter_1D (width: Int = 5):
      */
     def update (vec_ : VectorD): Unit = vec = vec_
 
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return/get the filter coefficients (needed for forward and gradient computation)
+     */
+    def coef: VectorD = vec
+
 end CoFilter_1D
 
 

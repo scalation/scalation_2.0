@@ -52,7 +52,7 @@ class NaiveBayesR (x: MatrixD, y: VectorI, fname_ : Array [String] = null, k: In
 
     private val cd   = Array.ofDim [Double => Double] (k, x.dim2)        // conditional density functions
 
-    modelName = "NaiveBayesR"                                            // name of the model
+    _modelName = "NaiveBayesR"                                           // name of the model
 
     debug ("init", s"correlation matrix = $cor")
 

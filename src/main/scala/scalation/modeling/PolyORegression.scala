@@ -40,11 +40,10 @@ class PolyORegression (t: MatrixD, y: VectorD, ord: Int, fname_ : Array [String]
 
     private val debug = debugf ("PolyORegression", false)         // debug function
     private val flaw  = flawf ("PolyORegression")                 // flaw function
-    private val n0    = 1                                         // number of terms/columns originally
     private val nt    = PolyORegression.numTerms (ord)            // number of terms/columns after expansion
     private val a     = PolyORegression.getA                      // get the multipliers for orthogonal polynomials
 
-    modelName = "PolyORegression"
+    _modelName = s"PolyORegression_$ord"
 
     if t.dim2 != 1 then flaw ("init", "matrix t must have 1 column")
 
@@ -53,7 +52,7 @@ class PolyORegression (t: MatrixD, y: VectorD, ord: Int, fname_ : Array [String]
      *  i.e., add polynomial terms.
      *  @param z  the un-expanded vector
      */
-    def expand (z: VectorD): VectorD = PolyORegression.forms (z, n0, nt) 
+    def expand (z: VectorD): VectorD = PolyORegression.forms (z, nt) 
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Follow the same transformations used to orthogonalize the data/input matrix 'x',
@@ -123,7 +122,7 @@ object PolyORegression:
      */
     def apply (t: VectorD, y: VectorD, ord: Int, fname: Array [String],
                hparam: HyperParameter): PolyORegression =
-        new PolyORegression (MatrixD (t).transpose, y, ord, fname, hparam)
+        new PolyORegression (MatrixD (t).ᵀ, y, ord, fname, hparam)
     end apply
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -151,10 +150,9 @@ object PolyORegression:
     /** Given a 1-vector/point 'v', compute the values for all of its polynomial
      *  forms/terms, returning them as a vector.
      *  @param v   the vector/point (i-th row of t) for creating forms/terms
-     *  @param k   number of features/predictor variables (not counting intercept) = 1
      *  @param nt  the number of terms
      */
-    def forms (v: VectorD, k: Int, nt: Int): VectorD =
+    def forms (v: VectorD, nt: Int): VectorD =
         val t = v(0)
         VectorD (for j <- 0 until nt yield t~^j)
     end forms
@@ -169,7 +167,7 @@ object PolyORegression:
         val nt = numTerms (ord)
         println (s"allForms: create expanded data matrix with nt = $nt columns from k = $k columns")
         val xe = new MatrixD (x.dim, nt)
-        for i <- x.indices do xe(i) = forms (x(i), k, nt)          // vector with values for all forms/terms
+        for i <- x.indices do xe(i) = forms (x(i), nt)            // vector with values for all forms/terms
         val za = orthogonalize (xe)
         a = za._2                                                 // save multipliers
         debug ("allForms", s"expanded data matrix za._1 = ${za._1}")

@@ -42,7 +42,7 @@ class LogisticRegression (x: MatrixD, y: VectorI, fname_ : Array [String] = null
 
     private val r_df  = (n-1.0) / (n-k-1.0)                              // ratio of degrees of freedom
 
-    modelName = s"LogisticRegression_$cThresh"                           // name of the model
+    _modelName = s"LogisticRegression_$cThresh"                          // name of the model
 
     debug ("init", s"r_df = $r_df")
 

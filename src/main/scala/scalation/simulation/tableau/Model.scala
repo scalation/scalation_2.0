@@ -171,7 +171,6 @@ class Model (name: String, m: Int, rv: Array [Variate], label_ : Array [String] 
               n  -= 1
               et += dt; lt += n
               j += 1
-           end if
         end while
         (VectorD (et), VectorD (lt))
     end timeLine

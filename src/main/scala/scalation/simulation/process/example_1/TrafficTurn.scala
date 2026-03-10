@@ -110,7 +110,6 @@ class TrafficModelTurn (name: String = "TrafficTurn", reps: Int = 1, animating: 
             else 
                 road(i + 4).lane(l).move ()             // add 4 for next segment (straight)
                 sink((i + 2) % 4).leave ()              // add 2
-            end if
         end act
 
     end Car

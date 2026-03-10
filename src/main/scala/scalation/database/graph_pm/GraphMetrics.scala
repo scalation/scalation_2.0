@@ -13,6 +13,7 @@ package database
 package graph_pm
 
 import scala.collection.mutable.{ArrayBuffer, Queue}
+import scala.runtime.ScalaRunTime.stringOf
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `GraphMetrics` class provides methods for determining graph metrics that
@@ -32,7 +33,6 @@ class GraphMetrics (val g: Graph, isUndirected: Boolean = true):
     
     if ! isUndirected then
         for i <- 0 until n; j <- g.ch (i) do g.ch (j) += i    // converting directed to undirected
-    end if    
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute the diameter of graph g (i.e., maximum eccentricity).  This also
@@ -94,7 +94,6 @@ class GraphMetrics (val g: Graph, isUndirected: Boolean = true):
             if go(c) && len(c) == 0 then
                 len(c) = len_c                               // distance from vertex i to c
                 qu.enqueue (c)                               // put child c in queue
-            end if
         end for
     end visit
 
@@ -133,24 +132,24 @@ end GraphMetrics
 
     // Compute the diameter of graph g
     var dia = 0
-    for k <- 0 until 10 do
+    cfor (0, 10) { _ =>
         time { dia = bfs.diam }
         println (s"diameter  = $dia")
-    end for
+    } // cfor
     
     // Compute the radius of graph g
     var rd = 0
-    for k <- 0 until 10 do
+    cfor (0, 10) { _ =>
         time { rd = bfs.rad }
         println (s"radius  = $rd")
-    end for
+    } // cfor
 
     // Return the central vertices of graph g
     var ctr: Array [Int] = null
-    for k <- 0 until 10 do
+    cfor (0, 10) { _ =>
         time { ctr = bfs.central }
-        println ("central  = ${stringOf (ctr)}")
-    end for
+        println (s"central  = ${stringOf (ctr)}")
+    } // cfor
 
 end graphMetricsTest
 

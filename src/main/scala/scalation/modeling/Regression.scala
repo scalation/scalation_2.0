@@ -6,6 +6,8 @@
  *  @see     LICENSE (MIT style license file).
  *
  *  @note    Model: Multiple Linear Regression (linear terms, no cross-terms)
+ * 
+ *  @see math.stackexchange.com/questions/617735/multiple-regression-degrees-of-freedom-f-test
  */
 
 package scalation
@@ -44,15 +46,16 @@ import scalation.mathstat._
 class Regression (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
                   hparam: HyperParameter = Regression.hp)
       extends Predictor (x, y, fname_, hparam)
-         with Fit (dfm = x.dim2 - 1, df = x.dim - x.dim2):
+         with Fit (dfr = x.dim2 - 1, df = x.dim - x.dim2):
+         // degrees of freedom: dfr = n - 1, df = m - n
          // if not using an intercept df = (x.dim2, x.dim-x.dim2), correct by calling 'resetDF' method from `Fit`
 
-    private val debug     = debugf ("Regression", false)                 // debug function
+    private val debug     = debugf ("Regression", true)                  // debug function
     private val flaw      = flawf ("Regression")                         // flaw function
     private val algorithm = hparam("factorization")                      // factorization algorithm
     private val n         = x.dim2                                       // number of columns
 
-    modelName = s"Regression @dfm = $dfm"
+    _modelName = s"Regression_$dfr"
 
     if n < 1 then flaw ("init", s"dim2 = $n of the 'x' matrix must be at least 1")
 
@@ -62,9 +65,9 @@ class Regression (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
      */
     private def solver (x_ : MatrixD): Factorization =
         algorithm match                                                  // select factorization algorithm
-        case "Fac_Cholesky" => new Fac_Cholesky (x_.transpose * x_)      // Cholesky Factorization
-        case "Fac_LU"       => new Fac_LU (x_.transpose * x_)            // LU Factorization
-        case "Fac_Inverse"  => new Fac_Inverse (x_.transpose * x_)       // Inverse Factorization
+        case "Fac_Cholesky" => new Fac_Cholesky (x_.ᵀ * x_)              // Cholesky Factorization
+        case "Fac_LU"       => new Fac_LU (x_.ᵀ * x_)                    // LU Factorization
+        case "Fac_Inverse"  => new Fac_Inverse (x_.ᵀ * x_)               // Inverse Factorization
         case "Fac_SVD"      => new Fac_SVD (x_)                          // Singular Value Decomposition
         case _              => Fac_QR (x_)                               // QR/LQ Factorization (default)
         end match
@@ -85,7 +88,7 @@ class Regression (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
         b = fac match                                                    // RECORD the parameters/coefficients (@see `Predictor`)
             case fac: Fac_QR  => fac.solve (y_)
             case fac: Fac_SVD => fac.solve (y_)
-            case _            => fac.solve (x_.transpose * y_)
+            case _            => fac.solve (x_.ᵀ * y_)
 
         if b(0).isNaN then flaw ("train", s"parameter b = $b")
         debug ("train", s"$fac estimates parameter b = $b")
@@ -101,7 +104,6 @@ class Regression (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
      */
     def test (x_ : MatrixD = x, y_ : VectorD = y): (VectorD, VectorD) =
         val yp = predict (x_)                                            // make predictions
-//      e = y_ - yp                                                      // RECORD the residuals/errors (@see `Predictor`)
         (yp, diagnose (y_, yp))                                          // return predictions and QoF vector
     end test
 
@@ -127,10 +129,11 @@ class Regression (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Build a sub-model that is restricted to the given columns of the data matrix.
      *  @param x_cols  the columns that the new model is restricted to
+     *  @param fname2  the variable/feature names for the new model (defaults to null)
      */
-    override def buildModel (x_cols: MatrixD): Regression =
+    def buildModel (x_cols: MatrixD, fname2: Array [String] = null): Regression =
         debug ("buildModel", s"${x_cols.dim} by ${x_cols.dim2}")
-        new Regression (x_cols, y, null, hparam)
+        new Regression (x_cols, y, fname2, hparam)
     end buildModel
 
 end Regression
@@ -146,6 +149,10 @@ object Regression:
      */
     val hp = new HyperParameter; hp += ("factorization", "Fac_QR", "Fac_QR")
 
+    /** Main metrics for regression type problems, e.g., used in `PlotM`
+     */
+    val metrics = Array ("R^2", "R^2 bar", "sMAPE", "R^2 cv")
+
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Create a `Regression` object from a combined data-response matrix.
      *  @param xy      the combined data-response matrix (predictors and response)
@@ -160,7 +167,8 @@ object Regression:
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Create a `Regression` object from a data matrix and a response vector.
-     *  This method provides data rescaling.
+     *  This method provides data rescaling of x.  However, rescaling of y may be
+     *  needed for Regularized Regression and Neural Networks.
      *  @param x       the data/input m-by-n matrix
      *                     (augment with a first column of ones to include intercept in model)
      *  @param y       the response/output m-vector
@@ -254,13 +262,13 @@ end regressionTest
     val y = VectorD (105.0, 115.0, 116.0, 117.0, 112.0, 121.0, 121.0, 110.0, 110.0, 114.0,
                      114.0, 115.0, 114.0, 106.0, 125.0, 114.0, 106.0, 113.0, 110.0, 122.0)
 
-    println ("model: y = b_0 + b_1*x1 + b_2*x_ + b3*x3 + b4*x42")
+    println ("model: y = b_0 + b_1*x_1 + b_2*x_2 + b_3*x_3 + b_4*x_4")
 //  println ("model: y = b₀ + b₁∙x₁ + b₂∙x₂ + b₃∙x₃ + b₄∙x₄")
     println (s"x = $x")
     println (s"y = $y")
 
-    val xtx = x.transpose * x
-    val xty = x.transpose * y
+    val xtx = x.ᵀ * x
+    val xty = x.ᵀ * y
 
     var fac: Factorization = null                             // factorization algorithm
     var mod: Regression = null                                // regression model
@@ -341,21 +349,43 @@ import Example_AutoMPG._
  */
 @main def regressionTest3 (): Unit =
 
-//  println (s"ox = $ox")
-//  println (s"y  = $y")
+    import MatrixD.at
+
+//  println (s"ox = $ox")                                        // data/input matrix
+//  println (s"y  = $y")                                         // response/output vector
     println (s"ox_fname = ${stringOf (ox_fname)}")
 
     banner ("AutoMPG Regression")
-    val mod = new Regression (ox, y, ox_fname)                // create model with intercept (else pass x)
-    mod.trainNtest ()()                                       // train and test the model
-    println (mod.summary ())                                  // parameter/coefficient statistics
+    val mod = new Regression (ox, y, ox_fname)                   // create model with intercept (else pass x)
+    val yp  = mod.trainNtest ()()._1                             // train and test the model and save predictions
+    println (mod.summary ())                                     // parameter/coefficient statistics
 
+    val mName = mod.modelName
+
+    // PREDICTION INTERVAL assuming Gaussian errors and using predictInt from `Fit`
+
+    banner ("AutoMPG Prediction Intervals")
+    val l_u           = mod.PIbounds (yp, mod.predictInt_ (ox))  // make PI lower and upper bound matrices from yp and ihw
+    val (qof_all, iα) = mod.diagnose_pi (y, yp, l_u)             // compute metrics for both point and interval predictions
+    mod.showQoF (qof_all)                                        // show all the QoF metrics
+    Predictor.plotPredictionInt (y, yp, at (l_u, iα), mName)     // plot ordered actual, predicted, lower, upper
+
+    // PREDICTION INTERVAL using Split Conformal Predictions (SCP) `predictCInt` from `Predictor`
+
+    banner ("AutoMPG Conformal Prediction Intervals")
+    val l_u_     = mod.PIbounds (yp, mod.predictCInt (ox, y))    // make PI lower and upper bound vectors from yp and ihw
+    val qof_all_ = mod.diagnose_ (y, yp, l_u_)                   // compute metrics for both point and interval predictions
+    mod.showQoF (qof_all_)                                       // show all the QoF metrics
+    Predictor.plotPredictionInt (y, yp, l_u_, mName)             // plot ordered actual, predicted, lower, upper
+
+/*
     banner ("AutoMPG Validation Test")
     mod.validate ()()
 
     banner ("AutoMPG Cross-Validation Test")
     val stats = mod.crossValidate ()
     FitM.showQofStatTable (stats)
+*/
 
 end regressionTest3
  
@@ -381,8 +411,7 @@ end regressionTest3
 //  val (cols, rSq) = mod.backwardElimAll ()                  // R^2, R^2 bar, sMAPE, R^2 cv
     val k = cols.size
     println (s"k = $k, n = ${x.dim2}")
-    new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "sMAPE", "R^2 cv"),
-               "R^2 vs n for Regression", lines = true)
+    new PlotM (null, rSq.ᵀ, Regression.metrics, "R^2 vs n for Regression", lines = true)
     println (s"rSq = $rSq")
 
 end regressionTest4
@@ -413,8 +442,7 @@ end regressionTest4
         val (cols, rSq) = mod.selectFeatures (tech)           // R^2, R^2 bar, sMAPE, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "sMAPE", "R^2 cv"),
-                   s"R^2 vs n for Regression with $tech", lines = true)
+        new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for Regression with $tech", lines = true)
         banner ("Feature Importance")
         println (s"$tech: rSq = $rSq")
         val imp = mod.importance (cols.toArray, rSq)
@@ -427,7 +455,7 @@ end regressionTest5
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `regressionTest6` main function tests the `Regression` class using the following
  *  regression equation.
- *      y = b dot x = b_0 + b_1*x1 + b_2*x_2.
+ *      y = b dot x = b_0 + b_1*x_1 + b_2*x_2.
  *  Show effects of increasing collinearity.
  *  > runMain scalation.modeling.regressionTest6
  */
@@ -446,7 +474,7 @@ end regressionTest5
     mod.trainNtest ()()
     println (mod.summary ())
 
-    for i <- 0 to 8 do
+    cfor (0, 9) { _ =>
         banner (s"Test Increasing Collinearity: x_32 = ${x(3, 2)}")
         println (s"x = $x")
         println (s"x.corr = ${x.corr}")
@@ -454,7 +482,7 @@ end regressionTest5
         mod.trainNtest ()()
         println (mod.summary ())
         x(3, 2) += 0.5
-    end for
+    } // cfor
 
 end regressionTest6
 
@@ -462,15 +490,15 @@ end regressionTest6
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `regressionTest7` main function trains a regression model on a small dataset of
  *  temperatures from counties in Texas where the variables/factors to consider
- *  are Latitude (x1), Elevation (x2) and Longitude (x3).  The model equation
+ *  are Latitude (x_1), Elevation (x_2) and Longitude (x_3).  The model equation
  *  is the following:
- *      y  =  b dot x  =  b0 + b1*x1 + b2*x2 + b3*x3
+ *      y  =  b dot x  =  b_0 + b_1*x_1 + b_2*x_2 + b_3*x_3
  *  > runMain scalation.modeling.regressionTest7
  */
 @main def regressionTest7 (): Unit =
 
     // 16 data points:         one      x1      x2       x3     y
-    //                                 Lat    Elev     Long  Temp        County
+    //                         Const   Lat    Elev     Long  Temp        County
     val xy = MatrixD ((16, 5), 1.0, 29.767,   41.0,  95.367, 56.0,    // Harris
                                1.0, 32.850,  440.0,  96.850, 48.0,    // Dallas
                                1.0, 26.933,   25.0,  97.800, 60.0,    // Kennedy
@@ -498,7 +526,8 @@ end regressionTest7
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `regressionTest8` main function trains a regression model on the Boston House Prices
- *  dataset.
+ *  dataset.  It illustrates use of the `load` method in the `MatrixD` object.
+ *  @see `scalation.mathstat.MatrixD`
  *  > runMain scalation.modeling.regressionTest8
  */
 @main def regressionTest8 (): Unit =
@@ -535,7 +564,7 @@ end regressionTest8
         val yp   = x * b
         val e    = y - yp
         val sse  = e.normSq
-        val grad = -x.transpose * e
+        val grad = -x.ᵀ * e
         println (s"epoch = $epoch, sse = $sse, rSq = ${1 - sse/sst}, b = $b, yp = $yp, grad = $grad")
         b -= grad * eta
     end for
@@ -553,7 +582,7 @@ end regressionTest9
  */
 @main def regressionTest10 (): Unit =
 
-    // 5 data points: constant term, x_1 coordinate, x_2 coordinate
+    // 6 data points: constant term, x_1 coordinate, x_2 coordinate
 
     val x = MatrixD ((6, 3), 1.0, 1.0,  1.0,                  // 6-by-3 matrix
                              1.0, 2.0,  4.0,
@@ -568,4 +597,68 @@ end regressionTest9
     println (mod.summary ())                                  // parameter/coefficient statistics
 
 end regressionTest10
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `regressionTest11` main function trains a regression model small dataset.
+ *  val x2 = VectorD (1, 4, 9, 16, 25)
+ *  > runMain scalation.modeling.regressionTest11
+ */
+@main def regressionTest11 (): Unit =
+
+    // 5 data points: constant term, x_1 coordinate, x_2 coordinate
+
+    val _1 = VectorD.one (5)
+    val x1 = VectorD (1, 2, 3, 4, 5)
+    val y  = VectorD (2, 3, 8, 18, 48)
+
+//  val x = MatrixD (_1, x1).transpose
+    val x = MatrixD (_1, x1, x1~^2).transpose
+
+    val mod = new Regression (x, y)                           // create model with intercept
+    mod.trainNtest ()()                                       // train and test the model
+    println (mod.summary ())                                  // parameter/coefficient statistics
+
+    println (s"xtx = ${x.transpose * x}")
+    println (s"xty = ${x.transpose * y}")
+
+end regressionTest11
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `regressionTest12` main function tests the `Regression` class using
+ *  the AutoMPG dataset.  It illustrates using the `Table` class for reading
+ *  the data from a .csv file "auto_mpg.csv".  Assumes no missing values.
+ *  It also combines feature selection with cross-validation and plots
+ *  R^2, R^2 bar, sMAPE, and R^2 cv vs. the instance index.
+ *  > runMain scalation.modeling.regressionTest12
+ */
+@main def regressionTest12 (): Unit =
+
+    import scalation.database.table.Table
+
+    banner ("auto_mpg Table")
+    val ncols = 8
+    val data  = Table.load ("auto_mpg.csv", "auto_mpg", ncols, null)
+    data.show ()
+
+    banner ("AutoMPG dataset")
+    val xcols  = Array.range (0, ncols-1)
+    val (x, y) = data.toMatrixV (xcols, ncols-1)
+    val fname  = xcols.map (data.schema (_))
+    println (s"y = $y")
+
+    banner ("Regression for AutoMPG")
+    val mod = new Regression (x, y, fname)                         // create a regression model
+    mod.trainNtest ()()                                            // train and test the model
+    println (mod.summary ())                                       // parameter/coefficient statistics
+
+    banner ("Forward Selection Test")
+    val (cols, rSq) = mod.forwardSelAll ()                         // R^2, R^2 bar, sMAPE, R^2 cv
+    val k = cols.size
+    val t = VectorD.range (1, k)                                   // instance index
+    new PlotM (t, rSq.ᵀ, Regression.metrics, "R^2 vs n for Regression", lines = true)
+    println (s"rSq = $rSq")
+
+end regressionTest12
 

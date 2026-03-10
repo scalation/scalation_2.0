@@ -226,9 +226,8 @@ case class MuGraph (ch: Array [SET [Int]],
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Print this multi-digraph in a deep sense with all the information.
-     *  @param clip whether to clip out "Set(" and ")"
      */
-    def printG (clip: Boolean = true): Unit =
+    def printG (): Unit =
         println (s"MuGraph ($name, $inverse, $size")
         for i <- ch.indices do println (toLine (i))
         for (k, v) <- elabel do println (s"edge $k -> $v")
@@ -301,7 +300,7 @@ object MuGraph:
                schema: Array [String]): MuGraph =
         val n  = label.length
         val ch = Array.fill (n)(SET [Int] ())
-        for (e, l) <- elabel do ch(e._1) += e._2
+        for (e, _) <- elabel do ch(e._1) += e._2
         new MuGraph (ch, label, elabel, inverse, name, schema)
     end apply
 

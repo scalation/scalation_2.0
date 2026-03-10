@@ -12,6 +12,8 @@ package scalation
 package simulation
 package activity
 
+import scala.annotation.unused
+
 import scalation.mathstat._
 import scalation.random.{Sharp, Variate}
 
@@ -121,10 +123,13 @@ end PetriNetRules
 
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `PetriNetRulesTest` object is used to test the `PetriNetRules` trait.
- *  > runMain scalation.simulation.activity.PetriNetRulesTest
+/** The `petriNetRulesTest` main function is used to test the `PetriNetRules` trait.
+ *  > runMain scalation.simulation.activity.petriNetRulesTest
  */
-object PetriNetRulesTest extends App with PetriNetRules:
+@main def petriNetRulesTest (): Unit =
+
+    object PetriNetRules_ extends PetriNetRules
+    import PetriNetRules_._
 
     //:: Set the initial time.
 
@@ -181,10 +186,10 @@ object PetriNetRulesTest extends App with PetriNetRules:
 
     println ("\n *** Test fluid flows: differential flow model integral derv\n")
 
-    def derv1 (t: Double, y: Double) = y
-    def derv2 (t: Double, y: Double) = 2.0 * y
+    def derv1 (@unused t: Double, y: Double) = y
+    def derv2 (@unused t: Double, y: Double) = 2.0 * y
     val dervs = Array [Derivative] (derv1, derv2)
     println ("Fluid flow:  place to transition: " + fluidFlow (f, dervs, t0, d))
 
-end PetriNetRulesTest
+end petriNetRulesTest
 

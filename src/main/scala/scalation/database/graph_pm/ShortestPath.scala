@@ -79,7 +79,6 @@ class ShortestPath (c: MatrixD, s: Int):
                     val alt = v.dd + c(v.id, j)              // compute alternate distance from s to j
                     if alt < d(j) then
                         p(j) = v.id; d(j) = alt; q += Item (j, d(j))
-                    end if
                 end for
                 debug ("spath", s"updated distance (s, v) : ($s, ${v.id}) = $d")
             end if

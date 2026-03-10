@@ -3,14 +3,14 @@
 
 lazy val scalation = project.in(file("."))
   .settings(
-    scalaVersion  := "3.6.4",
+    scalaVersion  := "3.8.2",
     scalacOptions ++= Seq(
        "-deprecation",         // emit warning and location for usages of deprecated APIs
        "-explain",             // explain errors in more detail
 //     "-explain-types",       // explain type errors in more detail
        "-new-syntax",          // require `then` and `do` in control expressions.
        "-Wunused:all",         // warn of unused imports, ...
-       "-Xfatal-warnings")     // fail the compilation if there are any warnings
+       "-Werror")     // fail the compilation if there are any warnings
 //  javacOptions  += "--add-modules jdk.incubator.vector"
   )
 

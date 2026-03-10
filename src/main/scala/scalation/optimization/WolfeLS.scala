@@ -92,7 +92,6 @@ class WolfeLS (f: FunctionS2S, c1: Double = 0.0001, c2: Double = 0.9)
                 x  = if hi < POS_INF then (lo + hi) / 2.0 else x + x
             else
                 go = false                                          // both conditions satisfied
-            end if
 
             fx = f(x); dfx = Ⅾ (f)(x)                               // recompute f(x) and f'(x)
             debug ("lsearch_", s"(it = $it) x = $x, f(x) = $fx")

@@ -57,7 +57,7 @@ class NeuralNet_XL (x: MatrixD, y: MatrixD, fname_ : Array [String] = null,
                     f: Array [AFF] = Array (f_sigmoid, f_sigmoid, f_id),
                     val itran: FunctionM2M = null)
       extends PredictorMV (x, y, fname_, hparam)
-         with Fit (dfm = x.dim2, df = x.dim - x.dim2):                    // under-estimate of degrees of freedom
+         with Fit (dfr = x.dim2, df = x.dim - x.dim2):                    // under-estimate of degrees of freedom
 
     private   val flaw    = flawf ("NeuralNet_XL")                        // flaw function
     private   val eta     = hp("eta").toDouble                            // learning rate
@@ -72,7 +72,6 @@ class NeuralNet_XL (x: MatrixD, y: MatrixD, fname_ : Array [String] = null,
 
     if nz.length + 1 != nl then
         flaw ("init", "count mismatch among number of layers and activation functions")
-    end if
 
     if nl < 2 then flaw ("init", s"must have at least two ACTIVE layers, but nl = $nl")
 
@@ -84,7 +83,7 @@ class NeuralNet_XL (x: MatrixD, y: MatrixD, fname_ : Array [String] = null,
                               weightVec (sizes(l+1)))                     // biases per active layer
     end for
 
-    modelName = s"NeuralNet_XL_${stringOf (f.map (_.name))}"
+    _modelName = s"NeuralNet_XL_${stringOf (f.map (_.name))}"
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the network parameters (weights and biases) for the given layer.
@@ -190,8 +189,9 @@ class NeuralNet_XL (x: MatrixD, y: MatrixD, fname_ : Array [String] = null,
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Build a sub-model that is restricted to the given columns of the data matrix.
      *  @param x_cols  the columns that the new model is restricted to
+     *  @param fname2  the variable/feature names for the new model (defaults to null)
      */
-    def buildModel (x_cols: MatrixD): NeuralNet_XL =
+    def buildModel (x_cols: MatrixD, fname2: Array [String] = null): NeuralNet_XL =
         new NeuralNet_XL (x_cols, y, null, null, hparam, f, itran)
     end buildModel
 
@@ -351,7 +351,7 @@ end neuralNet_XLTest
     println (mod.summary2 ())                                    // parameter/coefficient statistics
 
     banner ("Concrete - NeuralNet_XL: validate")
-    println (FitM.showFitMap (mod.validate ()(), QoF.values.map (_.toString)))
+    println (Fit.showFitMap (mod.validate ()()._2))
 
     banner ("Concrete - NeuralNet_XL: crossValidate")
     val stats = mod.crossValidate ()
@@ -390,7 +390,7 @@ end neuralNet_XLTest2
     mod.opti.plotLoss ("NeuralNet_XL")                           // loss function vs epochs
 
     banner ("AutoMPG - NeuralNet_XL: TnT validate")
-    println (FitM.showFitMap (mod.validate ()(), QoF.values.map (_.toString)))
+    println (Fit.showFitMap (mod.validate ()()._2))
 
 /*
     banner ("AutoMPG - NeuralNet_XL: crossValidate")
@@ -426,8 +426,7 @@ end neuralNet_XLTest3
 //  val (cols, rSq) = mod.backwardElimAll ()                     // R^2, R^2 bar, smape, R^2 cv
     val k = cols.size
     println (s"k = $k, n = ${x.dim2}")
-    new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "smape", "R^2 cv"),
-               s"R^2 vs n for ${mod.modelName}", lines = true)
+    new PlotM (null, rSq.transpose, Regression.metrics, s"R^2 vs n for ${mod.modelName}", lines = true)
     println (s"rSq = $rSq")
 
 end neuralNet_XLTest4
@@ -462,8 +461,7 @@ end neuralNet_XLTest4
         val (cols, rSq) = mod.selectFeatures (tech)              // R^2, R^2 bar, smape, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "smape", "R^2 cv"),
-                   s"R^2 vs n for ${mod.modelName} with $tech", lines = true)
+        new PlotM (null, rSq.transpose, Regression.metrics, s"R^2 vs n for ${mod.modelName} with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 
@@ -492,7 +490,7 @@ end neuralNet_XLTest5
         mod.trainNtest2 ()()                                     // train and test the model - with auto-tuning
 
         banner ("AutoMPG Validation Test")
-        println (FitM.showFitMap (mod.validate ()(), QoF.values.map (_.toString)))
+        println (Fit.showFitMap (mod.validate ()()._2))
     end for
 
 end neuralNet_XLTest6

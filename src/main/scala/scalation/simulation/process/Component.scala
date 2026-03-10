@@ -77,9 +77,9 @@ trait Component
      *  @param label  the name of this component
      */
     protected def initStats (label: String): Unit =
-        _durationStat   = new Statistic (name)
+        _durationStat   = new Statistic (label)
         if ! this.isInstanceOf [Source] && ! this.isInstanceOf [Sink] && ! this.isInstanceOf [Gate] then
-            _persistentStat = new TimeStatistic ("p-" + name)
+            _persistentStat = new TimeStatistic ("p-" + label)
     end initStats
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

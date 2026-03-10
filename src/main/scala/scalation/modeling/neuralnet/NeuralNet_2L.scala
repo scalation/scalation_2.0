@@ -47,7 +47,7 @@ class NeuralNet_2L (x: MatrixD, y: MatrixD, fname_ : Array [String] = null,
                     hparam: HyperParameter = Optimizer.hp,
                     f: AFF = f_sigmoid, val itran: FunctionM2M = null)
       extends PredictorMV (x, y, fname_, hparam)
-         with Fit (dfm = x.dim2 - 1, df = x.dim - x.dim2):
+         with Fit (dfr = x.dim2 - 1, df = x.dim - x.dim2):
 
     private val eta  = hp("eta").toDouble                                 // learning rate
             val opti = new OPTIMIZER ()                                   // parameter optimizer
@@ -56,7 +56,7 @@ class NeuralNet_2L (x: MatrixD, y: MatrixD, fname_ : Array [String] = null,
 //  bb = Array (b.asInstanceOf [NetParam])                                // inside array 
     bb = Array (new NetParam (weightMat (x.dim2, y.dim2)))                // initialize parameters bb
 
-    modelName = "NeuralNet_2L_" + f.name
+    _modelName = s"NeuralNet_2L_${f.name}"
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Given training data x_ and y_, fit the parameters bb.
@@ -136,8 +136,9 @@ class NeuralNet_2L (x: MatrixD, y: MatrixD, fname_ : Array [String] = null,
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Build a sub-model that is restricted to the given columns of the data matrix.
      *  @param x_cols  the columns that the new model is restricted to
+     *  @param fname2  the variable/feature names for the new model (defaults to null)
      */
-    def buildModel (x_cols: MatrixD): NeuralNet_2L =
+    def buildModel (x_cols: MatrixD, fname2: Array [String] = null): NeuralNet_2L =
         new NeuralNet_2L (x_cols, y, null, hparam, f, itran)
     end buildModel
 
@@ -318,7 +319,7 @@ end neuralNet_2LTest
     println (mod.summary2 ())                                    // parameter/coefficient statistics
 
     banner ("Concrete - NeuralNet_2L: validate")
-    println (FitM.showFitMap (mod.validate ()(), QoF.values.map (_.toString)))
+    println (Fit.showFitMap (mod.validate ()()._2))
 
     banner ("Concrete - NeuralNet_2L: crossValidate")
     val stats = mod.crossValidate ()
@@ -357,7 +358,7 @@ import Example_AutoMPG._
     println (mod.summary2 ())                                    // parameter/coefficient statistics
 
     banner ("AutoMPG - NeuralNet_2L: TnT validate")
-    println (FitM.showFitMap (mod.validate ()(), QoF.values.map (_.toString)))
+    println (Fit.showFitMap (mod.validate ()()._2))
 
     banner ("AutoMPG - NeuralNet_2L: crossValidate")
     val stats = mod.crossValidate ()
@@ -389,8 +390,7 @@ end neuralNet_2LTest3
 //  val (cols, rSq) = mod.backwardElimAll ()                     // R^2, R^2 bar, smape, R^2 cv
     val k = cols.size
     println (s"k = $k, n = ${ox.dim2}")
-    new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "smape", "R^2 cv"),
-               s"R^2 vs n for ${mod.modelName}", lines = true)
+    new PlotM (null, rSq.transpose, Regression.metrics, s"R^2 vs n for ${mod.modelName}", lines = true)
     println (s"rSq = $rSq")
 
 end neuralNet_2LTest4
@@ -423,8 +423,7 @@ end neuralNet_2LTest4
         val (cols, rSq) = mod.selectFeatures (tech)              // R^2, R^2 bar, smape, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${ox.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "smape", "R^2 cv"),
-                   s"R^2 vs n for ${mod.modelName} with $tech", lines = true)
+        new PlotM (null, rSq.transpose, Regression.metrics, s"R^2 vs n for ${mod.modelName} with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 
@@ -448,7 +447,7 @@ end neuralNet_2LTest5
         mod.trainNtest2 ()()                                      // train and test the model - with auto-tuning
 
         banner ("AutoMPG Validation Test")
-        println (FitM.showFitMap (mod.validate ()(), QoF.values.map (_.toString)))
+        println (Fit.showFitMap (mod.validate ()()._2))
     end for
 
 end neuralNet_2LTest6
@@ -530,7 +529,7 @@ end neuralNet_2LTest7
         val yp = f.fM (u)                                             // predicted response from calculation for sigmoid
         val ε  = y - yp                                               // error matrix
         val δ  = f.dM(yp) ⊙ ε                                         // delta matrix for y
-        b     += x.𝐓 * δ * η                                          // parameter update (transpose (𝐓))
+        b     += x.ᵀ * δ * η                                          // parameter update (transpose (ᵀ))
 
         val sse0 = ε(?, 0).normSq                                     // sum of squared errors for column 0
         val sse1 = ε(?, 1).normSq                                     // sum of squared errors for column 1
@@ -554,7 +553,7 @@ end neuralNet_2LTest8
 /** The `neuralNet_2LTest9` main function is used to test the `NeuralNet_2L` class.
  *  It compares `NeuralNet_2L.perceptron` using sigmoid with `TransRegression` using logit.
  *  > runMain scalation.modeling.neuralnet.neuralNet_2LTest9
- */
+ *
 @main def neuralNet_2LTest9 (): Unit =
 
 //  val x  = VectorD (1, 2, 3, 4, 5, 6)
@@ -575,4 +574,5 @@ end neuralNet_2LTest8
     tr.trainNtest ()()                                                // train and test the model
 
 end neuralNet_2LTest9
+ */
 

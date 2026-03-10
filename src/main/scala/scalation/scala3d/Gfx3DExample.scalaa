@@ -47,7 +47,6 @@ class Gfx3DExample extends Application:
         if ! is3DSupported then
            println ("Sorry, 3D is not supported in JavaFX on this platform.")
            return
-        end if
 
         val box = new Box (100, 100, 100)
         box.setCullFace (CullFace.NONE)

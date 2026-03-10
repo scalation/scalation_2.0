@@ -38,19 +38,20 @@ import scalation.optimization.quasi_newton.BFGS
 class PoissonRegression (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
                          hparam: HyperParameter = null)
       extends Predictor (x, y, fname_, hparam)
-         with Fit (dfm = x.dim2 - 1, df = x.dim - x.dim2):
+         with Fit (dfr = x.dim2 - 1, df = x.dim - x.dim2):
 
 /*
-    private val k          = x.dim2 - 1               // number of variables 
-    private val n          = x.dim.toDouble           // number of data points (rows)
-    private val r_df       = (n-1.0) / (n-k-1.0)      // ratio of degrees of freedom
+    private val k          = x.dim2 - 1                         // number of variables 
+    private val n          = x.dim.toDouble                     // number of data points (rows)
+    private val r_df       = (n-1.0) / (n-k-1.0)                // ratio of degrees of freedom
 */
-    private var aic        = -1.0                     // Akaike’s Information Criterion
-    private var n_dev      = -1.0                     // null dev: -LL, for null model (intercept only)
-    private var r_dev      = -1.0                     // residual dev: -LL, for full model
-    private var pseudo_rSq = -1.0                     // McFaffen's pseudo R-squared
+    private val debug      = debugf ("PoissonRegression", true) // debug function
+    private var aic        = -1.0                               // Akaike’s Information Criterion
+    private var n_dev      = -1.0                               // null dev: -LL, for null model (intercept only)
+    private var r_dev      = -1.0                               // residual dev: -LL, for full model
+    private var pseudo_rSq = -1.0                               // McFaffen's pseudo R-squared
 
-    modelName = "PoissonRegression"
+    _modelName = "PoissonRegression"
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** For a given parameter vector 'b', compute '-Log-Likelihood' (-LL).
@@ -62,9 +63,9 @@ class PoissonRegression (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
         var sum = 0.0
         for i <- x.indices do
             val bx = b dot x(i)
-            sum += y(i) * bx - exp (bx)               // last term not needed [ - log (fac (y(i))) ]
+            sum += y(i) * bx - exp (bx)                         // last term not needed [ - log (fac (y(i))) ]
         end for
-        -sum                                          // set up for minimization
+        -sum                                                    // set up for minimization
     end ll
    
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -76,10 +77,10 @@ class PoissonRegression (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
     def ll_null (b: VectorD): Double =
         var sum = 0.0
         for i <- x.indices do
-            val bx = b(0)                              // only use the intercept
-            sum += y(i) * bx - exp (bx)                // last term not needed [ - log (fac (y(i))) ]
+            val bx = b(0)                                        // only use the intercept
+            sum += y(i) * bx - exp (bx)                          // last term not needed [ - log (fac (y(i))) ]
         end for
-        - sum                                          // set up for minimization
+        - sum                                                    // set up for minimization
     end ll_null
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -91,11 +92,11 @@ class PoissonRegression (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
     def train (x_ : MatrixD = x, y_ : VectorD = y.toDouble): Unit =
          // FIX - currently only works for x_ = x and y_ = y
          train_null ()
-         val b0   = new VectorD (x_.dim2)              // use b_0 = 0 for starting guess for parameters
-         val bfgs = new BFGS (ll)                      // minimizer for -2LL
+         val b0   = new VectorD (x_.dim2)                        // use b_0 = 0 for starting guess for parameters
+         val bfgs = new BFGS (ll)                                // minimizer for -2LL
 
-         b     = bfgs.solve (b0)._2                    // find optimal solution for parameters
-         r_dev = ll (b)                                // measure of fitness for full model
+         b     = bfgs.solve (b0)._2                              // find optimal solution for parameters
+         r_dev = ll (b)                                          // measure of fitness for full model
          aic   = r_dev + 2.0 * x_.dim2
     end train
 
@@ -105,11 +106,11 @@ class PoissonRegression (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
      *  Do this by minimizing '-2LL'.
      */
     def train_null (): Unit =
-         val b0   = new VectorD (x.dim2)               // use b0 = 0 for starting guess for parameters
-         val bfgs = new BFGS (ll_null)                 // minimizer for -2LL
+         val b0   = new VectorD (x.dim2)                         // use b0 = 0 for starting guess for parameters
+         val bfgs = new BFGS (ll_null)                           // minimizer for -2LL
 
-         val b_n = bfgs.solve (b0)._2                  // find optimal solution for parameters
-         n_dev   = ll_null (b_n)                       // measure of fitness for null nodel
+         val b_n = bfgs.solve (b0)._2                            // find optimal solution for parameters
+         n_dev   = ll_null (b_n)                                 // measure of fitness for null nodel
     end train_null
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -121,8 +122,8 @@ class PoissonRegression (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
      *  @param y_  the testing/full response/output vector (defaults to full y)
      */
     def test (x_ : MatrixD = x, y_ : VectorD = y): (VectorD, VectorD) =
-        val yp = predict (x_)                                            // make predictions
-        (yp, diagnose (y_, yp))                                          // return predictions and QoF vector
+        val yp = predict (x_)                                    // make predictions
+        (yp, diagnose (y_, yp))                                  // return predictions and QoF vector
     end test
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -149,9 +150,11 @@ class PoissonRegression (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Build a sub-model that is restricted to the given columns of the data matrix.
      *  @param x_cols  the columns that the new model is restricted to
+     *  @param fname2  the variable/feature names for the new model (defaults to null)
      */
-    def buildModel (x_cols: MatrixD): PoissonRegression =
-        new PoissonRegression (x_cols, y)
+    def buildModel (x_cols: MatrixD, fname2: Array [String] = null): PoissonRegression =
+        debug ("buildModel", s"${x_cols.dim} by ${x_cols.dim2}")
+        new PoissonRegression (x_cols, y, fname2)
     end buildModel
 
 end PoissonRegression

@@ -252,7 +252,6 @@ object LatLong2UTM:
         else
             if latIndex == -2 then latIndex = negLetters.length - 1
             negLetters (latIndex).toString
-        end if
     end getLatZone
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

@@ -186,7 +186,7 @@ import Example_Concrete._
 
     banner ("Concrete - RegressionMV")
     val mod = new RegressionMV (ox, y, ox_fname)                 // create model with intercept (else pass x)
-    val (yp, qof) = mod.trainNtest ()()                          // train and test the model
+    val qof = mod.trainNtest ()()._2                             // train and test the model
     println (mod.summary ())                                     // parameter/coefficient statistics
 
     val sse = qof (QoF.sse.ordinal)
@@ -264,7 +264,7 @@ end example_ConcreteTest2
     val pt = NeuralNet_2L.rescale (ox, y)
 
     banner (s"Neural_2L as 3 perceptrons: trainNtest2")
-    val (yp, qof) = pt.trainNtest2 ()()                          // interval search on eta
+    val yp = pt.trainNtest2 ()()._1                             // interval search on eta
     for j <- y.indices2 do
         val yj  = y(?, j)
         val ypj = yp(?, j)

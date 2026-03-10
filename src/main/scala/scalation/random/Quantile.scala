@@ -12,6 +12,7 @@ package scalation
 package random
 
 import scala.math.{abs, exp, log, Pi, sqrt}
+import scala.annotation.unused
 
 import scalation.mathstat.{Plot, VectorD}
 
@@ -44,7 +45,6 @@ object Quantile:
         if p < 0.0 || p > 1.0 then
             flaw ("check", "probability parameter p must be in the range [0, 1]")
             return (true, -0.0)
-        end if
         if p =~ 0.0 then return (true, x_min)                  // smallest value, defaults to -infinity
         if p =~ 1.0 then return (true, POSITIVE_INFINITY)      // +infinity
         (false, 0.0)                                           // in usual range (0, 1)
@@ -110,7 +110,7 @@ object Quantile:
      *  @param p   the p-th quantile, e.g., .95 (95%)
      *  @param pr  parameter for the distribution (currently not used)
      */
-    def normalInv (p: Double = .95, pr: Parameters = null): Double =
+    def normalInv (p: Double = .95, @unused pr: Parameters = null): Double =
         val extreme = check (p)                        // handle extreme cases
         if extreme._1 then return extreme._2
 
@@ -205,7 +205,6 @@ object Quantile:
         else
             y = ((1.0 / (((df + 6.0) / (df * y) - 0.089 * d - 0.822) * (df + 2.0) * 3.0) +
                 0.5 / (df + 4.0))  * y - 1.0) * (df + 1.0) / (df + 2.0) + 1.0 / y
-        end if
         sign * sqrt (df * y)
     end studentTInv
 
@@ -268,7 +267,6 @@ object Quantile:
         if df <= 0 || df >= 50 then
             flaw ("chiSquareInv", "parameter df must be in the set {1, 2, ..., 49}")
             return -0.0
-        end if
 
         var x1   = 0.0                        // lower limit
         var x2   = 8.0 * df                   // upper limit
@@ -311,7 +309,6 @@ object Quantile:
         if df1 <= 0 || df2 <= 0 then
             flaw ("fisherInv", "parameters df1 and df2 must be strictly positive")
             return -0.0
-        end if
 
         var x1   = 0.0                        // lower limit
         var x2   = 1.0E6                      // upper limit

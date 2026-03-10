@@ -40,16 +40,16 @@ class Perceptron (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
                   hparam: HyperParameter = Perceptron.hp,
                   f: AFF = f_sigmoid, val itran: FunctionV2V = null)
       extends Predictor (x, y, fname_, hparam)
-         with Fit (dfm = x.dim2 - 1, df = x.dim - x.dim2)
+         with Fit (dfr = x.dim2 - 1, df = x.dim - x.dim2)
          with MonitorLoss:
 
     private val debug     = debugf ("Perceptron", false)                // debug function
     private val flaw      = flawf ("Perceptron")                        // flaw function
     private val (m, n)    = x.dims                                      // input data matrix dimensions
-    private val η         = hparam ("eta").toDouble                     // the learning/convergence rate (requires adjustment)
-    private val maxEpochs = hparam ("maxEpochs").toInt                  // the maximum number of training epcochs/iterations
+    private val η         = hparam("eta").toDouble                      // the learning/convergence rate (requires adjustment)
+    private val maxEpochs = hparam("maxEpochs").toInt                   // the maximum number of training epcochs/iterations
 
-    modelName = "Perceptron_" + f.name
+    _modelName = s"Perceptron_${f.name}"
 
     if y.dim != m then flaw ("init", "dimensions of x and y are incompatible")
 
@@ -82,7 +82,7 @@ class Perceptron (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
             val yp = f.f_ (x_ * b)                                      // predicted output vector yp = f(Xb)
             val e  = y_ - yp                                            // error vector for y (protected var from `Predictor)
             val δ  = -f.d (yp) * e                                      // delta vector for y (protected var from `Predictor)
-            b     -= x_.𝐓 * δ * η                                       // update the parameters/weights (𝐓 for transpose)
+            b     -= x_.ᵀ * δ * η                                       // update the parameters/weights (ᵀ for transpose)
 
             val sse = (y_ - f.f_ (x_ * b)).normSq                       // recompute sum of squared errors
             collectLoss (sse)                                           // collect loss per epoch
@@ -121,11 +121,7 @@ class Perceptron (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
         debug ("trainNTest", s"b = $b")
         val (yp, qof) = test (xx, yy)
         println (report (qof))
-        if DO_PLOT then
-            val yy_ = if itran == null then yy else itran (yy)          // undo scaling, if used
-            val (ryy, ryp) = orderByY (yy_, yp)                         // order by yy
-            new Plot (null, ryy, ryp, s"$modelName: y actual, predicted")
-        end if
+        Predictor.plotPrediction (if itran == null then yy else itran (yy), yp, modelName)   // undo scaling, if used
         (yp, qof)
     end trainNtest
 
@@ -150,9 +146,11 @@ class Perceptron (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Build a sub-model that is restricted to the given columns of the data matrix.
      *  @param x_cols  the columns that the new model is restricted to
+     *  @param fname2  the variable/feature names for the new model (defaults to null)
      */
-    override def buildModel (x_cols: MatrixD): Perceptron =
-        new Perceptron (x_cols, y, null, hparam, f, itran)
+    def buildModel (x_cols: MatrixD, fname2: Array [String] = null): Perceptron =
+        debug ("buildModel", s"${x_cols.dim} by ${x_cols.dim2}")
+        new Perceptron (x_cols, y, fname2, hparam, f, itran)
     end buildModel
 
 end Perceptron
@@ -229,7 +227,7 @@ import Perceptron.hp
 @main def perceptronTest (): Unit =
 
 /*
-    // 9 data points:    Constant    x1    x2     y
+    // 9 data points:         One    x1    x2     y
     val xy = MatrixD ((9, 4), 1.0,  1.0,  1.0,  0.04,           // dataset 1
                               1.0,  2.0,  1.0,  0.05,
                               1.0,  3.0,  1.0,  0.06,
@@ -246,7 +244,7 @@ import Perceptron.hp
 //  val b = VectorD (-5.0, -0.5, 1.5)                               // initial weights/parameters, better
 */
 
-    // 9 data points:    Constant    x1    x2     y
+    // 9 data points:         One    x1    x2     y
     val xy = MatrixD ((9, 4), 1.0,  0.0,  0.0,  0.5,            // dataset 2
                               1.0,  0.0,  0.5,  0.3,
                               1.0,  0.0,  1.0,  0.2,
@@ -269,46 +267,46 @@ import Perceptron.hp
     val sst = (y - y.mean).normSq                                   // sum of squares total
     println (s"sst = $sst")
 
-    val η   = 0.5 
+    val η   = 2.0 
     hp("eta") = η                                                   // try several values for eta
 //  val nn = new Perceptron (x, y, null, hp, f_reLU)                // create a perceptron, user control
-    val nn = new Perceptron (x, y, null, hp)                        // create a perceptron, user control
+//  val nn = new Perceptron (x, y, null, hp)                        // create a perceptron, user control
 //  val nn = Perceptron (xy, null, hp)                              // create a perceptron, automatic scaling
 
     banner ("initialize")
 
-    nn.setWeights (b)                                               // set the parameters/weights
+//  nn.setWeights (b)                                               // set the parameters/weights
+
+    var u, yp, e, fp, d, g: VectorD = null
  
-    for epoch <- 1 to 5 do
+    for epoch <- 1 to 10 do
         banner (s"improvement step $epoch")
-        val u   = x * b                                             // pre-activation value
-        val yp  = nn.predict ()                                     // predicted response from nn
-        val yp2 = sigmoid_ (u)                                      // predicted response from calculation for sigmoid
-//      val yp2 = reLU_ (u)                                         // predicted response from calculation for reLU
-        assert (yp == yp2)
-        val e   = y - yp                                            // error
-        val fp  = yp * (_1 - yp)                                    // derivative (f') for sigmoid
-//      val fp  = u.map (z => is_ (z >= 0.0))                       // derivative (f') for reLU
-        val d   = - e * fp                                          // delta
-        val g   = x.transpose * d                                   // gradient
-        val bup = g * η                                             // parameter update
-        b      -= bup                                               // new parameter vector
+        u   = x * b                                                 // pre-activation value
+        yp  = sigmoid_ (u)                                          // predicted response from calculation for sigmoid
+        e   = y - yp                                                // error
+        fp  = yp * (_1 - yp)                                        // derivative (f') for sigmoid
+        d   = - e * fp                                              // delta
+        g   = x.ᵀ * d                                               // gradient
+        b  -= g * η                                                 // new parameter vector
         val sse = e.normSq                                          // sum of squared errors
 
-        println (s"b   = $b")
+//      val yp2 = nn.predict ()                                     // predicted response from nn
+//      val yp  = reLU_ (u)                                         // predicted response from calculation for reLU
+//      assert (yp == yp2)
+//      val fp  = u.map (z => is_ (z >= 0.0))                       // derivative (f') for reLU
+
         println (s"u   = $u")                                 
         println (s"y   = $y")
         println (s"yp  = $yp")
-        println (s"yp2 = $yp2")
+//      println (s"yp2 = $yp2")
         println (s"e   = $e")
         println (s"fp  = $fp")
         println (s"d   = $d")
         println (s"g   = $g")
-        println (s"bup = $bup")
         println (s"b   = $b")
         println (s"sse = $sse")
         println (s"R^2 = ${1 - sse/sst}")
-        nn.setWeights (b)
+//      nn.setWeights (b)
     end for
  
 end perceptronTest
@@ -423,8 +421,7 @@ end perceptronTest3
 //  val (cols, rSq) = mod.backwardElimAll ()                        // R^2, R^2 bar, R^2 cv
     val k = cols.size
     println (s"k = $k, n = ${x.dim2}")
-    new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-               "R^2 vs n for Perceptron", lines = true)
+    new PlotM (null, rSq.ᵀ, Regression.metrics, "R^2 vs n for Perceptron", lines = true)
     println (s"rSq = $rSq")
 
 end perceptronTest4
@@ -456,8 +453,7 @@ end perceptronTest4
         val (cols, rSq) = mod.selectFeatures (tech)                   // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for Perceptron with $tech", lines = true)
+        new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for Perceptron with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 

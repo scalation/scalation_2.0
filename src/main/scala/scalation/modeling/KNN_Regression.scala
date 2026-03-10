@@ -34,17 +34,17 @@ import scalation.mathstat._
 class KNN_Regression (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
                       hparam: HyperParameter = KNN_Regression.hp)
       extends Predictor (x, y, fname_, hparam)
-         with Fit (dfm = x.dim2 - 1, df = x.dim - x.dim2):
+         with Fit (dfr = x.dim2 - 1, df = x.dim - x.dim2):
 
     private val debug      = debugf ("KNN_Regression", false)                // debug function
     private val flaw       = flawf ("KNN_Regression")                        // debug function
     private val MAX_DOUBLE = Double.PositiveInfinity                         // infinity
-    private val kappa      = hparam ("kappa").toInt                          // the number of nearest neighbors to consider
+    private val kappa      = hparam("kappa").toInt                           // the number of nearest neighbors to consider
 
     private val topK       = Array.fill (kappa)(-1, MAX_DOUBLE)              // top-kappa nearest points (in reserve order)
     private val d          = new VectorD (x.dim)                             // vector to hold distances
 
-    modelName = "KNN_Regression"
+    _modelName = s"KNN_Regression_$kappa"
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute a distance metric between vectors/points x and z.
@@ -142,31 +142,36 @@ class KNN_Regression (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /*  Use validation to compute test Quality of Fit (QoF) measures by dividing
-     *  the full dataset into a TESTING set and a TRAINING set.
-     *  The test set is defined by idx and the rest of the data is the training set.
+     *  the full dataset into a TESTING-set and a TRAINING-set.
+     *  The testing-set is defined by idx and the rest of the data is the training-set.
+     *  @see `modeling.Predictor.validate` about the RANDOM, FIRST, and LAST options
+     *  for selecting the testing-set.
      *  @param rando  flag indicating whether to use randomized or simple validation
-     *  @param ratio  the ratio of the TESTING set to the full dataset (most common 70-30, 80-20)
-     *  @param idx    the prescribed TESTING set indices
+     *  @param ratio  the ratio of the TESTING-set to the full dataset (most common 70-30 (.3), 80-20 (.2))
+     *  @param idx    the prescribed TESTING-set indices
      */
-    override def validate (rando: Boolean = true, ratio: Double = 0.2)
-                 (idx : IndexedSeq [Int] = testIndices ((ratio * y.dim).toInt, rando)): VectorD =
+    override def validate (rando: Boolean = true, ratio: Double = Model.TE_RATIO)
+//                        (idx : IndexedSeq [Int] = testIndices ((ratio * y.dim).toInt, rando)):
+                          (idx: IndexedSeq [Int] = testIndices (y.dim, (ratio * y.dim).toInt, rando)):
+                          (VectorD, VectorD) =
         val x_e = x(idx)                                                     // test data/input matrices
         val y_e = y(idx)                                                     // test response/output vectors
 
-        val qof = testNoSpy (x_e, y_e, idx)._2                               // test on test-set and get QoF measures
+        val (yp, qof) = testNoSpy (x_e, y_e, idx)                            // test on TESTING-set and get its yp and QoF measures
         if qof(QoF.sst.ordinal) <= 0.0 then                                  // requires variation in test-set
             flaw ("validate", "chosen testing set has no variability")
-        end if
         println (FitM.fitMap (qof, QoF.values.map (_.toString)))
-        qof
+        (yp, qof)
     end validate
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Build a sub-model that is restricted to the given columns of the data matrix.
      *  @param x_cols  the columns that the new model is restricted to
+     *  @param fname2  the variable/feature names for the new model (defaults to null)
      */
-    override def buildModel (x_cols: MatrixD): KNN_Regression =
-        new KNN_Regression (x, y, null, hparam)
+    def buildModel (x_cols: MatrixD, fname2: Array [String] = null): KNN_Regression =
+        debug ("buildModel", s"${x_cols.dim} by ${x_cols.dim2}")
+        new KNN_Regression (x, y, fname2, hparam)
     end buildModel
 
 end KNN_Regression
@@ -307,7 +312,7 @@ end kNN_RegressionTest2
         rSq(k) = Fit.qofVector (mod.fit, mod.crossValidate ())            // use main model, knn
     end for
 
-    new PlotM (kr, rSq.transpose, lines = true)
+    new PlotM (kr, rSq.ᵀ, Regression.metrics, lines = true)
 
 end kNN_RegressionTest3
 

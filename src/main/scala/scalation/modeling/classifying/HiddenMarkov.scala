@@ -69,19 +69,16 @@ class HiddenMarkov (y: VectorI, m: Int, n: Int, cname_ : Array [String] = null,
     private val rvalue = 0 until m                                    // range over observation symbols/values
     private val rstate = 0 until n                                    // range over states
 
-    modelName = "HiddenMarkov"                                        // name of the model
+    _modelName = s"HiddenMarkov_$n"                                   // name of the model
 
     if pi == null then
         pi = pvn.gen                                                  // initialize the state probability vector
-    end if
     if a == null then
         a = new MatrixD (n, n)
         for i <- rstate do a(i) = pvn.gen                             // initialize state transition probability matrix a
-    end if
     if b == null then
         b = new MatrixD (n, m)
         for i <- rstate do b(i) = pvm.gen                             // initialize observation probability matrix b
-    end if
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the size of the (hidden) state space.
@@ -143,7 +140,6 @@ class HiddenMarkov (y: VectorI, m: Int, n: Int, cname_ : Array [String] = null,
            1.0 / p                                                    // reciporcal of product
         else
            alp(tt-1).sum                                              // sum of last row
-        end if
     end probY
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -153,14 +149,13 @@ class HiddenMarkov (y: VectorI, m: Int, n: Int, cname_ : Array [String] = null,
      *  Requires:  alp  the unscaled alpha matrix or
      *             c    the vector of scaling factors
      */
-    private def logProbY (scaled: Boolean = false): Double =
+    private def logProbY (scaled: Boolean): Double =
         if scaled then
             var lp = 0.0                                              // log-probability
             for t <- rtime do lp += log (c(t))                        // sum of the log of scaling factors
             -lp                                                       // reciporcal via -log
         else
             -log (alp(tt-1).sum)                                      // - log of sum of last row
-        end if
     end logProbY
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -299,7 +294,6 @@ class HiddenMarkov (y: VectorI, m: Int, n: Int, cname_ : Array [String] = null,
                 else
                     println (s"train: HMM model converged after $it iterations")
                     break ()
-                end if
             end for
         } // breakable
         println (s"train: HMM model did not converged after $MIT iterations")

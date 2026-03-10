@@ -199,7 +199,6 @@ case class NHPoissonProcess (lambda: VectorD, dt: Double = 1.0, stream: Int = 0)
         if i2 >= lsum.dim then
             flaw ("meanF", "i2 is beyond the end of lsum vector")
             return -1.0
-        end if
         val t1 = i1 * dt
         val t2 = t1 + dt
         val l1 = lsum(i1 - 1)
@@ -247,7 +246,6 @@ case class NHPoissonProcess (lambda: VectorD, dt: Double = 1.0, stream: Int = 0)
             else
                 val s = -sum + k * log (sum) - logfac (k)
                 exp (s)
-            end if
         end if
     end pf
 
@@ -312,10 +310,10 @@ end NHPoissonProcess
 
         var sum = 0.0
         val rep = 10000
-        for i <- 1 to rep do
+        cfor (0, rep) { _ =>
             rv.reset ()
             sum += rv.count (tt)
-        end for
+        } // cfor
         println ("rv.mean = " + rv.meanF (tt) + " estimate = " + sum / rep.toDouble)
     end meansTest
 
@@ -333,22 +331,22 @@ end NHPoissonProcess
 
         val rep  = 50000              // replications
         var j    = 0                  // interval number
-        var x    = 0.0                // x coordinate
+//      var x    = 0.0                // x coordinate
         var o    = 0.0                // observed value: height of histogram
         var e    = 0.0                // expected value: pf (x)
         var chi2 = 0.0                // ChiSquare statistic
         var n    = 0                  // number of nonzero intervals
         val sum  = new Array [Int] (51)
 
-        for i <- 1 to rep do
+        cfor (0, rep) { _ =>
             rv.reset ()
             if name == "PoissonProcess" then j = rv.count (tt)
             else j = rv.count (a, b)
             if 0 <= j && j <= 50 then sum (j) += 1
-        end for
+        } // cfor
 
         for i <- 0 until sum.length do
-            x = i / 10.0
+//          x = i / 10.0
             o = sum(i)
             rv.gen
             if name == "PoissonProcess" then e = round (rep * rv.pf (i, tt)).toDouble
@@ -356,7 +354,6 @@ end NHPoissonProcess
             if e >= 5 then
                 chi2 += pow (o - e, 2) / e
                 n += 1
-            end if
             print ("\tsum (" + i + ") = " + o + " : " + e + " ")
             if i % 5 == 4 then println ()
         end for

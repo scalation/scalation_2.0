@@ -98,13 +98,11 @@ class IntegerLP (a: MatrixD, b: VectorD, c: VectorD, excl: Set [Int] = Set ()):
                 println (s"x_$j <= ${x_le(j)}")
                 aa = aa :+ VectorD.oneAt (j, c.dim)               // add row to constraint matrix
                 bb = bb :+ x_le(j)                                // add element to limit vector
-            end if
                 
             if x_ge(j) >= 0.0 then                                // check for x_j >= bound
                 println ("x_$j >= ${x_ge(j)}")
                 aa = aa :+ VectorD.oneAt (j, c.dim)               // add row to constraint matrix
                 bb = bb :+ -x_ge(j)                               // add element to limit vector
-            end if
         end for
         (aa, bb)                                                  // return the full set of constraints
     end formConstraints
@@ -149,7 +147,6 @@ class IntegerLP (a: MatrixD, b: VectorD, c: VectorD, excl: Set [Int] = Set ()):
                 println (">>>>>>>>>>>>>> left branch:  dp = " + (dp + 1))
                 println (">>>>>>>>>>>>>> add constraint x_" + j + " <= " + bound)
                 solve (dp + 1, formConstraints)
-            end if
 
             // add upper bound constraint: x_j >= -ceil (x(j)) where "-" => ">=" constraint
             bound = ceil (x(j))

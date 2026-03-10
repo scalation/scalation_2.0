@@ -34,6 +34,11 @@ class CoFilter_2D (width: Int = 5):
      */
     def update (mat_ : MatrixD): Unit = mat = mat_
 
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return/get the filter coefficients (needed for forward and gradient computation)
+     */
+    def coef: MatrixD = mat
+
 end CoFilter_2D
 
 

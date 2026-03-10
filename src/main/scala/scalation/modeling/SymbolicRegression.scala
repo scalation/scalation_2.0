@@ -19,7 +19,7 @@
 package scalation
 package modeling
 
-import scala.collection.mutable.Set
+import scala.collection.mutable.{LinkedHashSet => LSET}
 import scala.runtime.ScalaRunTime.stringOf
 
 import scalation.mathstat._
@@ -27,18 +27,91 @@ import scalation.mathstat._
 type Xj2p = (Int, Double)                                                 // factor in term x_j ^ p
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `SymbolicRegression` object supports a limited form of symbolic regression that
+/** The `SymbolicRegression` class supports a limited form of symbolic regression that
  *  allows variables/columns to be raised to various powers, e.g., x^2, x^3, x^.5.
  *  Note, x~^p is a column-wise power function (each column raised to p-th power).
  *  IMPORTANT:  must not include intercept (column of ones) in initial data matrix),
  *  i.e., DO NOT include a column of ones in x (will cause singularity in expanded matrix).
+ *  @param xx       the expanded data/input m-by-n matrix
+ *  @param y        the response/output m-vector
+ *  @param fname    the feature/variable names
+ *  @param powers   the set of powers to raise matrix x to
+ *  @param rpowers  the set of rational powers to raise matrix x to (allows a negative base)
+*                       DON'T use the same powers for powers and rpowers
+ *  @param hparam   the hyper-parameters (use Regression.hp for default)
+ */
+class SymbolicRegression (xx: MatrixD, y: VectorD, fname: Array [String],
+                          powers: LSET [Double],
+                          rpowers: LSET [Rat],
+                          hparam: HyperParameter = Regression.hp)
+      extends Regression (xx, y, fname, hparam):
+
+    _modelName = s"SymbolicRegression_${powers}_$rpowers"
+
+end SymbolicRegression
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `SymbolicRegression` object provides several factory methods.
  */
 object SymbolicRegression:
 
     private val debug = debugf ("SymbolicRegression", true)               // debug function
 
+    val powers  = LSET (-2.0, -1.5, -1.0, -0.5, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0)  // powers (x~^p) are doubles
+
+    val rpowers = LSET (Rat(-2), Rat(-5, 3), Rat(-4, 3),                  // powers (x↑r) are rational numbers
+                        Rat(-1), Rat(-2, 3), Rat(-1, 3),                  // these allow a negative base x in x↑r
+                                 Rat(1, 3),  Rat(2, 3),                   // since the denominators are odd
+                        Rat(1),  Rat(4, 3),  Rat(5, 3),
+                        Rat(2),  Rat(7, 3),  Rat(8, 3),
+                        Rat(3))
+
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Create a `Regression` object from a data matrix and a response vector.
+    /** Search for a good symbolic regression model by trying several combinations
+     *  of powers.
+     *  @param x          the initial data/input m-by-n matrix (before expansion)
+     *                        must not include an intercept column of all ones
+     *  @param y          the response/output m-vector
+     *  @param fname      the feature/variable names (defaults to null)
+     *  @param intercept  whether to include the intercept term (column of ones) _1 (defaults to true)
+     *  @param cross      whether to include 2-way cross/interaction terms x_i x_j (defaults to true)
+     *  @param cross3     whether to include 3-way cross/interaction terms x_i x_j x_k (defaults to false)
+     *  @param rational   whether to search over rational or double powers
+     *  @param hparam     the hyper-parameters (use Regression.hp for default)
+     *  @param terms      custom terms to add into the model, e.g., Array ((0, 1.0), (1, -2.0))
+     *                        adds x0 x1^(-2)
+     */
+    def searchSR (x: MatrixD, y: VectorD, fname: Array [String] = null,
+                  intercept: Boolean = true,
+                  cross: Boolean = true, cross3: Boolean = false,
+                  rational: Boolean = true,
+                  hparam: HyperParameter = Regression.hp,
+                  terms: Array [Xj2p]*): BestStep =
+        var best = BestStep ()()                                          // best step so far
+
+        for k <- 2 to 3 do
+            if rational then
+                for r <- rpowers.subsets (k) do                           // grid search rational powers r
+                    val mod = apply (x, y, fname, null, r, intercept,
+                                     cross, cross3, hparam, terms*)
+                    val (_, qof) = mod.trainNtest ()()                    // train and test the model
+                    println (mod.summary ())                              // parameter/coefficient statistics
+                    best = best.better (-1, qof, mod, mod.mcols)          // which is better (-1 => all columns)
+
+            else
+                for p <- powers.subsets (k) do                            // grid search double powers p
+                    val mod = apply (x, y, fname, p, null, intercept,
+                                     cross, cross3, hparam, terms*)
+                    val (_, qof) = mod.trainNtest ()()                    // train and test the model
+                    println (mod.summary ())                              // parameter/coefficient statistics
+                    best = best.better (-1, qof, mod, mod.mcols)          // which is better (-1 => all columns)
+        end for
+        best                                                              // return the best model
+    end searchSR
+
+    //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Create a `SymbolicRegression` object from a data matrix and a response vector.
      *  Partial support for "Symbolic Regression" as matrix x can be raised to
      *  several powers (e.g., x^1 and x^2).
      *  @param x          the initial data/input m-by-n matrix (before expansion)
@@ -46,6 +119,8 @@ object SymbolicRegression:
      *  @param y          the response/output m-vector
      *  @param fname      the feature/variable names (defaults to null)
      *  @param powers     the set of powers to raise matrix x to (defaults to null)
+     *  @param rpowers    the set of rational powers to raise matrix x to (allows a negative base)
+     *                        DON'T use the same powers for powers and rpowers
      *  @param intercept  whether to include the intercept term (column of ones) _1 (defaults to true)
      *  @param cross      whether to include 2-way cross/interaction terms x_i x_j (defaults to true)
      *  @param cross3     whether to include 3-way cross/interaction terms x_i x_j x_k (defaults to false)
@@ -54,22 +129,21 @@ object SymbolicRegression:
      *                        adds x0 x1^(-2)
      */
     def apply (x: MatrixD, y: VectorD, fname: Array [String] = null,
-               powers: Set [Double] = null, intercept: Boolean = true,
+               powers: LSET [Double] = null,
+               rpowers: LSET [Rat] = null,
+               intercept: Boolean = true,
                cross: Boolean = true, cross3: Boolean = false,
                hparam: HyperParameter = Regression.hp,
-               terms: Array [Xj2p]*): Regression =
+               terms: Array [Xj2p]*): SymbolicRegression =
         val fname_ = if fname != null then fname
                      else x.indices2.map ("x" + _).toArray                // default feature/variable names
 
-        val (xx, f_name) = buildMatrix (x, fname_, powers, intercept, cross, cross3, terms*)
-        val mod       = new Regression (xx, y, f_name, hparam)
-        mod.modelName = "SymbolicRegression" + (if cross then "X" else "") +
-                                               (if cross3 then "X" else "")
-        mod
+        val (xx, f_name) = buildMatrix (x, fname_, powers, rpowers, intercept, cross, cross3, terms*)
+        new SymbolicRegression (xx, y, f_name, powers, rpowers, hparam)
     end apply
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Create a `Regression` object from a data matrix and a response vector.
+    /** Create a `SymbolicRegression` object from a data matrix and a response vector.
      *  Partial support for "Symbolic Regression" as matrix x can be raised to
      *  several powers (e.g., x^1 and x^2).  Will append the columns in matrix dv.
      *  Allows for having dummy variables without raising them to powers or crossing them.
@@ -80,6 +154,8 @@ object SymbolicRegression:
      *  @param fname      the feature/variable names (defaults to null)
      *  @param fname_dv   the feature/variable names for dummy variables (defaults to null)
      *  @param powers     the set of powers to raise matrix x to (defaults to null)
+     *  @param rpowers    the set of rational powers to raise matrix x to (allows a negative base)
+     *                        DON'T use the same powers for powers and rpowers
      *  @param intercept  whether to include the intercept term (column of ones) _1 (defaults to true)
      *  @param cross      whether to include 2-way cross/interaction terms x_i x_j (defaults to true)
      *  @param cross3     whether to include 3-way cross/interaction terms x_i x_j x_k (defaults to false)
@@ -89,18 +165,17 @@ object SymbolicRegression:
      */
     def withDvars (x: MatrixD, dv: MatrixD, y: VectorD,
                    fname: Array [String] = null, fname_dv: Array [String] = null,
-                   powers: Set [Double] = null, intercept: Boolean = true,
+                   powers: LSET [Double] = null,
+                   rpowers: LSET [Rat] = null,
+                   intercept: Boolean = true,
                    cross: Boolean = true, cross3: Boolean = false,
                    hparam: HyperParameter = Regression.hp,
-                   terms: Array [Xj2p]*): Regression =
+                   terms: Array [Xj2p]*): SymbolicRegression =
         val fname_ = if fname != null then fname
                      else x.indices2.map ("x" + _).toArray                // default feature/variable names
 
-        val (xx, f_name) = buildMatrix (x, fname_, powers, intercept, cross, cross3, terms*)
-        val mod       = new Regression (xx ++^ dv, y, f_name ++ fname_dv, hparam)
-        mod.modelName = "SymbolicRegression" + (if cross then "X" else "") +
-                                               (if cross3 then "X" else "")
-        mod
+        val (xx, f_name) = buildMatrix (x, fname_, powers, rpowers, intercept, cross, cross3, terms*)
+        new SymbolicRegression (xx ++^ dv, y, f_name ++ fname_dv, powers, rpowers, hparam)
     end withDvars
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -109,6 +184,8 @@ object SymbolicRegression:
      *                        must not include an intercept column of all ones
      *  @param fname      the feature/variable names (should not be null here)
      *  @param powers     the set of powers to raise matrix x to (x^p or log1p(x) for p = 0)
+     *  @param rpowers    the set of rational powers to raise matrix x to (allows a negative base)
+     *                        DON'T use the same powers for powers and rpowers
      *  @param intercept  whether to include the intercept term (column of ones) _1 (defaults to true)
      *  @param cross      whether to include 2-way cross/interaction terms x_i x_j (defaults to true)
      *  @param cross3     whether to include 3-way cross/interaction terms x_i x_j x_k (defaults to false)
@@ -116,14 +193,16 @@ object SymbolicRegression:
      *                        adds x0 x1^(-2)
      */
     def buildMatrix (x: MatrixD, fname: Array [String],
-                     powers: Set [Double], intercept: Boolean,
+                     powers: LSET [Double],
+                     rpowers: LSET [Rat],
+                     intercept: Boolean,
                      cross: Boolean, cross3: Boolean,
                      terms: Array [Xj2p]*): (MatrixD, Array [String]) =
         val _1     = VectorD.one (x.dim)                                  // one vector
         var xx     = new MatrixD (x.dim, 0)                               // start empty
         var fname_ = Array [String] ()                                    // derived feature names
 
-        if powers != null then
+        if powers != null then                                            // raise x to a double
             if powers contains 1 then
                 xx     = xx ++^ x                                         // add linear terms x
                 fname_ = fname
@@ -135,6 +214,15 @@ object SymbolicRegression:
                 fname_ ++= fname.map ((n) => s"$n^$p")
         end if
 
+        if rpowers != null then                                           // raise x to a rational number
+            if rpowers contains Rat._1 then
+                xx     = xx ++^ x                                         // add linear terms x
+                fname_ = fname
+            for r <- rpowers do                                           // allows a negative base when dem. is odd
+                xx       = xx ++^ x↑r                                     // add rpower terms x↑p
+                fname_ ++= fname.map ((n) => s"$n↑$r")
+        end if
+
         if terms != null then
             debug ("buildMatrix", s"add custom terms = ${stringOf (terms)}")
             val z = _1.copy
@@ -143,22 +231,20 @@ object SymbolicRegression:
                 for (j, p) <- t do                                        // x_j to the p-th power
                     z *= x(?, j)~^p                                       
                     s = s + s"x$j^$p"
-                end for
                 xx     = xx :^+ z                                         // add custom term/column t
                 fname_ = fname_ :+ s
             end for
         end if
 
         if cross then
-           xx       = xx ++^ x.crossAll                                   // add 2-way cross terms x_i x_j
-           fname_ ++= crossNames (fname)
+            xx       = xx ++^ x.crossAll                                  // add 2-way cross terms x_i x_j
+            fname_ ++= crossNames (fname)
         if cross3 then
-           xx       = xx ++^ x.crossAll3                                  // add 3-way cross terms x_i x_j x_k
-           fname_ ++= crossNames3 (fname)
+            xx       = xx ++^ x.crossAll3                                 // add 3-way cross terms x_i x_j x_k
+            fname_ ++= crossNames3 (fname)
         if intercept then
             xx     = _1 +^: xx                                            // add intercept term (column of ones) _1
             fname_ = Array ("one") ++ fname_
-        end if
 
 //      debug ("buildMatrix", s"xx = $xx")
         (xx, fname_)                                                      // return expanded matrix and its column names
@@ -166,12 +252,14 @@ object SymbolicRegression:
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Create a `SymbolicRegression` object from a data matrix and a response vector.
-     *  This method provides data rescaling via normalization
+     *  This method provides data rescaling via normalization (z-transform).
      *  @param x          the data/input m-by-n matrix
      *                        (augment with a first column of ones to include intercept in model)
      *  @param y          the response/output m-vector
      *  @param fname      the feature/variable names (defaults to null)
      *  @param powers     the set of powers to raise matrix x to
+     *  @param rpowers    the set of rational powers to raise matrix x to (allows a negative base)
+     *                        DON'T use the same powers for powers and rpowers
      *  @param intercept  whether to include the intercept term (column of ones) _1 (defaults to true)
      *  @param cross      whether to include 2-way cross/interaction terms x_i x_j (defaults to true)
      *  @param cross3     whether to include 3-way cross/interaction terms x_i x_j x_k (defaults to false)
@@ -180,22 +268,27 @@ object SymbolicRegression:
      *                        adds x0 x1^(-2)
      */
     def rescale (x: MatrixD, y: VectorD, fname: Array [String] = null,
-                 powers: Set [Double] = null, intercept: Boolean = true,
+                 powers: LSET [Double] = null,
+                 rpowers: LSET [Rat] = null,
+                 intercept: Boolean = true,
                  cross: Boolean = true, cross3: Boolean = false,
                  hparam: HyperParameter = Regression.hp,
-                 terms: Array [Xj2p]*): Regression =
+                 terms: Array [Xj2p]*): SymbolicRegression =
         val xn = normalize ((x.mean, x.stdev)) (x)
-        apply (xn, y, fname, powers, intercept, cross, cross3, hparam, terms*)
+        debug ("rescale", s"rescaled via z-transform: xn = $xn")
+        apply (xn, y, fname, powers, rpowers, intercept, cross, cross3, hparam, terms*)
     end rescale
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Create a `SymbolicRegression` object from a data matrix and a response vector.
-     *  This method provides data rescaling via min-max.
+     *  This method provides data rescaling via min-max-transform.
      *  @param x          the data/input m-by-n matrix
      *                        (augment with a first column of ones to include intercept in model)
      *  @param y          the response/output m-vector
      *  @param fname      the feature/variable names (defaults to null)
      *  @param powers     the set of powers to raise matrix x to
+     *  @param rpowers    the set of rational powers to raise matrix x to (allows a negative base)
+     *                        DON'T use the same powers for powers and rpowers
      *  @param intercept  whether to include the intercept term (column of ones) _1 (defaults to true)
      *  @param cross      whether to include 2-way cross/interaction terms x_i x_j (defaults to true)
      *  @param cross3     whether to include 3-way cross/interaction terms x_i x_j x_k (defaults to false)
@@ -204,12 +297,15 @@ object SymbolicRegression:
      *                        adds x0 x1^(-2)
      */
     def rescale2 (x: MatrixD, y: VectorD, fname: Array [String] = null,
-                 powers: Set [Double] = null, intercept: Boolean = true,
+                 powers: LSET [Double] = null,
+                 rpowers: LSET [Rat] = null,
+                 intercept: Boolean = true,
                  cross: Boolean = true, cross3: Boolean = false,
                  hparam: HyperParameter = Regression.hp,
-                 terms: Array [Xj2p]*): Regression =
-        val xn = normalize ((x.mean, x.stdev)) (x)
-        apply (xn, y, fname, powers, intercept, cross, cross3, hparam, terms*)
+                 terms: Array [Xj2p]*): SymbolicRegression =
+        val xn = scale (extreme (x)) (x)
+        debug ("rescale2", s"rescaled via min-max-transform: xn = $xn")
+        apply (xn, y, fname, powers, rpowers, intercept, cross, cross3, hparam, terms*)
     end rescale2
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -229,7 +325,7 @@ object SymbolicRegression:
     end crossNames3
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Create a `Regression` object that uses multiple regression to fit a quadratic
+    /** Create a `SymbolicRegression` object that uses multiple regression to fit a quadratic
      *  surface to the data.  For example in 2D, the quadratic regression equation is
      *      y  =  b dot x + e  =  [b_0, ... b_k] dot [1, x_0, x_0^2, x_1, x_1^2] + e
      *  @param x          the initial data/input m-by-n matrix (before quadratic term expansion)
@@ -242,14 +338,12 @@ object SymbolicRegression:
      */
     def quadratic (x: MatrixD, y: VectorD, fname: Array [String] = null,
                    intercept: Boolean = true, cross: Boolean = false,
-                   hparam: HyperParameter = Regression.hp): Regression =
-        val mod       = apply (x, y, fname, Set (1, 2), intercept, cross, false, hparam)
-        mod.modelName = "SymbolicRegression.quadratic" + (if cross then "X" else "")
-        mod
+                   hparam: HyperParameter = Regression.hp): SymbolicRegression =
+        apply (x, y, fname, LSET (1, 2), null, intercept, cross, false, hparam)
     end quadratic
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Create a `Regression` object that uses multiple regression to fit a cubic
+    /** Create a `SymbolicRegression` object that uses multiple regression to fit a cubic
      *  surface to the data.  For example in 2D, the cubic regression equation is
      *      y  =  b dot x + e  =  [b_0, ... b_k] dot [1, x_0, x_0^2, x_0^3,
      *                                                   x_1, x_1^2, x_1^3,
@@ -265,11 +359,8 @@ object SymbolicRegression:
      */
     def cubic (x: MatrixD, y: VectorD, fname: Array [String] = null,
                intercept: Boolean = true, cross: Boolean = false, cross3: Boolean = false,
-               hparam: HyperParameter = Regression.hp): Regression =
-        val mod       = apply (x, y, fname, Set (1, 2, 3), intercept, cross, cross3, hparam)
-        mod.modelName = "SymbolicRegression.cubic" + (if cross then "X" else "") +
-                                                     (if cross3 then "X" else "")
-        mod
+               hparam: HyperParameter = Regression.hp): SymbolicRegression =
+        apply (x, y, fname, LSET (1, 2, 3), null, intercept, cross, cross3, hparam)
     end cubic
 
 end SymbolicRegression
@@ -279,7 +370,7 @@ import Example_AutoMPG._
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `symbolicRegressionTest` main function tests the `SymbolicRegression`
  *  object using the AutoMPG dataset.  Assumes no missing values.
- *  It tests custom "Symbolic Regression", with powers specified in "Set (...)" and
+ *  It tests custom "Symbolic Regression", with powers specified in "LSET (...)" and
  *  applies forward selection, backward elimination, or stepwise regression.
  *  > runMain scalation.modeling.symbolicRegressionTest
  */
@@ -289,7 +380,7 @@ import Example_AutoMPG._
 //  println (s"y = $y")
 
     banner ("AutoMPG Symbolic Regression")
-    val mod = SymbolicRegression (x, y, x_fname, Set (-2, -1, 0.5, 2))   // add, intercept, cross-terms and given powers
+    val mod = SymbolicRegression (x, y, x_fname, LSET (-2, -1, 0.5, 2))  // add, intercept, cross-terms and given powers
     mod.trainNtest ()()                                                  // train and test the model
     println (mod.summary ())                                             // parameter/coefficient statistics
 
@@ -298,10 +389,13 @@ import Example_AutoMPG._
         val (cols, rSq) = mod.selectFeatures (tech)                      // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for Symbolic Regression with $tech", lines = true)
+        new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for Symbolic Regression with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
+
+    FitM.showQofStatTable (mod.crossValidate ())                         // cross-validation for full model
+    val modBest = mod.getBest.mod                                        // FIX - check this is really the best model
+    FitM.showQofStatTable (modBest.crossValidate ())                     // cross-validation for best model
 
 end symbolicRegressionTest
 
@@ -331,8 +425,7 @@ end symbolicRegressionTest
         val (cols, rSq) = mod.selectFeatures (tech)                     // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for Quadratic Regression with $tech", lines = true)
+        new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for Quadratic Regression with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 
@@ -362,8 +455,7 @@ end symbolicRegressionTest2
         val (cols, rSq) = mod.selectFeatures (tech)                     // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for Quadratic X Regression with $tech", lines = true)
+        new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for Quadratic X Regression with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 
@@ -393,8 +485,7 @@ end symbolicRegressionTest3
         val (cols, rSq) = mod.selectFeatures (tech)                     // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for Cubic Regression with $tech", lines = true)
+        new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for Cubic Regression with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 
@@ -424,8 +515,7 @@ end symbolicRegressionTest4
         val (cols, rSq) = mod.selectFeatures (tech)                     // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for Cubic X Regression with $tech", lines = true)
+        new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for Cubic X Regression with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 
@@ -456,8 +546,7 @@ end symbolicRegressionTest5
         val (cols, rSq) = mod.selectFeatures (tech)                     // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for Cubic XX Regression with $tech", lines = true)
+        new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for Cubic XX Regression with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 
@@ -467,19 +556,24 @@ end symbolicRegressionTest6
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `symbolicRegressionTest7` main function tests the `SymbolicRegression`
  *  object using the AutoMPG dataset.  Assumes no missing values.
- *  It tests custom "Symbolic Regression", with powers specified in "Set (...)" and
+ *  It tests custom "Symbolic Regression", with powers specified in "LSET (...)" and
  *  applies forward selection, backward elimination, or stepwise regression.
  *  This test case performs data rescaling.
  *  > runMain scalation.modeling.symbolicRegressionTest7
  */
 @main def symbolicRegressionTest7 (): Unit =
 
+    val RESCALE = true
+
 //  println (s"x = $x")
 //  println (s"y = $y")
 
     banner ("AutoMPG Symbolic Regression")
-    val mod = SymbolicRegression.rescale (x, y, x_fname,
-                                          Set (-2, -1, 0.5, 2))          // add intercept, cross-terms and given powers
+    val mod =
+    if RESCALE then
+        SymRidgeRegression.rescale (x, y, x_fname, LSET (-2, -1, 2))     // add cross-terms and given powers & rescale (0.5 -> NaN)
+    else
+        SymRidgeRegression (x, y, x_fname, LSET (-2, -1, 0.5, 2))        // add cross-terms and given powers
     mod.trainNtest ()()                                                  // train and test the model
     println (mod.summary ())                                             // parameter/coefficient statistics
 
@@ -488,8 +582,7 @@ end symbolicRegressionTest6
         val (cols, rSq) = mod.selectFeatures (tech)                      // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for Symbolic Regression with $tech", lines = true)
+        new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for Symbolic Regression with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 
@@ -529,7 +622,7 @@ end symbolicRegressionTest7
     val (x, y) = (xy.not (?, 2), xy(?, 2))
 
     banner ("Newton's Universal Gravity Symbolic Regression")
-    val mod = SymbolicRegression (x, y, fname, null, false, false,
+    val mod = SymbolicRegression (x, y, fname, null, null, false, false,
               terms = Array ((0, 1.0), (1, -2.0)))                       // add one custom term
                                           
     mod.trainNtest ()()                                                  // train and test the model
@@ -559,13 +652,13 @@ end symbolicRegressionTest8
 
     banner ("Quadratic Regression")
     val fname = Array ("x")
-    mod = SymbolicRegression.quadratic (MatrixD (x).transpose, y, fname)
+    mod = SymbolicRegression.quadratic (MatrixD (x).ᵀ, y, fname)
     mod.trainNtest ()()
     println (mod.summary ())
     new Plot (null, y, mod.predict (mod.getX), s"${mod.modelName} y vs yp", lines = true)
 
     banner ("Cubic Regression")
-    mod = SymbolicRegression.cubic (MatrixD (x).transpose, y, fname)
+    mod = SymbolicRegression.cubic (MatrixD (x).ᵀ, y, fname)
     mod.trainNtest ()()
     println (mod.summary ())
     new Plot (null, y, mod.predict (mod.getX), s"${mod.modelName} y vs yp", lines = true)
@@ -604,8 +697,7 @@ end symbolicRegressionTest9
         val (cols, rSq) = mod.selectFeatures (tech)                     // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for Quadratic Regression with $tech", lines = true)
+        new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for Quadratic Regression with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 
@@ -627,7 +719,7 @@ end symbolicRegressionTest10
 
     // loadStr: column 2 in file has month strings, column 3 has day strings
 
-    val xy    = MatrixD.loadStr ("forestfires.csv", 1, 0)(Set (2, 3), month, day)
+    val xy    = MatrixD.loadStr ("forestfires.csv", 1, 0)(LSET (2, 3), month, day)
     val resp  = xy.dim2 - 1
     val y     = xy(?, resp)                                             // response - burned area
     val x     = xy.not (?, resp)
@@ -638,7 +730,7 @@ end symbolicRegressionTest10
 
     banner ("Forest Fires Cubic Regression with Log with Ordinal Values")
     val mod = SymbolicRegression (x, y, fname,
-                                  Set (0, 1, 2, 3), cross = false)      // use log(x), x, x^2 and x^3 terms
+                                  LSET (0, 1, 2, 3), cross = false)     // use log(x), x, x^2 and x^3 terms
                                                                         // adds intercept by default
     mod.trainNtest ()()                                                 // train and test the model
     println (mod.summary ())                                            // parameter/coefficient statistics
@@ -654,8 +746,7 @@ end symbolicRegressionTest10
     val (cols, rSq) = mod.selectFeatures (tech)                         // R^2, R^2 bar, R^2 cv
     val k = cols.size
     println (s"k = $k, n = ${x.dim2}")
-    new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-               s"R^2 vs n for Quadratic Regression with $tech", lines = true)
+    new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for Quadratic Regression with $tech", lines = true)
     println (s"$tech: rSq = $rSq")
 
 //  end for
@@ -680,7 +771,7 @@ end symbolicRegressionTest11
 
     // loadStr: column 2 in file has month strings, column 3 has day strings
 
-    val xy    = MatrixD.loadStr ("forestfires.csv", 1, 0)(Set (2, 3), month, day)
+    val xy    = MatrixD.loadStr ("forestfires.csv", 1, 0)(LSET (2, 3), month, day)
     val resp  = xy.dim2 - 1
     val y     = xy(?, resp)                                             // response - burned area
     var x     = xy.not (?, resp)
@@ -693,7 +784,7 @@ end symbolicRegressionTest11
     x = x.not (?, 3)
 
     println (s"day_col = $day_col")
-    val dv = RegressionCat.dummyVars (MatrixI (day_col).transpose)
+    val dv = RegressionCat.dummyVars (MatrixI (day_col).ᵀ)
 
     println (s"x  = $x")                                                // regular predictor variables
     println (s"dv = $dv")                                               // dummy variables
@@ -701,7 +792,7 @@ end symbolicRegressionTest11
 
     banner ("Forest Fires Quadratic Regression with Ordinal Values")
     val mod = SymbolicRegression.withDvars (x, dv, y, fname, fnam2,
-                                            Set (1, 2, 3), cross = false)  // use x, x^2 and x^3 terms
+                                            LSET (1, 2, 3), cross = false)  // use x, x^2 and x^3 terms
                                                                         // adds intercept by default
     mod.trainNtest ()()                                                 // train and test the model
     println (mod.summary ())                                            // parameter/coefficient statistics
@@ -717,8 +808,7 @@ end symbolicRegressionTest11
     val (cols, rSq) = mod.selectFeatures (tech)                         // R^2, R^2 bar, R^2 cv
     val k = cols.size
     println (s"k = $k, n = ${x.dim2}")
-    new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-               s"R^2 vs n for Quadratic Regression with $tech", lines = true)
+    new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for Quadratic Regression with $tech", lines = true)
     println (s"$tech: rSq = $rSq")
 
 //  end for
@@ -733,14 +823,24 @@ end symbolicRegressionTest12
  */
 @main def symbolicRegressionTest13 (): Unit =
 
+/*
     import neuralnet._
     import ActivationFun._
     import scala.math.tanh
+*/
 
-    val x  = VectorD (1, 2, 3, 4, 5, 6, 7, 8, 9)
+//  val x  = VectorD (1, 2, 3, 4, 5, 6, 7, 8, 9)
 //  val y  = VectorD (8, 6, 4, 2, 1, 3, 5, 9, 7)
-    val y  = VectorD (7, 8, 5, 3, 2, 1, 4, 6, 9)
+//  val y  = VectorD (7, 8, 5, 3, 2, 1, 4, 6, 9)
+//  val y  = VectorD (7, 6, 5, 3, 2, 1, 4, 8, 9)
+//  val y  = VectorD (6, 7, 5, 3, 2, 1, 4, 8, 9)
+//  val y  = VectorD (9, 6, 4, 2, 1, 3, 5, 8, 7) 
+
+    val x = VectorD (1, 2, 3, 4, 5, 6)
+    val y = VectorD (1, 3, 5, 6, 4, 2)
     val ox = MatrixD.one (x.dim) :^+ x
+
+    println (x.corr (y))
 
     banner ("SimpleRegression")
     val mod0 = SimpleRegression (x, y, null)
@@ -754,17 +854,31 @@ end symbolicRegressionTest12
     println (mod.summary ())
     new Plot (null, y, mod.predict (mod.getX), s"${mod.modelName} y vs yp", lines = true)
 
+    println (s"X^TX = ${ox.ᵀ * ox}")
+    println (s"X^Ty = ${ox.ᵀ * y}")
+
     banner ("Quadratic Regression")
     val fname = Array ("x")
-    mod = SymbolicRegression.quadratic (MatrixD (x).transpose, y, fname)
+    mod = SymbolicRegression.quadratic (MatrixD (x).ᵀ, y, fname)
     mod.trainNtest ()()
     println (mod.summary ())
     new Plot (null, y, mod.predict (mod.getX), s"${mod.modelName} y vs yp", lines = true)
 
+    val xx = mod.getX
+    println (s"X^TX = ${xx.ᵀ * xx}")
+    println (s"X^Ty = ${xx.ᵀ * y}")
+
+    banner ("TranRegression (sqrt)")
+    mod = new TranRegression (ox, y, fname, yℱ = RootForm ())
+    mod.trainNtest ()()
+    println (mod.summary ())
+    new Plot (null, y, mod.predict (mod.getX), s"${mod.modelName} y vs yp", lines = true)
+
+/*
     banner ("NeuralNet 3-Layer")
     Optimizer.hp("eta") = 0.3
     Optimizer.hp("bSize") = 2
-    val mod2 = NeuralNet_3L.rescale (MatrixD (x).transpose, MatrixD (y).transpose, fname, nz = 3, f = f_sigmoid, f1 = f_id)
+    val mod2 = NeuralNet_3L.rescale (MatrixD (x).ᵀ, MatrixD (y).ᵀ, fname, nz = 3, f = f_sigmoid, f1 = f_id)
     mod2.trainNtest2 ()()
 //  println (mod2.summary ())
     new Plot (null, y, (mod2.predict (mod2.getX))(?, 0), s"${mod2.modelName} y vs yp", lines = true)
@@ -775,7 +889,33 @@ end symbolicRegressionTest12
         0.5099 * tanh(-0.6860 * z - 0.6764) - 
         0.8904 * tanh(1.2081 * z + 1.6912) + 1.7239 }
 
-    println (MatrixD (y, yp).transpose)
+    println (MatrixD (y, yp).ᵀ)
+*/
 
 end symbolicRegressionTest13
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `symbolicRegressionTest14` main function tests the `SymbolicRegression`
+ *  object using the AutoMPG dataset.  Assumes no missing values.
+ *  It tests custom "Symbolic Regression", with powers specified in "LSET (...)" and
+ *  applies forward selection, backward elimination, or stepwise regression.
+ *  This test case performs data rescaling.
+ *  > runMain scalation.modeling.symbolicRegressionTest14
+ */
+@main def symbolicRegressionTest14 (): Unit =
+
+    val RAT = true                                                             // try both
+    banner ("AutoMPG Symbolic Regression")
+    val best = SymbolicRegression.searchSR (x, y, x_fname, rational = RAT)     // return best model from search
+    banner (s"Best Full Model: ${best.mod.modelName}, qof = ${best.qof}")
+
+    banner (s"Feature Selection Technique: Stepwise")
+    val (cols, rSq) = best.mod.selectFeatures (SelectionTech.Stepwise, "one")  // R^2, R^2 bar, R^2 cv
+    val k = cols.size
+    println (s"k = $k, n = ${x.dim2}")
+    new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for Symbolic Regression with Stepwise", lines = true)
+    println (s"Stepwise: rSq = $rSq")
+
+end symbolicRegressionTest14
 

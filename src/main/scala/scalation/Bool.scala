@@ -11,7 +11,8 @@
 package scalation
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** Extend `Boolean` to include an and, or, not, xor.  Note: they all have the same precedence.
+/** Extend `Boolean` to include an and, or, not, xor.
+ *  @note:  unfortunately they all have the same precedence.
  */
 extension (x: Boolean)
     inline infix def and (y: Boolean): Boolean = x && y

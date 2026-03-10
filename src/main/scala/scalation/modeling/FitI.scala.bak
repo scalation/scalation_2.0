@@ -10,6 +10,8 @@
  *  @see github.com/scikit-learn/scikit-learn/issues/20162     // used in scikit-learn
  *       www.mdpi.com/1999-4893/13/6/132                       // defines several metrics
  *       arxiv.org/pdf/2005.12881.pdf                          // for IS and WIS
+ *       https://www.sciencedirect.com/science/article/pii/S1364032120308005
+ *       www.datasciencewithmarco.com/blog/conformal-prediction-in-time-series-forecasting
  */
 
 package scalation
@@ -18,7 +20,8 @@ package modeling
 import scalation.mathstat._
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `QoFI` enum defines the Interval-based Quality of Fit (QoFI) measures/metrics.
+/** The `QoFI` enum defines the Interval-based Quality of Fit (QoFI) measures/metrics,
+ *  i.e., prediction interval metrics.
  *  @param name  the name of the parameter
  */
 enum QoFI (val name: String):
@@ -27,9 +30,11 @@ enum QoFI (val name: String):
     case pinc   extends QoFI ("pinc")                          // index  1
     case ace    extends QoFI ("ace")                           // index  2
     case pinaw  extends QoFI ("pinaw")                         // index  3
-    case pinad  extends QoFI ("pinad")                         // index  4
-    case iscore extends QoFI ("iscore")                        // index  5
-    case wis    extends QoFI ("wis")                           // index  7
+    case iscore extends QoFI ("iscore")                        // index  4
+    case wis    extends QoFI ("wis")                           // index  5
+    case pinad  extends QoFI ("pinad")                         // index  6
+    case cwc    extends QoFI ("cwc")                           // index  7
+    case crps   extends QoFI ("crps")                          // index  8
 
 end QoFI
 
@@ -55,13 +60,15 @@ object FitI:
     def help: String =
         """
 help: Interval-based Quality of Fit (QoFI) metrics/measures:
-    picp   =  prediction interval coverage probability
+    picp   =  prediction interval coverage probability (reliability)
     pinc   =  prediction interval nominal coverage
     ace    =  average coverage error
-    pinaw  =  prediction interval normalized average width
-    pinad  =  prediction interval normalized average deviation
+    pinaw  =  prediction interval normalized average width (sharpness)
     iscore =  interval score
     wis    =  weighted interval score
+    pinad  =  prediction interval normalized average deviation (future use)
+    cwc    =  coverage width-based criterion (future use)
+    crps   =  continuous ranked probability score (future use)
         """
     end help
 

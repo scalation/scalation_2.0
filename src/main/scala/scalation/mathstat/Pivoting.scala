@@ -46,10 +46,13 @@ end Pivoting
 
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `PivotingTest` object is used to test the `Pivoting` trait.
- *  > runMain scalation.mathstat.PivotingTest
+/** The `pivotingTest` main function is used to test the `Pivoting` trait.
+ *  > runMain scalation.mathstat.pivotingTest
  */
-object PivotingTest extends App with Pivoting:
+@main def pivotingTest (): Unit =
+
+    object Pivoting_ extends Pivoting
+    import Pivoting_._
 
     val a = MatrixD ((3, 3), 1, 2, 3,
                              4, 5, 6,
@@ -61,5 +64,5 @@ object PivotingTest extends App with Pivoting:
     println (s"a1 = ${reorderRows (a, piv)}")
     println (s"a2 = ${reorderCols (a, piv)}")
 
-end PivotingTest
+end pivotingTest
 

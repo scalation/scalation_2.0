@@ -83,7 +83,6 @@ class Fac_QR (aa: MatrixD, needQ: Boolean = false)
             if at_k(k) < 0.0 then _norm = -_norm               // make k-th Householder vector
             cfor (k, m) { i => at_k(i) /= _norm }
             at_k(k) += 1.0
-        end if
         r(k, k) = -_norm                                       // set the diagonal of r matrix
 
         cfor (k+1, p) { j =>                                   // transform all the rest of aa matrix

@@ -64,6 +64,9 @@ object Cards:
     val htype = Array ("high-card", "one-pair", "two-pair", "3-of-a-kind", "straight",
                        "flush", "full-house", "4-of-a-kind", "straight-flush")
 
+    given intOrd: Ordering [Int] = new Ordering [Int]:
+        def compare (s: Int, t: Int) = s compare t
+
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Convert the integer card number c (0 to 51) to the
      *  face value: 1(A), 2, 3, ..., 10, 11(J), 12(Q), 13(K) and
@@ -108,7 +111,8 @@ object Cards:
     def classify (hand: IndexedSeq  [Int]): Int =
         val flush = isFlush (hand)
         val hmap  = handMap (hand)
-        val freq  = hmap.values.toIndexedSeq.sorted ((x, y) => y.compare (x))
+//      val freq  = hmap.values.toIndexedSeq.sorted ((x, y) => y.compare (x))
+        val freq  = hmap.values.toIndexedSeq.sorted (using intOrd)
      
         freq(0) match
         case 4 => 7
@@ -139,7 +143,7 @@ end Cards
     println ("\nShuffled deck of cards:")
     println (deck)
 
-    val hand  = for i <- 1 to 5 yield deck.draw ()
+    val hand  = for _ <- 1 to 5 yield deck.draw ()
     val cards = hand.map (value (_))
     val hmap  = handMap (hand)
     println ("\n hand  = " + hand)
@@ -164,7 +168,7 @@ end cardsTest
     println (deck)
 
     for h <- 1 to 1000 do
-        val hand  = for i <- 1 to 5 yield deck.draw ()
+        val hand  = for _ <- 1 to 5 yield deck.draw ()
         val cards = hand.map (value (_))
         val kind  = classify (hand)
         if kind > 1 then                                    // skip common hands
@@ -196,11 +200,11 @@ end cardsTest2
     val iter  = 30000000
     val count = new VectorD (htype.length)
 
-    for h <- 1 to iter do
-        val hand = for i <- 1 to 5 yield deck.draw ()
+    cfor (0, iter) { _ =>
+        val hand = for _ <- 1 to 5 yield deck.draw ()
         count(classify (hand)) += 1
         deck.shuffle ()
-    end for
+    } // cfor
 
     banner ("Monte Carlo Simulation Poker Hand Precentages")
     val mul = 100.0 / iter

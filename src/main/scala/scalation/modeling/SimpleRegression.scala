@@ -30,15 +30,17 @@ import scalation.mathstat._
  */
 class SimpleRegression (x: MatrixD, y: VectorD, fname_ : Array [String] = null)
       extends Predictor (x, y, if fname_ == null then null else fname_.slice (0, 2), null)
-         with Fit (dfm = 1, df = x.dim - 2)
+         with Fit (dfr = 1, df = x.dim - 2)
          with NoSubModels:
 
     private val debug = debugf ("SimpleRegression", true)          // debug function
     private val flaw  = flawf ("SimpleRegression")                 // flaw function
 
-    modelName = "SimpleRegression"
+    _modelName = s"SimpleRegression_${fname(1)}"
 
     if x.dim2 < 2 then flaw ("init", s"data matrix must have at least 2 columns: ${x.dim2}")
+
+    override def getBest: BestStep = super [NoSubModels].getBest
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Train the predictor by fitting the parameter vector (b-vector) in the
@@ -93,9 +95,9 @@ class SimpleRegression (x: MatrixD, y: VectorD, fname_ : Array [String] = null)
     /** Compute the confidence intervals for the parameters b_0 and b_1, returning
      *  their interval half widths.
      *  @param x_  the training/full data/input matrix
-     *  @param p   the confidence level
+     *  @param p_  the confidence level (1 - alpha)
      */
-    def confInterval (x_ : MatrixD = getX, p: Double = .95): VectorD =
+    def confInterval (x_ : MatrixD = getX, p_ : Double = .95): VectorD =
         val x1   = x_(?, 1)                                        // second column (column 1)
         val m    = x1.dim                                          // number of instances
         val df   = m - 2                                           // DoF for error e
@@ -106,8 +108,8 @@ class SimpleRegression (x: MatrixD, y: VectorD, fname_ : Array [String] = null)
         val se_0 = s * sqrt (1.0 / m + x1.mean~^2 / s_xx)          // standard error for b_0
         val se_1 = s / sqrt (s_xx)                                 // standard error for b_1
 
-        val pp = 1.0 - (1.0 - p) / 2.0                             // e.g., .95 --> .975 (two tails)
-        val t  = random.Quantile.studentTInv (pp, df)              // critical value from Student's t distribution
+        val p = 1.0 - (1.0 - p_) / 2.0                             // e.g., .95 --> .975 (two tails)
+        val t = random.Quantile.studentTInv (p, df)                // critical value from Student's t distribution
 
         debug ("confInterval", s"s = $s, s_xx = $s_xx, se_0 = $se_0, se_1 = $se_1, t = $t")
 
@@ -172,7 +174,7 @@ object SimpleRegression:
         val j = x.corr (y, 1).argmag () + 1                          // use best column
         val fname_ = Array (fname(0), fname(j))
         println (s"best: column j = $j, fname(j) = ${fname(j)}")
-        new SimpleRegression (MatrixD (x(?, 0), x(?, j)).transpose, y, fname_)
+        new SimpleRegression (MatrixD (x(?, 0), x(?, j)).ᵀ, y, fname_)
     end best
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -183,7 +185,6 @@ object SimpleRegression:
     def coeff (x: VectorD, y: VectorD): VectorD =
         if x.dim != y.dim then
             flaw ("coeff", s"dimensions do not agree: x.dim = ${x.dim} != y.dim = ${y.dim}")
-        end if
         val b1 = (x cov y) / x.variance
         val b0 = y.mean - b1 * x.mean
         VectorD (b0, b1)
@@ -295,7 +296,7 @@ end simpleRegressionTest2
     val yq = qrg.trainNtest ()()._1
     new Plot (x, y, yq, "plot y and yq vs. x", lines = true)
 
-    val trg = new TranRegression (ox, y, tran = sqrt, itran = sq)
+    val trg = new TranRegression (ox, y, yℱ = RootForm ())
     val yt = trg.trainNtest ()()._1
     new Plot (x, y, yt, "plot y and yt vs. x", lines = true)
 
@@ -450,7 +451,8 @@ end simpleRegressionTest7
 @main def simpleRegressionTest8 (): Unit =
 
     val x  = VectorD (1, 2, 3, 4, 5, 6)
-    val y  = VectorD (1, 3, 3, 5, 4, 4)
+//  val y  = VectorD (1, 3, 3, 5, 4, 4)
+    val y  = VectorD (1, 3, 5, 6, 4, 2)
     val ox = MatrixD.one (x.dim) :^+ x
 
     val x_fname  = Array ("x")
@@ -464,7 +466,7 @@ end simpleRegressionTest7
     new Plot (null, y, nmod.predict (nmod.getX), s"${nmod.modelName} y vs yp", lines = true)
 
     banner ("SimplerRegression")
-    val reg = new SimplerRegression (MatrixD (x).transpose, y, x_fname)
+    val reg = new SimplerRegression (MatrixD (x).ᵀ, y, x_fname)
     reg.trainNtest ()()
     println (s"mse = ${reg.mse_}")
     println (reg.summary ())
@@ -479,7 +481,7 @@ end simpleRegressionTest7
     new Plot (null, y, mod.predict (mod.getX), s"${mod.modelName} y vs yp", lines = true)
 
     banner ("SymbolicRegression.quadratic")
-    val qrg = SymbolicRegression.quadratic (MatrixD (x).transpose, y, x_fname)
+    val qrg = SymbolicRegression.quadratic (MatrixD (x).ᵀ, y, x_fname)
     qrg.trainNtest ()()
     println (s"mse   = ${qrg.mse_}")
 //  println (s"confI = ${qrg.confInterval ()}")
@@ -487,7 +489,7 @@ end simpleRegressionTest7
     new Plot (null, y, qrg.predict (qrg.getX), s"${qrg.modelName} y vs yp", lines = true)
 
     banner ("TranRegression")
-    val trd = new TranRegression (ox, y, ox_fname, tran = sqrt, itran = sq)
+    val trd = new TranRegression (ox, y, ox_fname, yℱ = RootForm ())
     trd.trainNtest ()()
     println (s"mse   = ${trd.mse_}")
 //  println (s"confI = ${trd.confInterval ()}")

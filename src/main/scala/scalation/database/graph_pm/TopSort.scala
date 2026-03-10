@@ -13,7 +13,10 @@ package database
 package graph_pm
 
 import scala.collection.mutable.{Set => SET}
+import scala.collection.mutable.ArrayBuffer
 import scala.runtime.ScalaRunTime.stringOf
+
+import scalation.modeling.autograd.{Variabl, Function}
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `TrafficLight` object is an enumeration type for traffic light colors.
@@ -69,6 +72,36 @@ object TopSort:
 
         vList
     end topSort
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Topological sort for Autograd DAGs (Function nodes).
+     *  Traverses the computation graph starting from a root `Variabl`
+     *  (typically the final loss/output) and returns a topologically
+     *  sorted sequence of `Function` nodes (inputs appear before the
+     *  Functions that consume them).
+     *  @param root  the output variable whose graph should be sorted
+     *  @throws IllegalStateException if a cycle is detected
+     */
+    def topSortFunctions (root: Variabl): Seq [Function] =
+        val visited  = SET [Function] ()                       // permanently visited (processed)
+        val active   = SET [Function] ()                       // recursion stack for cycle detection
+        val ordering = ArrayBuffer [Function] ()
+
+        def dfs (fn: Function): Unit =
+            if active.contains (fn) then
+                throw new IllegalStateException (s"Cycle detected in autograd graph at Function node: $fn")
+            if ! visited.contains (fn) then
+                active += fn
+                // Recurse to predecessor Functions (those that produce this fn's inputs)
+                for in <- fn.inputs; gfn <- in.gradFn do dfs (gfn)
+                active   -= fn
+                visited  += fn
+                ordering += fn                                 // post-order append yields inputs -> outputs
+        end dfs
+
+        root.gradFn.foreach (dfs)
+        ordering.toSeq
+    end topSortFunctions
 
 end TopSort
 

@@ -53,14 +53,12 @@ import scala.collection.mutable.ArrayBuffer
                     fos.write ("<li> <a href = './" + fName + "'> " + fName + " </a> </li>\n")
                 else if fName != SKIP && fName != "index.html" then
                     dirs += fi
-                end if
             end for
 
             for fi <- dirs do
                 val fName = fi.getName ()
                 if fName != SKIP then
                     fos.write ("<li> <a href = './" + fName + "'> " + fName + " </a> </li>\n")
-                end if
             end for
 
             fos.write ("</ul>\n</body>\n<html>")
@@ -84,7 +82,6 @@ import scala.collection.mutable.ArrayBuffer
             val files = f.listFiles ()
             if files != null then
                 for fi <- files do try recDeleteIndex (fi) catch { case _ : Throwable => }
-            end if
         end if
     end recDeleteIndex
 

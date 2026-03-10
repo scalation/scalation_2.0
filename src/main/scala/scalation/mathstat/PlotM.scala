@@ -25,24 +25,24 @@ import scalation.scala2d.Colors._
  *  (2) mouse dragging repositions the objects in the panel (drawing canvas).
  *  @see ZoomablePanel
  *------------------------------------------------------------------------------
- *  @param x_      the x vector of data values (horizontal)
- *  @param y_      the y matrix of data values where y(i) is the i-th vector (vertical)
- *  @param label   the label/legend/key for each curve in the plot
- *  @param _title  the title of the plot
- *  @param lines   flag for generating a line plot
+ *  @param x_     the x vector of data values (horizontal)
+ *  @param y_     the y matrix of data values where y(i) is the i-th vector (vertical)
+ *  @param label  the label/legend/key for each curve in the plot
+ *  @param title  the title of the plot
+ *  @param lines  flag for generating a line plot
  */
 class PlotM (x_ : VectorD, y_ : MatrixD, var label: Array [String] = null,
-            _title: String = "PlotM y_i vs. x for each i", lines: Boolean = false)
-      extends VizFrame (_title, null):
+             title: String = "PlotM y_i vs. x for each i", lines: Boolean = false)
+      extends VizFrame (title, null):
 
-    val xa: VectorD = if x_ == null then VectorD.range (0, y_.dim2) else x_
+    private val xa: VectorD = if x_ == null then VectorD.range (0, y_.dim2) else x_
 
-    private val EPSILON  = 1E-9                                 // number close to zero
-    private val offset   = 70                                   // offset frame to axis
-    private val frameW   = getW                                 // frame width
-    private val frameH   = getH                                 // frame height
-    private val baseX    = offset                               // base for x-axis
-    private val baseY    = frameH - offset                      // base for y-axis
+    private val EPSILON  = 1E-9                                      // number close to zero
+    private val offset   = 70                                        // offset frame to axis
+    private val frameW   = getW                                      // frame width
+    private val frameH   = getH                                      // frame height
+    private val baseX    = offset                                    // base for x-axis
+    private val baseY    = frameH - offset                           // base for y-axis
 
     private val minX     = floor (xa.min)
     private val maxX     = ceil (xa.max + EPSILON)
@@ -77,7 +77,7 @@ class PlotM (x_ : VectorD, y_ : MatrixD, var label: Array [String] = null,
           extends ZoomablePanel:
 
         setBackground (white)
-        val colors = Array (red, green, blue, black, yellow, cyan, magenta)
+        private val colors = Array (red, green, blue, black, yellow, cyan, magenta)
 
         //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
         /** Paint the canvas by plotting the data points.
@@ -85,9 +85,9 @@ class PlotM (x_ : VectorD, y_ : MatrixD, var label: Array [String] = null,
          */
         override def paintComponent (gr: Graphics): Unit =
             super.paintComponent (gr)
-            val g2d = gr.asInstanceOf [Graphics2D]              // use hi-res graphics
+            val g2d = gr.asInstanceOf [Graphics2D]                   // use hi-res graphics
 
-            g2d.setTransform (at)                               // used for zooming (at @see `ZoomablePanel`)
+            g2d.setTransform (at)                                    // used for zooming (at @see `ZoomablePanel`)
 
             Plot.drawAxes (g2d, baseX, baseY, frameW, frameH, offset, minX, maxY, deltaX, deltaY)
 
@@ -97,8 +97,8 @@ class PlotM (x_ : VectorD, y_ : MatrixD, var label: Array [String] = null,
 
             //:: Draw the dots for the data points being plotted
 
-            var x_pos  = 0                                      // current x position
-            var y_pos  = 0                                      // current y position
+            var x_pos  = 0                                           // current x position
+            var y_pos  = 0                                           // current y position
 
             for i <- 0 until y_.dim do
                 val y_i = y_(i)
@@ -107,25 +107,24 @@ class PlotM (x_ : VectorD, y_ : MatrixD, var label: Array [String] = null,
                 g2d.setPaint (color)
                 if i < label.length then g2d.drawString (label(i), offset * (i + 2), frameH - 30)
 
-                var px_pos = 0                                  // previous x position
-                var py_pos = 0                                  // previous y position
+                var px_pos = 0                                       // previous x position
+                var py_pos = 0                                       // previous y position
 
                 for j <- xa.indices do
                     val xx = round ((xa(j) - minX) * (frameW - 2 * offset))
-                    x_pos = (xx / deltaX).asInstanceOf [Int] + offset
+                    x_pos  = (xx / deltaX).toInt + offset
                     val yy = round ((maxY - y_i(j)) * (frameH - 2 * offset))
-                    y_pos = (yy / deltaY).asInstanceOf [Int] + offset
-                    dot.setFrame (x_pos, y_pos, diameter, diameter)         // x, y, w, h
+                    y_pos  = (yy / deltaY).toInt + offset
+                    dot.setFrame (x_pos, y_pos, diameter, diameter)  // x, y, w, h
                     g2d.fill (dot)
 
                     // connect with lines
                     if j != 0 && lines then
                         g2d.setStroke (new BasicStroke (1.0f))
                         g2d.drawLine (px_pos+1, py_pos+1, x_pos+1, y_pos+1)
-                    end if
 
-                    px_pos = x_pos                              // update previous x
-                    py_pos = y_pos                              // update previous y
+                    px_pos = x_pos                                   // update previous x
+                    py_pos = y_pos                                   // update previous y
 
                 end for
             end for

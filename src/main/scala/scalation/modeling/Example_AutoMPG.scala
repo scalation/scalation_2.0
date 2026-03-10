@@ -26,6 +26,9 @@ object Example_AutoMPG:
     val xr_fname = Array ("cylinders", "displacement", "horsepower", "weight",
                           "acceleration", "modelyear", "origin")
 
+    val xyr_fname = Array ("cylinders", "displacement", "horsepower", "weight",
+                           "acceleration", "modelyear", "origin", "mpg")
+
     /** the raw combined data matrix 'xyr'
      */
     val xyr = MatrixD ((392,  8), 8, 307, 130, 3504, 12, 70, 1, 18, 
@@ -570,4 +573,17 @@ end example_AutoMPG_Regression
     println (mod.summary ())                                           // produce summary statistics
 
 end example_AutoMPG_QuadRegression
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `example_AutoMPG_write_csv` main function writes the AutoMPG dataset into
+ *  a CSV file in the DATA director (.../scalation_2.0/data).
+ *  @see archive.ics.uci.edu/ml/datasets/Auto+MPG
+ *  > runMain scalation.modeling.example_AutoMPG_write_csv
+ */
+@main def example_AutoMPG_write_csv (): Unit =
+
+    xyr.write ("auto_mpg.csv", xyr_fname) 
+
+end example_AutoMPG_write_csv
 

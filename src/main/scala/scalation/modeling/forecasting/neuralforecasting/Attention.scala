@@ -50,7 +50,7 @@ trait Attention (n_var: Int, n_mod: Int = 512, heads: Int = 8, n_v: Int = -1):
      *  @param w_v  the weight matrix for value V
      */
     def queryKeyValue (x: MatrixD, w_q: MatrixD, w_k: MatrixD, w_v: MatrixD): (MatrixD, MatrixD, MatrixD) =
-        (x * w_q.transpose, x * w_k.transpose, x * w_v.transpose)
+        (x * w_q.ᵀ, x * w_k.ᵀ, x * w_v.ᵀ)
     end queryKeyValue
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -61,7 +61,7 @@ trait Attention (n_var: Int, n_mod: Int = 512, heads: Int = 8, n_v: Int = -1):
      */
     def context (q_t: VectorD, k: MatrixD, v: MatrixD): VectorD =
         val root_n = sqrt (q_t.dim)
-        v.transpose * f_softmax.f_ (k * (q_t / root_n))
+        v.ᵀ * f_softmax.f_ (k * (q_t / root_n))
     end context
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -72,7 +72,7 @@ trait Attention (n_var: Int, n_mod: Int = 512, heads: Int = 8, n_v: Int = -1):
      */
     def attention (q: MatrixD, k: MatrixD, v: MatrixD): MatrixD =
         val root_n = sqrt (q.dim2)
-        f_softmax.fM (q * (k.transpose / root_n)) * v
+        f_softmax.fM (q * (k.ᵀ / root_n)) * v
     end attention
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -97,7 +97,7 @@ trait Attention (n_var: Int, n_mod: Int = 512, heads: Int = 8, n_v: Int = -1):
 
         debug ("attentionMH", s"q.dims = ${q.dims}, k.dims: ${k.dims}, v.dims: ${v.dims}")
         debug ("attentionMH", s"w_q.dims = ${w_q.dims}, w_k.dims = ${w_k.dims}, w_v.dims = ${w_v.dims}")
-        debug ("attensionMH", "w_o.dims = ${w_o.dims}")
+        debug ("attensionMH", s"w_o.dims = ${w_o.dims}")
 
         println (s"(q * w_q(0)).dims: ${(q * w_q(0)).dims}")
         println (s"(k * w_k(0)).dims: ${(k * w_k(0)).dims}")
@@ -106,7 +106,7 @@ trait Attention (n_var: Int, n_mod: Int = 512, heads: Int = 8, n_v: Int = -1):
         var att = attention (q * w_q(0), k * w_k(0), v * w_v(0))
         for i <- 1 until heads do
             att = att ++^ attention (q * w_q(i), k * w_k(i), v * w_v(i))
-        debug ("attentionMH", s"att = $att")
+        debug (s"attentionMH", s"att = $att")
         att * w_o
     end attentionMH
 
@@ -140,7 +140,7 @@ object Attention:
 
     val m   = x.dim                                                       // number of time points
     val n   = x.dim2                                                      // size of input x_t
-    println (s"m = $m, n= $n")
+    println (s"m = $m, n = $n")
 end Attention
 
 import Attention._
@@ -194,9 +194,9 @@ end attentionTest
 
     val n_var = x.dim2                                                    // number of variables in input vector x_t
     println (s"n_var = $n_var")
-    val n_mod = 72                                                        // size of each query/key vector (q_t, k_t, v_t)
+    val n_mod = 72                                                        // size of each query/key vector (q_t, k_t)
     val heads = 3                                                         // number of attention heads
-    val n_val = 28
+    val n_val = 28                                                        // size of the value vector v_t
     object att extends Attention (n_var, n_mod, heads, n_val)
 
     val w_q = att.rmg.gen

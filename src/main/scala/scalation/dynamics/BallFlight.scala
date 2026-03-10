@@ -11,6 +11,7 @@
 package scalation
 package dynamics
 
+import scala.annotation.nowarn
 import scala.math.{cos, sin, Pi}
 import scala.util.control.Breaks.{breakable, break}
 
@@ -31,25 +32,25 @@ import scalation.mathstat._
  */
 @main def ballFlight (): Unit =
 
-    val n  = 200                                          // maximum number of time points
-    val tm =   5.0                                        // simulate for a maximum of tm seconds
-    val g  =   9.80665                                    // gravitational force (meters/second^2)
-//  val m  =  45.93                                       // mass of a golf ball in grams
-    val aa =  15.00                                       // launch angle in degrees
-    val ss = 100.00                                       // swing speed in miles/hour
-    val sf =   1.49                                       // smash factor
-    val s  = ss * sf * 1609.344 / 3600                    // initial ball speed in meters/second
-    val a  = aa * Pi / 180.0                              // launch angle in radians
-    val p0 = VectorD (0.0, 0.0)                           // initial position (x, y) at time t0=0
-    val v0 = VectorD (s * cos(a), s * sin(a))             // initial velocity (v_x, v_y) at t0
+    val n  = 200                                                 // maximum number of time points
+    val tm =   5.0                                               // simulate for a maximum of tm seconds
+    val g  =   9.80665                                           // gravitational force (meters/second^2)
+//  val m  =  45.93                                              // mass of a golf ball in grams
+    val aa =  15.00                                              // launch angle in degrees
+    val ss = 100.00                                              // swing speed in miles/hour
+    val sf =   1.49                                              // smash factor
+    val s  = ss * sf * 1609.344 / 3600                           // initial ball speed in meters/second
+    val a  = aa * Pi / 180.0                                     // launch angle in radians
+    val p0 = VectorD (0.0, 0.0)                                  // initial position (x, y) at time t0=0
+    val v0 = VectorD (s * cos(a), s * sin(a))                    // initial velocity (v_x, v_y) at t0
 
     println ("ball speed    s  = " + s)
     println ("launch angle  a  = " + a)
     println ("ball velocity v0 = " + v0)
 
     // define the system of Ordinary Differential Equations (ODEs)
-    def dx_dt (t: Double, x: Double) = v0(0)              // ODE 1
-    def dy_dt (t: Double, y: Double) = v0(1) - g * t      // ODE 2
+    @nowarn def dx_dt (t: Double, x: Double) = v0(0)             // ODE 1
+    @nowarn def dy_dt (t: Double, y: Double) = v0(1) - g * t     // ODE 2
     val odes: Array [Derivative] = Array (dx_dt, dy_dt)
 
     def exactSolution (t: Double) = VectorD (v0(0) * t, v0(1) * t - .5 * g * t * t)

@@ -46,7 +46,7 @@ class LinDiscAnalyis (x: MatrixD, y: VectorI, fname_ : Array [String] = null, k:
 
     if k != 2 then flaw ("init", "k must equal 2 in current implementation")
 
-    modelName = "LinDiscAnalyis"                                         // name of the model
+    _modelName = "LinDiscAnalyis"                                        // name of the model
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute the corrected covariance matrix.

@@ -16,6 +16,7 @@
  *  inline def ρ (newName: String): T = rename (newName)
  *  inline def π (x: String): T = project (strim (x))
  *  inline def π (cPos: IndexedSeq [Int]): T = project (cPos)
+ *  inline def π_ (x: String): T = project (schema diff strim (x))
  *  inline def σπ (a: String, apred: APredicate): T = selproject (a, apred)
  *  inline def σ (a: String, apred: APredicate): T = select (a, apred)
  *  inline def σ (predicate: Predicate): T = select (predicate)
@@ -33,6 +34,7 @@
  *  inline def ⋉ (x: Schema, y: Schema, r2: T): T = leftJoin (x, y, r2)
  *  inline def ⋊ (x: Schema, y: Schema, r2: T): T = rightJoin (x, y, r2)
  *  inline def / (r2: T): T = divide (r2)
+ *  inline def ÷ (r2: T): T = divide (r2)
  *  inline def γ (ag: String): T = groupBy (ag)
  *  inline def ℱ (ag: String, f_as: (AggFunction, String)*): T = aggregate (ag, f_as :_*)
  *  inline def ↑ (x: String*): T = orderBy (x :_*)
@@ -303,6 +305,16 @@ trait Tabular [T <: Tabular [T]] (val name: String, val schema: Schema, val doma
     def project (cPos: IndexedSeq [Int]): T
 
     inline def π (cPos: IndexedSeq [Int]): T = project (cPos)
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** PROJECTOUT the tuples in this table onto 'schema - the given attribute names'.
+     *  @param x  the schema/attribute names to project out
+     */
+    inline def projectOut (x: Schema): T = project (schema diff x)
+
+    inline def projectOut (x: String): T = project (schema diff strim (x))
+
+    inline def π_ (x: String): T = project (schema diff strim (x))
 
     // ========================================================== SELECT-PROJECT
 
@@ -588,6 +600,8 @@ trait Tabular [T <: Tabular [T]] (val name: String, val schema: Schema, val doma
     def divide (r2: T): T
 
     inline def / (r2: T): T = divide (r2)
+
+    inline def ÷ (r2: T): T = divide (r2)
 
     // ================================================================ GROUP BY
 

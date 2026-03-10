@@ -14,13 +14,18 @@ package mathstat
 import scala.math.{ceil, floor, min}
 
 import scalation.random.{Normal, Uniform}
-import scalation.scala2d.{BasicStroke, Graphics, Graphics2D, Line, Panel, Rectangle, VizFrame}
+import scalation.scala2d.{BasicStroke, Graphics, Graphics2D, Line, Rectangle, VizFrame, ZoomablePanel}
 import scalation.scala2d.Colors._
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `Histogram` class takes a vector of values, counts the number of values
- *  in each of several intervals and displays the counts vertically in a
- *  histogram.
+ *  in each of several intervals and displays the counts vertically in a histogram.
+ *------------------------------------------------------------------------------
+ *  Zoom functionality has two options:
+ *  (1) mouse wheel controls the amount of zooming (in/out);
+ *  (2) mouse dragging repositions the objects in the panel (drawing canvas).
+ *  @see ZoomablePanel
+ *------------------------------------------------------------------------------
  *  @param value         the vector of values (want several per interval)
  *  @param numIntervals  the number of intervals (typically 5 to 100)
  *  @param _title        title of the histogram
@@ -31,7 +36,7 @@ class Histogram (value: VectorD, numIntervals: Int = 40, _title: String = "Histo
 
     /** Create a drawing canvas
      */
-    val canvas = new HCanvas (getW, getH, value, numIntervals, counts)
+    private val canvas = new HCanvas (getW, getH, value, numIntervals, counts)
 
     getContentPane ().add (canvas)
     setVisible (true)
@@ -70,7 +75,8 @@ end FramelessHistogram
  *  @param counts        the counts per interval, if available
  */
 class HCanvas (frameW: Int, frameH: Int, value: VectorD, numIntervals: Int, counts: VectorD = null)
-      extends Panel:
+//    extends Panel:
+      extends ZoomablePanel:
 
     private val EPSILON       = 1E-9
     private val offset        = 50
@@ -94,7 +100,9 @@ class HCanvas (frameW: Int, frameH: Int, value: VectorD, numIntervals: Int, coun
      */
     override def paintComponent (gr: Graphics): Unit =
         super.paintComponent (gr)
-        val g2d = gr.asInstanceOf [Graphics2D]            // use hi-res
+        val g2d = gr.asInstanceOf [Graphics2D]                // use hi-res
+
+        g2d.setTransform (at)                                 // used for zooming (at @see `ZoomablePanel`)
 
         var x_pos = 0
         var y_pos = 0
@@ -156,7 +164,6 @@ class HCanvas (frameW: Int, frameH: Int, value: VectorD, numIntervals: Int, coun
             h
         else
             counts
-        end if
     end computeHistogram
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -170,7 +177,6 @@ class HCanvas (frameW: Int, frameH: Int, value: VectorD, numIntervals: Int, coun
         for i <- 0 until numIntervals do
             val h = histogram(i) * scale
             c(i) = VectorD (baseX + i * w, baseY.toDouble - h, w, h)
-        end for
         c
     end computeCoordinates
 
@@ -197,23 +203,23 @@ end HCanvas
     val uniformDist = new VectorD (samples)
     for i <- 0 until samples do
         var sum = 0.0
-        for j <- 0 until k do sum += uniformRV.gen
+        cfor (0, k) { _ => sum += uniformRV.gen }
         uniformDist(i) = sum
     end for
    
     val h1 = new Histogram (uniformDist, intervals, "Histogram for Sum of Uniform")
-    println ("histogram = " + h1)
+    println (s"histogram = $h1")
 
     val normalRV   = Normal (0, 1)
     val normalDist = new VectorD (samples)
-    for (i <- 0 until samples) normalDist(i) = normalRV.gen
+    for i <- 0 until samples do normalDist(i) = normalRV.gen
 
     val h2 = new Histogram (normalDist, intervals, "Histogram for Normal")
-    println ("histogram = " + h2)
+    println (s"histogram = $h2")
 
 //  val h3 = new Histogram (VectorD (0.0, 2.0, 3.0, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 8.0, 9.0),
 //                          5, "Simple Histogram")
-//  println ("histogram = " + h3)
+//  println (s"histogram = $h3")
 
 end histogramTest
 

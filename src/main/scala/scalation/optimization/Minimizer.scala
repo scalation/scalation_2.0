@@ -32,11 +32,11 @@ import scalation.random.RandomVecD
  */
 trait Minimizer:
 
-    protected val EPSILON = 1E-10                 // number close to zero
-                                                  //   between machine epsilon and its square root
-    protected val TOL     = 100.0 * EPSILON       // default tolerance level more relaxed
-    protected val STEP    = 0.5                   // default initial step size
-    protected val MAX_IT  = 400                   // maximum number of major steps/iterations 
+    protected val EPSILON = 1E-10                        // number close to zero
+                                                         //   between machine epsilon and its square root
+    protected val TOL     = 100.0 * EPSILON              // default tolerance level more relaxed
+    protected val STEP    = 0.5                          // default initial step size
+    protected val MAX_IT  = 400                          // maximum number of major steps/iterations 
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** The objective function f plus a weighted penalty based on the constraint
@@ -61,7 +61,7 @@ trait Minimizer:
      *  Return the optimal point/vector x and its objective function value.
      *  @param x0     the starting point 
      *  @param step   the initial step size (may default to STEP)
-     *  @param toler  the tolerance (may default to EPSILON)
+     *  @param toler  the tolerance (may default to TOL)
      */
     def solve (x0: VectorD, step: Double, toler: Double): FuncVec
 
@@ -75,12 +75,12 @@ trait Minimizer:
      *  @param toler  the tolerance
      */
     def resolve (n: Int, step_ : Double = STEP, toler: Double = TOL): FuncVec =
-        val rvg = RandomVecD (n, -0.5, 0.5)
+        val rvg = RandomVecD (n, 0.5, -0.5)              // note max before min 
         var opt = (MAX_VALUE, VectorD.nullv)
         for i <- 0 until 2*n do
             val x0 = rvg.gen
             println (s"==> resolve: random restart $i at x0 = $x0")
-            opt = better (solve (x0, STEP, EPSILON), opt)
+            opt = better (solve (x0, step_, toler), opt)
         end for
         opt
     end resolve
@@ -93,8 +93,8 @@ end Minimizer
  */
 object Minimizer:
 
-    val EPSILON = 1E-10                 // number close to zero
-    val STEP    = 0.6                   // step size
+    val EPSILON = 1E-10                                  // number close to zero
+    val STEP    = 0.6                                    // step size
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Test the optimizer's solve method with the given objective function and

@@ -51,7 +51,6 @@ class TabuSearch (f: VectorD => Double, g: VectorD => Double = null, maxStep: Do
             var sum = f(x)                                      // unconstrained value
             if g != null then                                   // if constrained
                 sum += f(x) * weight * (max (g(x), 0))~^2       // add penalty
-            end if
             sum
         end if
     end fg
@@ -78,13 +77,11 @@ class TabuSearch (f: VectorD => Double, g: VectorD => Double = null, maxStep: Do
             x_f = minNeighbor (x_f, i + 1, step)                // min in neighborhood of x_f
             y_f = minNeighbor (y_f, i + 1, step)                // min in neighborhood of y_f
             z_f = minNeighbor (z_f, i + 1, step)                // min in neighborhood of z_f
-        end if
 
         if x_f._2 < y_f._2 then                                 // find smallest of 3 functional value
             if x_f._2 < z_f._2 then x_f else z_f
         else 
             if y_f._2 < z_f._2 then y_f else z_f
-        end if
     end minNeighbor
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -102,7 +99,6 @@ class TabuSearch (f: VectorD => Double, g: VectorD => Double = null, maxStep: Do
                 if x_f._2 <= y_f._2 then                            // no improvement
                     if step <= TOL then { print ("optimal"); break () }  // => return solution when step is below TOL
                     else step /= shrink                             // => decrease step size otherwise
-                end if
                 x_f = y_f                                           // move to improved point
             end for
         } // breakable

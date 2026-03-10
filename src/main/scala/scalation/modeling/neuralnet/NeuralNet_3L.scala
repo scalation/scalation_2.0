@@ -52,7 +52,7 @@ class NeuralNet_3L (x: MatrixD, y: MatrixD, fname_ : Array [String] = null,
                     f: AFF = f_sigmoid, f1: AFF = f_id,
                     val itran: FunctionM2M = null)
       extends PredictorMV (x, y, fname_, hparam)
-         with Fit (dfm = x.dim2, df = x.dim - x.dim2):                    // under-estimate of degrees of freedom
+         with Fit (dfr = x.dim2, df = x.dim - x.dim2):                    // under-estimate of degrees of freedom
 
     private val eta  = hp("eta").toDouble                                 // learning rate
             val opti = new OPTIMIZER ()                                   // parameter optimizer
@@ -65,7 +65,7 @@ class NeuralNet_3L (x: MatrixD, y: MatrixD, fname_ : Array [String] = null,
     bb = Array (new NetParam (weightMat (n, nz), new VectorD (nz)),       // parameters (weights & biases) in to hid
                 new NetParam (weightMat (nz, ny), new VectorD (ny)))      // parameters (weights & biases) hid to out
 
-    modelName = s"NeuralNet_3L_${f.name}_${f1.name}"
+    _modelName = s"NeuralNet_3L_${f.name}_${f1.name}"
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Given training data x_ and y_, fit the parameters bb.
@@ -147,8 +147,9 @@ class NeuralNet_3L (x: MatrixD, y: MatrixD, fname_ : Array [String] = null,
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Build a sub-model that is restricted to the given columns of the data matrix.
      *  @param x_cols  the columns that the new model is restricted to
+     *  @param fname2  the variable/feature names for the new model (defaults to null)
      */
-    def buildModel (x_cols: MatrixD): NeuralNet_3L =
+    def buildModel (x_cols: MatrixD, fname2: Array [String] = null): NeuralNet_3L =
         new NeuralNet_3L (x_cols, y, null, -1, hparam, f, f1, itran)
     end buildModel
 
@@ -313,7 +314,7 @@ end neuralNet_3LTest
     println (mod.summary2 ())                                    // parameter/coefficient statistics
 
     banner ("Concrete - NeuralNet_3L: validate")
-    println (FitM.showFitMap (mod.validate ()(), QoF.values.map (_.toString)))
+    println (Fit.showFitMap (mod.validate ()()._2))
 
     banner ("Concrete - NeuralNet_3L: crossValidate")
     val stats = mod.crossValidate ()
@@ -351,7 +352,7 @@ end neuralNet_3LTest2
     mod.opti.plotLoss ("NeuralNet_3L")                           // loss function vs epochs
 
     banner ("AutoMPG - NeuralNet_3L: TNT validate")
-    println (FitM.showFitMap (mod.validate ()(), QoF.values.map (_.toString)))
+    println (Fit.showFitMap (mod.validate ()()._2))
 
 /*
     banner ("AutoMPG - NeuralNet_3L: crossValidate")
@@ -387,8 +388,7 @@ end neuralNet_3LTest3
 //  val (cols, rSq) = mod.backwardElimAll ()                     // R^2, R^2 bar, smape, R^2 cv
     val k = cols.size
     println (s"k = $k, n = ${x.dim2}")
-    new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "smape", "R^2 cv"),
-               s"R^2 vs n for ${mod.modelName}", lines = true)
+    new PlotM (null, rSq.transpose, Regression.metrics, s"R^2 vs n for ${mod.modelName}", lines = true)
     println (s"rSq = $rSq")
 
 end neuralNet_3LTest4
@@ -423,8 +423,7 @@ end neuralNet_3LTest4
         val (cols, rSq) = mod.selectFeatures (tech)              // R^2, R^2 bar, smape, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "smape", "R^2 cv"),
-                   s"R^2 vs n for ${mod.modelName} with $tech", lines = true)
+        new PlotM (null, rSq.transpose, Regression.metrics, s"R^2 vs n for ${mod.modelName} with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 
@@ -452,7 +451,7 @@ end neuralNet_3LTest5
         mod.trainNtest2 ()()                                     // train and test the model - with auto-tuning
 
         banner ("AutoMPG Validation Test")
-        println (FitM.showFitMap (mod.validate ()(), QoF.values.map (_.toString)))
+        println (Fit.showFitMap (mod.validate ()()._2))
     end for
 
 end neuralNet_3LTest6
@@ -487,10 +486,10 @@ end neuralNet_3LTest6
     val nz = 2                                                       // number of hidden nodes
     banner (s"AutoMPG NeuralNet_3L")
     val mod = new NeuralNet_3L (xs, yy, x46_fname, nz)               // create model without intercept
-    val (yp, qof) = mod.trainNtest2 ()()                             // train and test the model - with auto-tuning
+    val yp  = mod.trainNtest2 ()()._1                                // train and test the model - with auto-tuning
 
     banner ("AutoMPG Validation Test")
-    println (FitM.showFitMap (mod.validate ()(), QoF.values.map (_.toString)))
+    println (Fit.showFitMap (mod.validate ()()._2))
 
     banner ("Compare Model with Formula f_nn")
     val a  = MatrixD ((2, 2), -2.12262, -0.743867,                   // weights: input -> hidden layer
@@ -509,10 +508,9 @@ end neuralNet_3LTest6
     println (s"(yp_ - yp2).norm = ${(yp_ - yp2).norm}")              // norm of difference
     new Plot (null, yp_, yp2, "yp_ (black/model) vs. yp2 (red/formula)")
 
-    def ff (x: VectorD, i: Int): Double =
+    def ff (x: VectorD): Double =
         val xx = (x(0) - 1.61300) * (4/3.537) - 2
         val yy = (x(1) - 70) * (4.0/12) - 2
-//      println (s"ff: [$xx, $yy], xs($i) = ${xs(i)}")
         val u  = -2.12262  * xx - 0.200314 * yy - 2.15785
         val v  = -0.743867 * xx + 1.62988  * yy - 1.65227
         val uu = 1.0 / (1.0 + exp(-u))
@@ -520,14 +518,9 @@ end neuralNet_3LTest6
         15.7250 * uu + 13.1971 * vv + 13.4702
     end ff
 
-    val yp3 = VectorD (for i <- xs.indices yield ff (x46(i), i))     // compute the response
+    val yp3 = VectorD (for i <- xs.indices yield ff (x46(i)))        // compute the response
 
-    def ff2 (x: VectorD, i: Int): Double =
-//        val xx = (x(0) - 1.61300) * (4/3.537) - 2
-//        val yy = (x(1) - 70) * (4.0/12) - 2
-//        val u  = -2.12262  * xx - 0.200314 * yy - 2.15785
-//        val v  = -0.743867 * xx + 1.62988  * yy - 1.65227
-
+    def ff2 (x: VectorD): Double =
         15.7250 / (1.0 + exp (2.12262  * ((x(0) - 1.61300) * (4/3.537) - 2) +
                               0.200314 * ((x(1) - 70) * (4.0/12) - 2) + 2.15785)) +
         13.1971 / (1.0 + exp (0.743867 * ((x(0) - 1.61300) * (4/3.537) - 2) -
@@ -535,7 +528,7 @@ end neuralNet_3LTest6
         13.4702
     end ff2
 
-    val yp4 = VectorD (for i <- xs.indices yield ff2 (x46(i), i))    // compute the response
+    val yp4 = VectorD (for i <- xs.indices yield ff2 (x46(i)))       // compute the response
 
     println (s"(y - yp_).norm = ${(y - yp_).norm}")                  // norm of difference
     println (s"(y - yp2).norm = ${(y - yp2).norm}")                  // norm of difference
@@ -790,9 +783,9 @@ end neuralNet_3LTest10
         // backward
         val ε  = y - yp                                             // error matrix
         val δ1 = ε *~ f1.dM (yp)                                    // delta1 @ output layer
-        val δ0 = δ1 * b.𝐓 *~ f0.dM (z)                              // delta0 @ hidden layer (transpose (𝐓))
-        b     += z.𝐓 * δ1 * η                                       // parameter update Z -> Y
-        a     += x.𝐓 * δ0 * η                                       // parameter update X -> Z
+        val δ0 = δ1 * b.ᵀ *~ f0.dM (z)                              // delta0 @ hidden layer (transpose (ᵀ))
+        b     += z.ᵀ * δ1 * η                                       // parameter update Z -> Y
+        a     += x.ᵀ * δ0 * η                                       // parameter update X -> Z
 
         val sse0 = ε(?, 0).normSq                                   // sum of squared errors for column 0
         val sse1 = ε(?, 1).normSq                                   // sum of squared errors for column 1

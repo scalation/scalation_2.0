@@ -27,10 +27,12 @@ import scalation.mathstat._
  */
 class SimplerRegression (x: MatrixD, y: VectorD, fname_ : Array [String] = null)
       extends Predictor (x, y, if fname_ == null then null else fname_.slice (0, 1), null)
-         with Fit (dfm = 1, df = x.dim - 1)
+         with Fit (dfr = 1, df = x.dim - 1)
          with NoSubModels:
 
-    modelName = "SimplerRegression"
+    _modelName = "SimplerRegression"
+
+    override def getBest: BestStep = super [NoSubModels].getBest
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Train the predictor by fitting the parameter vector (b-vector) in the
@@ -102,7 +104,7 @@ object SimplerRegression:
      *  @param fname_  the feature/variable names
      */
     def apply (x: VectorD, y: VectorD, fname: Array [String]): SimplerRegression =
-        new SimplerRegression (MatrixD (x).transpose, y, fname)
+        new SimplerRegression (MatrixD (x).ᵀ, y, fname)
     end apply
 
 end SimplerRegression

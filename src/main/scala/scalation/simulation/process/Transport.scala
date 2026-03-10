@@ -64,7 +64,6 @@ class Transport (name: String, val from: Component, val to: Component,
         curve.setLine (p1, p2, bend)
 //      curve.setLine (p1, pc, p2)
 //      println ("loc = " + curve.getFirst)
-    end if
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Give the location of the curve to be its starting point.
@@ -149,7 +148,7 @@ class Transport (name: String, val from: Component, val to: Component,
         var loc    = curve.next (DIAM, DIAM)                            // get the starting position for the entity/token
         actor.trajectory = curve.traj
 
-        for i <- 1 to steps do
+        cfor (0, steps) { _ =>
             if loc != null then
                 director.animate (actor, MoveToken, null, null, Array (loc.x, loc.y))
                 actor.schedule (duration / steps.toDouble)
@@ -160,7 +159,7 @@ class Transport (name: String, val from: Component, val to: Component,
                 actor.trajectory = curve.traj
 //              println ("Transport.move: -- after  loc = " + loc)
             end if
-        end for
+        } // cfor
 
         accum (onTransport)
         onTransport -= 1

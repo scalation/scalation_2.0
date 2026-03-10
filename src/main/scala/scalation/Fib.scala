@@ -55,7 +55,7 @@ end Fib
         println (s"fib ($n) = $f_n")
 
     val rig = random.Randi0 (100000)
-    val a = (for i <- 0 until 10023 yield rig.igen).toArray     // 10023 works, 10024 stack overflow
+    val a = (for _ <- 0 until 10023 yield rig.igen).toArray     // 10023 works, 10024 stack overflow
 //  println (s"a = ${stringOf (a)}")
     val m = min (a, a.length-1)
     println (s"min = $m")

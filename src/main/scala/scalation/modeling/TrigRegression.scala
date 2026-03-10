@@ -38,16 +38,15 @@ class TrigRegression (t: MatrixD, y: VectorD, ord: Int, fname_ : Array [String] 
       extends Regression (TrigRegression.allForms (t, ord), y, fname_, hparam):
 
     private val w  = (2.0 * Pi) / (t.mmax - t.mmin)                         // base displacement angle in radians
-    private val n0 = 1                                                      // number of terms/columns originally
     private val nt = TrigRegression.numTerms (ord)                          // number of terms/columns after expansion
 
-    modelName = "TrigRegression"
+    _modelName = s"TrigRegression_$ord"
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Expand the vector 'z' into a vector of that includes additional terms.
      *  @param z  the un-expanded vector
      */
-    def expand (z: VectorD): VectorD = TrigRegression.forms (z, n0, nt, w)
+    def expand (z: VectorD): VectorD = TrigRegression.forms (z, nt, w)
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Given the scalar 'z', expand it and predict the response value.
@@ -96,7 +95,7 @@ object TrigRegression:
     def apply (t: VectorD, y: VectorD, ord: Int, fname: Array [String],
                hparam: HyperParameter): TrigRegression =
         val hp2 = if hparam == null then Regression.hp else hparam
-        new TrigRegression (MatrixD (t).transpose, y, ord, fname, hp2)
+        new TrigRegression (MatrixD (t).ᵀ, y, ord, fname, hp2)
     end apply
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -119,11 +118,10 @@ object TrigRegression:
      *  forms/terms, returning them as a vector.
      *  '[1, sin (wt), cos (wt), sin (2wt), cos (2wt), ...]'.
      *  @param v   the vector/point (i-th row of t) for creating forms/terms
-     *  @param k   number of features/predictor variables (not counting intercept) = 1
      *  @param nt  the number of terms
      *  @param w   the base displacement angle in radians
      */
-    def forms (v: VectorD, k: Int, nt: Int, w: Double): VectorD =
+    def forms (v: VectorD, nt: Int, w: Double): VectorD =
         val wt = w * v(0)
         val u  = new VectorD (nt)
         u(0)   = 1.0
@@ -148,11 +146,10 @@ object TrigRegression:
     def allForms (x: MatrixD, ord: Int): MatrixD =
         val t  = x(?, 0)                                             // first and only column of x
         val w  = (2.0 * Pi) / (t.max - t.min)                        // base displacement angle in radians
-        val k  = 1
         val nt = numTerms (ord)
-        println (s"allForms: create expanded data matrix with nt = $nt columns from k = $k columns")
+        println (s"allForms: create expanded data matrix with nt = $nt columns")
         val xe = new MatrixD (x.dim, nt)
-        for i <- x.indices do xe(i) = forms (x(i), k, nt, w)         // vector with values for all forms/terms
+        for i <- x.indices do xe(i) = forms (x(i), nt, w)            // vector with values for all forms/terms
         debug ("allForms", s"expanded data matrix xe = $xe")
         xe                                                           // expanded matrix
     end allForms
@@ -197,7 +194,6 @@ end TrigRegression
         if harmonics == 16 then
            val stats = trg.crossValidate ()
            FitM.showQofStatTable (stats)
-        end if
     end for
 
 end trigRegressionTest
@@ -241,7 +237,6 @@ end trigRegressionTest
         if harmonics == 16 then
            val stats = trg.crossValidate ()
            FitM.showQofStatTable (stats)
-        end if
     end for
 
 end trigRegressionTest2

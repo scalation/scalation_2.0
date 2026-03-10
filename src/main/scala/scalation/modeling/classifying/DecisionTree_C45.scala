@@ -16,8 +16,8 @@ import scala.collection.mutable.{ArrayBuffer, Set}
 
 import scalation.mathstat._
 import scalation.mathstat.Probability.{entropy, freq}
-
-import VariableKind.Categorical
+import scalation.theory.Variable
+import scalation.theory.VariableKind.Categorical
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `DecisionTree_C45` class implements a Decision Tree classifier using the
@@ -34,15 +34,15 @@ import VariableKind.Categorical
  *  @param hparam  the hyper-parameters
  */
 class DecisionTree_C45 (x: MatrixD, y: VectorI, fname_ : Array [String] = null, k: Int = 2,
-                       cname_ : Array [String] = Array ("No", "Yes"),
-                       conts: Set [Int] = Set [Int] (), hparam: HyperParameter = DecisionTree.hp)
+                        cname_ : Array [String] = Array ("No", "Yes"),
+                        conts: Set [Int] = Set [Int] (), hparam: HyperParameter = DecisionTree.hp)
       extends Classifier (x, y, fname_, k, cname_, hparam)
          with FitC (k)
          with DecisionTree:
 
     private val debug     = debugf ("DecisionTree_C45", false)                // debug function
-    private val height    = hparam ("height").toInt                           // the maximum height of tree
-    private val cutoff    = hparam ("cutoff")                                 // cutoff entropy threshold
+    private val height    = hparam("height").toInt                            // the maximum height of tree
+    private val cutoff    = hparam("cutoff")                                  // cutoff entropy threshold
 
     private var entropy_0 = entropy (y.freq (k)._2)                           // initial entropy of full vector y
     private val threshold = Array.ofDim [Double] (x.dim2)                     // threshold for continuous features (below <=, above >)
@@ -51,7 +51,7 @@ class DecisionTree_C45 (x: MatrixD, y: VectorI, fname_ : Array [String] = null, 
     for j <- x.indices2 do feas(j) = if conts contains j then Variable (x(?, j), j)
                                      else Variable (x(?, j), j, Categorical)
 
-    modelName = s"DecisionTree_C45_$height"                                   // name of the model
+    _modelName = s"DecisionTree_C45_$height"                                  // name of the model
 
     debug ("init", s"entropy of original/full y: entropy_0 = $entropy_0")
 
@@ -118,7 +118,6 @@ class DecisionTree_C45 (x: MatrixD, y: VectorI, fname_ : Array [String] = null, 
             val xj = x_(?, j)                                                 // column j of matrix x
             if feas(j).kind != Categorical then
                 threshold(j) = DecisionTree_C45.findSplit (xj, y_, rindex, k)   // => calculate split threshold
-            end if
             val (gn, nu) = gain (feas(j), xj, y_, rindex)                     // compute gain for feature j
 //          debug ("findBest", s"compare ($j, $gn, $nu) to $best")
             if gn > best._2 then best = (j, gn, nu)                           // better gainb => update best
@@ -148,11 +147,9 @@ class DecisionTree_C45 (x: MatrixD, y: VectorI, fname_ : Array [String] = null, 
         val node = Node (j, gn, nu, parent, nu.argmax (), leaf)               // construct the next node
         if ! leaf && feas(j).kind != Categorical then
             node.thres = threshold (j)                                        // for continuous features, store threshold in node
-        end if
         if parent == null then
             addRoot (node)                                                    // if no parent, add node as root of tree
             debug ("buildTree", s"entropy of root node: entropy_0 = $entropy_0")
-        end if
 
         if ! node.leaf && cindex.dim > 1 then
             val xj      = x(?, j)                                             // extract feature column j
@@ -176,9 +173,9 @@ class DecisionTree_C45 (x: MatrixD, y: VectorI, fname_ : Array [String] = null, 
      *  @param xj      the column of the data matrix to be considered
      *  @param rindex  the working row index used to create the new trimmed version
      *  @param vl      the value to matched (for conts its 0 (up to) or 1 (beyond) threshold)
-     *  @param thres   the splitting threshold 
+     *  @param thres   the splitting threshold
      */
-    private def trimRows (j: Int, xj: VectorD, rindex: VectorI, vl: Int, thres: Double = -0.0): VectorI =
+    private def trimRows (j: Int, xj: VectorD, rindex: VectorI, vl: Int, thres: Double): VectorI =
         val a = if conts contains j then
             if vl == 0 then (for i <- rindex if xj(i) <= thres yield i).toArray
             else            (for i <- rindex if xj(i)  > thres yield i).toArray
@@ -282,7 +279,6 @@ object DecisionTree_C45:
             if ent < minEnt then
                 thres  = mid                                             // found a better threshold
                 minEnt = ent                                             // save better gain
-            end if
         end for
 
         thres                                                            // save best threshold for this feature
@@ -321,7 +317,7 @@ object DecisionTree_C45:
         val ymin   = y.min ()
         println (s"unadjusted ymin = $ymin")
         if ymin != 0 then y -= ymin
-        val height = hparam ("height")
+        val height = hparam("height")
         println (s"height limit = $height")
 
         val tree = new DecisionTree_C45 (x, y.toInt, fn, k, cn, conts, hparam)

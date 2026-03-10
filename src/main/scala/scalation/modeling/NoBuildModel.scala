@@ -27,11 +27,20 @@ trait NoSubModels:
      *  Must be implemented for models that support feature selection.
      *  NOT SUPPORTED for this model, so throw an EXCEPTION.
      *  @param x_cols  the columns that the new model is restricted to
+     *  @param fname2  the variable/feature names for the new model (defaults to null)
      */
-    def buildModel (x_cols: MatrixD): Predictor & Fit =
+    def buildModel (x_cols: MatrixD, fname2: Array [String] = null): Predictor & Fit =
         throw new UnsupportedOperationException
               ("buildModel: this model does not support building sub-models for feature selection")
     end buildModel
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the best model found from feature selection.
+     */
+    def getBest: BestStep =
+        throw new UnsupportedOperationException
+              ("getBest: this model does not support building sub-models for feature selection")
+    end getBest
 
 end NoSubModels
 

@@ -34,8 +34,9 @@ import scala.reflect.ClassTag
  *  @param  order       the number of slots per bucket
  *  @param  loadFactor  the (lower, upper) bound on the load factor (# keys over # home slots)
  */
-class LinHashMultiMap [K: ClassTag, V: ClassTag] (name: String, order: Int = 4,
-                       loadFactor: (Double, Double) = (0.3, 1.2))
+//class LinHashMultiMap [K: ClassTag, V: ClassTag] (name: String, order: Int = 4,
+class LinHashMultiMap [K: ClassTag, V] (name: String, order: Int = 4,
+                                        loadFactor: (Double, Double) = (0.3, 1.2))
       extends LinHashMap [K, Set [V]] (name, order, loadFactor):
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -64,8 +65,8 @@ end LinHashMultiMap
  *  @param  initialCap  the initial hash table size (number of slots)
  *  @param  loadFactor  the load factor (number of keys over number of slots)
  */
-class HashMultiMap [K: ClassTag, V: ClassTag] (initialCap: Int    = HashMap.defaultInitialCapacity,
-                                               loadFactor: Double = HashMap.defaultLoadFactor)
+class HashMultiMap [K, V] (initialCap: Int    = HashMap.defaultInitialCapacity,
+                           loadFactor: Double = HashMap.defaultLoadFactor)
       extends Serializable:
 
     protected val hmap = new HashMap [K, Set [V]] (initialCap,
@@ -111,8 +112,8 @@ end HashMultiMap
  *  @param  initialCap  the initial hash table size (number of slots)
  *  @param  loadFactor  the load factor (number of keys over number of slots)
  */
-class JHashMultiMap [K: ClassTag, V: ClassTag] (initialCap: Int   = 16,
-                                                loadFactor: Float = 0.75)
+class JHashMultiMap [K, V] (initialCap: Int   = 16,
+                            loadFactor: Float = 0.75)
       extends Serializable:
 
     protected val hmap = new java.util.HashMap [K, Set [V]] (initialCap,
@@ -155,12 +156,12 @@ end JHashMultiMap
 /** The `BpTreeMultiMap` class provides tree maps that use the B+Tree algorithm.
  *  It build on `BpTreeMap` allowing values to multi-valued `Set [V]` and can be
  *  used for building Non-Unique Indices.
- *  @tparam K      the type of the keys contained in this tree map
+ *  -tparam K      the type of the keys contained in this tree map (FIX add this type)
  *  @tparam V      the base-type of the values assigned to keys in this tree map
  *  @param  order  the number of order (maximum number of children) of the tree
  *  @param  ord    the implicit ordering used to compare objects of type K
  */
-class BpTreeMultiMap [V: ClassTag] (order: Int = 4)
+class BpTreeMultiMap [V] (order: Int = 4)
       extends BpTreeMap [Set [V]] ("BpTreeMultiMap"):     // FIX: add ", order"
  
     println (s"BpTreeMultiMap: order = $order")
@@ -190,7 +191,7 @@ end BpTreeMultiMap
  *  @tparam V    the base-type of the values assigned to keys in this tree map
  *  @param  ord  the implicit ordering used to compare objects of type K
  */
-class TreeMultiMap [K: ClassTag, V: ClassTag] (implicit val ord: Ordering [K])
+class TreeMultiMap [K, V] (implicit val ord: Ordering [K])
       extends Serializable:
 
     protected val tree = new TreeMap [K, Set [V]] ()              // delegate to TreeMap
@@ -234,7 +235,7 @@ end TreeMultiMap
  *  @tparam V    the base-type of the values assigned to keys in this tree map
  *  @param  ord  the implicit ordering used to compare objects of type K
  */
-class JTreeMultiMap [K: ClassTag, V: ClassTag] (implicit val ord: Ordering [K])
+class JTreeMultiMap [K, V] (implicit val ord: Ordering [K])
       extends Serializable:
 
     protected val tree = new java.util.TreeMap [K, Set [V]] ()    // delegate to Java's TreeMap
@@ -296,7 +297,6 @@ end JTreeMultiMap
         for i <- 1 to totalKeys by 2 do index.put (rng.igen, Set (i~^2, i~^3))
     else
         for i <- 1 to totalKeys by 2 do index.put (i, Set (i~^2, i~^3))
-    end if
     index.show ()
 
     banner ("Find Keys")

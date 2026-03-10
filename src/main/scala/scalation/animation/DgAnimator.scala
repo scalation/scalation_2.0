@@ -165,7 +165,6 @@ class DgAnimator (_title: String, fgColor: Color = black, bgColor: Color = white
     private def invokeCommand (c: AnimateCommand): Unit =
         if c.action != MoveToken then                                          // remove if to see all move steps
             println (s"DgAnimator.invokeCommand: $c")
-        end if
 
         c.action match
         case CreateNode =>

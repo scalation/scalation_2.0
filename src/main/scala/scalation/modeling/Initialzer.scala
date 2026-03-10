@@ -65,7 +65,7 @@ object Initializer:
      */
     def weightVec2 (rows: Int, stream: Int = 0): VectorD =
         val normal = new Normal (stream = stream)
-        VectorD (for i <- 0 until rows yield normal.gen)
+        VectorD (for _ <- 0 until rows yield normal.gen)
     end weightVec2
  
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

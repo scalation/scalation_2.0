@@ -23,7 +23,7 @@ import scalation.mathstat._
  *  Fit the parameter vector b in for each regression equation
  *      y  =  b dot x + e  =  b_0 + b_1 * x_1 + ... b_k * x_k + e
  *  where e represents the residuals (the part not explained by the model).
- *  Use Least-Squares (minimizing the residuals) to solve the parameter vector b
+ *  Use Least-Squares (minimizing the residuals) to solve the parameter matrix bb(0).w
  *  using the Normal Equations:
  *      x.t * x * b  =  x.t * y 
  *      b  =  fac.solve (.)
@@ -46,7 +46,7 @@ import scalation.mathstat._
 class RegressionMV (x: MatrixD, y: MatrixD, fname_ : Array [String] = null,
                   hparam: HyperParameter = Regression.hp)
       extends PredictorMV (x, y, fname_, hparam)
-         with Fit (dfm = x.dim2 - 1, df = x.dim - x.dim2):
+         with Fit (dfr = x.dim2 - 1, df = x.dim - x.dim2):
          // if not using an intercept df = (x.dim2, x.dim-x.dim2), correct by calling 'resetDF' method from `Fit`
 
     private val debug     = debugf ("RegressionMV", false)               // debug function
@@ -54,7 +54,7 @@ class RegressionMV (x: MatrixD, y: MatrixD, fname_ : Array [String] = null,
     private val algorithm = hparam("factorization")                      // factorization algorithm
     private val n         = x.dim2                                       // number of columns
 
-    modelName = "RegressionMV"
+    _modelName = s"RegressionMV_$n"
 
     if n < 1 then flaw ("init", s"dim2 = $n of the 'x' matrix must be at least 1")
 
@@ -84,7 +84,7 @@ class RegressionMV (x: MatrixD, y: MatrixD, fname_ : Array [String] = null,
         val fac = solver (x_)
         fac.factor ()                                                    // factor the matrix, either X or X.t * X
 
-        bb = Array (new NetParam (new MatrixD (x.dim2, y.dim2)))         // allocate parameters bb (only uses 'bb(0).w')
+        bb = Array (new NetParam (new MatrixD (x_.dim2, y_.dim2)))       // allocate parameters bb (only uses 'bb(0).w')
         for k <- y_.indices2 do
             val yk  = y_(?, k) 
             bb(0).w(?, k) = fac match                                    // RECORD the parameters/coefficients (@see `PredictorMV`)
@@ -143,10 +143,11 @@ class RegressionMV (x: MatrixD, y: MatrixD, fname_ : Array [String] = null,
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Build a sub-model that is restricted to the given columns of the data matrix.
      *  @param x_cols  the columns that the new model is restricted to
+     *  @param fname2  the variable/feature names for the new model (defaults to null)
      */
-    def buildModel (x_cols: MatrixD): RegressionMV =
+    def buildModel (x_cols: MatrixD, fname2: Array [String] = null): RegressionMV =
         debug ("buildModel", s"${x_cols.dim} by ${x_cols.dim2}")
-        new RegressionMV (x_cols, y, null, hparam)
+        new RegressionMV (x_cols, y, fname2, hparam)
     end buildModel
 
 end RegressionMV
@@ -251,7 +252,7 @@ end regressionMVTest
     println (mod.summary ())                                     // parameter/coefficient statistics
 
     banner ("Concrete Validation Test")
-    println (FitM.showFitMap (mod.validate ()(), QoF.values.map (_.toString)))
+    println (Fit.showFitMap (mod.validate ()()._2))
 
     banner ("Concrete Cross-Validation Test")
     val stats = mod.crossValidate ()
@@ -279,7 +280,7 @@ end regressionMVTest2
     println (mod.summary ())                                     // parameter/coefficient statistics
 
     banner ("AutoMPG Validation Test")
-    println (FitM.showFitMap (mod.validate ()(), QoF.values.map (_.toString)))
+    println (Fit.showFitMap (mod.validate ()()._2))
 
     banner ("AutoMPG Cross-Validation Test")
     val stats = mod.crossValidate ()
@@ -311,8 +312,7 @@ end regressionMVTest3
 //  val (cols, rSq) = mod.backwardElimAll ()                     // R^2, R^2 bar, smape, R^2 cv
     val k = cols.size
     println (s"k = $k, n = ${ox.dim2}")
-    new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "smape", "R^2 cv"),
-               s"R^2 vs n for ${mod.modelName}", lines = true)
+    new PlotM (null, rSq.transpose, Regression.metrics, s"R^2 vs n for ${mod.modelName}", lines = true)
     println (s"rSq = $rSq")
 
 end regressionMVTest4
@@ -345,8 +345,7 @@ end regressionMVTest4
         val (cols, rSq) = mod.selectFeatures (tech)              // R^2, R^2 bar, smape, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${ox.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "smape", "R^2 cv"),
-                   s"R^2 vs n for ${mod.modelName} with $tech", lines = true)
+        new PlotM (null, rSq.transpose, Regression.metrics, s"R^2 vs n for ${mod.modelName} with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 

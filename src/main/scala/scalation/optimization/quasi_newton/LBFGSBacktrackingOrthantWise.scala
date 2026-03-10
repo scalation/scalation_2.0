@@ -62,7 +62,7 @@ object LBFGSBacktrackingOrthantWise extends LBFGSLineSearch:
             xNew = orthantwisePrms.project (xNew, wp)
 
             // Evaluate the function and gradient values
-            val evaluationResults = cd.evaluationLogic.evaluate (cd.instance, xNew, n, stpNew)
+            val evaluationResults = cd.evalLogic.evaluate (cd.instance, xNew, n, stpNew)
             fNew = evaluationResults.objFunctionValue
             gNew = evaluationResults.gradientVector
 

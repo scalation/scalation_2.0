@@ -433,6 +433,8 @@ object Fac_LU:
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the inverse of matrix a by calling the inverse method in `Fac_LU`.
      *  Note: `Fac_LU.inverse` is generally faster and more robust than `Fac_Inv.inverse`.
+     *  Usage: inverse (a)
+     *  Usage: inverse (a)(lu)           // shortcut when lu is already computed
      *  @param a   the matrix whose inverse is sought
      *  @param lu  an LU factorization (use existing or make a new one)
      */
@@ -445,6 +447,8 @@ object Fac_LU:
     /** Compute the determinant of matrix a.  The value of the determinant
      *  indicates, among other things, whether there is a unique solution to a
      *  system of linear equations (a nonzero determinant).
+     *  Usage: det (a)
+     *  Usage: det (a)(lu)               // shortcut when lu is already computed
      *  @param a   the matrix whose determinant is sought
      *  @param lu  an LU factorization (use existing or make a new one)
      */

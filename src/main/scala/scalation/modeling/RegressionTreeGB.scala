@@ -28,7 +28,7 @@ import modeling.{RegressionTree  => REG_TREE}                                 //
 class RegressionTreeGB (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
                         hparam: HyperParameter = RegressionTree.hp)
       extends Predictor (x, y, fname_, hparam)
-         with Fit (dfm = x.dim2 - 1, df = x.dim - x.dim2):                    // call resetDF once tree is built
+         with Fit (dfr = x.dim2 - 1, df = x.dim - x.dim2):                    // call resetDF once tree is built
 
     private val debug  = debugf ("RegressionTreeGB", false)                   // debug function
     private val depth  = hparam("maxDepth").toInt                             // the max depth for the base regression trees
@@ -36,7 +36,7 @@ class RegressionTreeGB (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
     private val eta    = hparam("eta").toDouble                               // the learning rate
     private val forest = new ArrayBuffer [REG_TREE] ()                        // forest is a list of regression trees
 
-    modelName = s"RegressionTreeGB ($depth, $iter)"
+    _modelName = s"RegressionTreeGB_${depth}_$iter"
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Use Gradient Boosting for Training.  For every iteration, evaluate the residual
@@ -100,9 +100,11 @@ class RegressionTreeGB (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Build a sub-model that is restricted to the given columns of the data matrix.
      *  @param x_cols  the columns that the new model is restricted to
+     *  @param fname2  the variable/feature names for the new model (defaults to null)
      */
-    override def buildModel (x_cols: MatrixD): RegressionTreeGB =
-        new RegressionTreeGB (x_cols, y, null, hparam)
+    def buildModel (x_cols: MatrixD, fname2: Array [String] = null): RegressionTreeGB =
+        debug ("buildModel", s"${x_cols.dim} by ${x_cols.dim2}")
+        new RegressionTreeGB (x_cols, y, fname2, hparam)
     end buildModel
 
 end RegressionTreeGB
@@ -134,7 +136,6 @@ object RegressionTreeGB:
         else
             val (x, y) = (xy.not (?, col), xy(?, col))
             new RegressionTreeGB (x, y, fname, hparam) 
-        end if
     end apply
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -154,7 +155,6 @@ object RegressionTreeGB:
         else
 // FIX - add rescale
             new RegressionTreeGB (x, y, fname, hparam) 
-        end if
     end rescale
 
 end RegressionTreeGB
@@ -229,12 +229,12 @@ end regressionTreeGBTest
 //      println (mod.summary ())                                      // parameter/coefficient statistics
 
         banner (s"AutoMPG Regression Tree GB with d = $d Validation")
-        val qof2 = mod.validate ()()                                  // out-of-sampling testing
+        val qof2 = mod.validate ()()._2                               // out-of-sampling testing
         val iq = QoF.rSq.ordinal                                      // index for rSq
         qual (d-1) = VectorD (qof(iq), qof(iq+1), qof2(iq))           // R^2, R^2 bar, R^2 os
     end for
 
-    new PlotM (VectorD.range (1, dmax+1), qual.transpose, Array ("R^2", "R^2 bar", "R^2 os"),
+    new PlotM (VectorD.range (1, dmax+1), qual.ᵀ, Array ("R^2", "R^2 bar", "R^2 os"),
                "RegressionTreeGB in-sample, out-of-sample QoF vs. depth", lines = true)
     println (s"RegressionTreeGB: qual = $qual")
 
@@ -267,8 +267,7 @@ end regressionTreeGBTest2
         val (cols, rSq) = mod.selectFeatures (tech)                   // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for Regression Tree GB with $tech", lines = true)
+        new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for Regression Tree GB with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 

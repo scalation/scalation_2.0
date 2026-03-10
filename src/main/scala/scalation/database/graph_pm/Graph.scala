@@ -134,7 +134,6 @@ case class Graph (ch: Array [SET [Int]],
                     flaw ("checkEdges", s"child of $u, with vertex id $u_c not in bounds 0..$maxId")
                     okay = false
                     break ()
-                end if
             end for
         } // breakable
         okay
@@ -152,7 +151,6 @@ case class Graph (ch: Array [SET [Int]],
                     flaw ("checkElabels", s"no such edge from $u to $v")
                     okay = false
                     break ()
-                end if
             end for
         } // breakable
         okay
@@ -228,9 +226,8 @@ case class Graph (ch: Array [SET [Int]],
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Print this digraph in a deep sense with all the information.
-     *  @param clip whether to clip out "Set(" and ")"
      */
-    def printG (clip: Boolean = true): Unit =
+    def printG (): Unit =
         println (s"Graph ($name, $inverse, $size")
         for i <- ch.indices do println (toLine (i))
         for (k, v) <- elabel do println (s"edge $k -> $v")
@@ -258,7 +255,6 @@ case class Graph (ch: Array [SET [Int]],
             end for
         else
             for i <- vset do lv(i) = g.label(i)                 // direct correspondence for labels 
-        end if
         (lv, vmap)
     end addVertices
 
@@ -302,7 +298,7 @@ object Graph:
                schema: Array [String]): Graph =
         val n  = label.length
         val ch = Array.fill (n)(SET [Int] ())
-        for (e, l) <- elabel do ch(e._1) += e._2
+        for (e, _) <- elabel do ch(e._1) += e._2
         new Graph (ch, label, elabel, inverse, name, schema)
     end apply
 
@@ -330,7 +326,6 @@ object Graph:
                 for j <- 0 until n if j != i do                 // no vertex order restriction
                     ch(i) += j
                     elab  += (i, j) -> adj(i, j)
-            end if
         end for
         new Graph (ch, lab, elab, inverse, name, schema)
     end fromMatrix

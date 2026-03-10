@@ -6,6 +6,8 @@
  *  @see     LICENSE (MIT style license file).
  *
  *  @note    Model Framework: Forecast Matrix time x horizons
+ *
+ *  @see     `randomWalkTest4` to see flat and slanted versions of a forecast matrix
  */
 
 package scalation
@@ -16,7 +18,7 @@ import scalation.mathstat._
 
 /*----------------------------------------------------------------------------
 
-The FORECASTING MATRIX yf: Example Values (made up (e.g., daily) values)
+The FORECAST MATRIX yf: Example Values (made up (e.g., daily) values)
 
 yf(t, h) = element for base time t and horizon h (its time = t+h)
 yf(?, h) shows column h that corresponds to a forecast vector for horizon h
@@ -49,24 +51,24 @@ Row time t = 3: yf(3, 0) = 4.0 = the actual value for day 3,
  */
 trait ForecastMatrix (y: VectorD, hh: Int, tRng: Range = null):
 
-    private val debug = debugf ("ForecastMatrix", true)                    // debug function
+    private val debug = debugf ("ForecastMatrix", false)                   // debug function
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Make the full FORECAST MATRIX where the zeroth column holds the actual time series
      *  and the last column is its time/time index.  Columns 1, 2, ... hh are for h steps
      *  ahead forecasts.
-     *  @param y_  the actual time series vector to use in making forecasts
-     *  @param hh  the maximum forecasting horizon, number of steps ahead to produce forecasts
+     *  @param y_   the actual time series vector to use in making forecasts
+     *  @param hh_  the maximum forecasting horizon, number of steps ahead to produce forecasts
      */
     def makeForecastMatrix (y_ : VectorD = y, hh_ : Int = hh): MatrixD =
-        val yf_ = new MatrixD (y_.dim, hh + 2)                             // forecasts for all time points t & horizons to h
+        val yf_ = new MatrixD (y_.dim, hh_ + 2)                            // forecasts for all time points t & horizons to h
         debug ("makeForecastMatrix", s"forecast matrix: y_.dim = ${y_.dim} --> yf_.dims = ${yf_.dims}")
 
         for t <- y_.indices do yf_(t, 0) = y_(t)                           // first column (0) holds the actual time series values
         if tRng == null then
-            for t <- yf_.indices do yf_(t, hh+1) = t                       // last column (h+1) holds time (logical day)
+            for t <- yf_.indices do yf_(t, hh_ + 1) = t                    // last column (h+1) holds time (logical day)
         else 
-            for t <- tRng do yf_(t, hh+1) = t                              // last column (h+1) holds time (logical day)
+            for t <- tRng do yf_(t, hh_ + 1) = t                           // last column (h+1) holds time (logical day)
         yf_
     end makeForecastMatrix
 
@@ -78,11 +80,21 @@ trait ForecastMatrix (y: VectorD, hh: Int, tRng: Range = null):
      *  @param yf  the current forecast matrix
      */
     def slant (yf: MatrixD): MatrixD =
+        val yf1 = yf(?, 0) ++ new VectorD (yf.dim2-2)
+        val yf2 = yf(?, 1 until yf.dim2)                                    // start shift from col 1, flat yf aleady has col 0 to col 1 shift
+        val yf_ = yf1 +^: yf2.shiftDiag
+        val j   = yf_.dim2 - 1
+        for i <- yf_.indices do yf_(i, j) = i
+        yf_
+    end slant
+/*
+    def slant (yf: MatrixD): MatrixD =
         val yf_ = yf.shiftDiag
         val j   = yf_.dim2 - 1
         for i <- yf_.indices do yf_(i, j) = i
         yf_
     end slant
+*/
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Diagnose the health of the model by computing the Quality of Fit (QoF) measures,
@@ -109,18 +121,16 @@ trait ForecastMatrix (y: VectorD, hh: Int, tRng: Range = null):
      *  @param y_      the actual response/output vector
      *  @param yf      the entire FORECAST MATRIX
      *  @param rRng    the time range, defaults to null (=> full time range)
-     *  @param sft     the amount of shift for yfh (FIX - ideally unify the code and remove sft)
-     *  @param showYf  the amount of shift for yfh (FIX - ideally unify the code and remove sft)
+     *  @param showYf  whether to show the forecast matrix
      */
-    def diagnoseAll (y_ : VectorD, yf: MatrixD, tRng: Range = null, sft: Int = 0,
-                     showYf: Boolean = false): Unit =
+    def diagnoseAll (y_ : VectorD, yf: MatrixD, tRng: Range = null, showYf: Boolean = false): MatrixD =
         val ftMat = new MatrixD (hh, Fit.N_QoF)
         val t1 = if tRng == null then 0 else tRng.start                    // first time point
         for h <- 1 to hh do
             val yy  = y_(t1+h-1 until y_.dim)                              // align the actual response values
-            val yfh = yf(?, h)(t1+sft until y_.dim-h+sft+1)                // align column h of the forecast matrix
-            println (s"yy.dim = ${yy.dim}, yfh.dim = ${yfh.dim}")
-//          println (s"for h = $h: ${MatrixD (yy, yfh).transpose}")
+            val yfh = yf(?, h)(t1 until y_.dim-h+1)                        // align column h of the forecast matrix
+            debug ("diagnoseAll", s"yy.dim = ${yy.dim}, yfh.dim = ${yfh.dim}")
+//          println (s"for h = $h: ${MatrixD (yy, yfh).ᵀ}")
 //          Forecaster.differ (yy, yfh)                                    // uncomment for debugging
             assert (yy.dim == yfh.dim)                                     // make sure the vector sizes agree
 
@@ -132,8 +142,11 @@ trait ForecastMatrix (y: VectorD, hh: Int, tRng: Range = null):
         end for
         if showYf then println (s"Final Forecast Matrix yf = ${slant (yf)}")
         println ("fitMap QoF = ")
-        println (FitM.showFitMap (ftMat.transpose, QoF.values.map (_.toString)))
+        println (Fit.showFitMap (ftMat.ᵀ))
+        ftMat
     end diagnoseAll
+
+// had  *  @param sft     the amount of shift for yfh (defaults to 0, FIX - ideally unify the code and remove sft)
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Diagnose the health of the model by computing the Quality of Fit (QoF) measures,
@@ -143,7 +156,7 @@ trait ForecastMatrix (y: VectorD, hh: Int, tRng: Range = null):
      *  @param yy  the actual response/output matrix over all horizons
      *  @param yf  the entire FORECAST MATRIX
      */
-    def diagnoseAll (yy: MatrixD, yf: MatrixD): Unit =
+    def diagnoseAll (yy: MatrixD, yf: MatrixD): MatrixD =
         val ftMat = new MatrixD (hh, Fit.N_QoF)
         for h <- 1 to hh do
             val qof    = diagnose (yy(?, h-1), yf(?, h))                   // use column h of yf
@@ -151,7 +164,8 @@ trait ForecastMatrix (y: VectorD, hh: Int, tRng: Range = null):
 //          println (FitM.fitMap (qof, qoF_names))
         end for
         println ("fitMap QoF = ")
-        println (FitM.showFitMap (ftMat.transpose, QoF.values.map (_.toString)))
+        println (Fit.showFitMap (ftMat.ᵀ))
+        ftMat
     end diagnoseAll
 
 end ForecastMatrix

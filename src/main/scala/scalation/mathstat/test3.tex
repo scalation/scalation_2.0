@@ -1,0 +1,32 @@
+
+\documentclass{article}
+\usepackage{amsmath} % For advanced math features like \text, \frac, etc.
+\usepackage[utf8]{inputenc} % To handle various characters
+\begin{document}
+
+\begin{table}[h]
+\centering
+\caption{Texas Temperatures: Regression, Ridge, Lasso, Transformed}
+\label{tab:Texas-Temps}
+\begin{tabular}{|c|c|c|c|c|c|} \hline 
+Metric & Regression & Ridge & Lasso & Transformed & Symbolic \\ \hline \hline 
+rSq &0.991921 &	0.991920 &	0.836978 &	0.986374 &	0.991340 \\ \hline 
+rSqBar &0.989902 &	0.989899 &	0.796222 &	0.982967 &	0.981443 \\ \hline 
+sst &941.938 &	941.938 &	941.938 &	941.938 &	941.938 \\ \hline 
+sse &7.60949 &	7.61128 &	153.557 &	12.8350 &	8.15712 \\ \hline 
+sde &0.712250 &	0.712333 &	2.18523 &	0.925020 &	0.737433 \\ \hline 
+mse0 &0.475593 &	0.475705 &	9.59730 &	0.802186 &	0.509820 \\ \hline 
+rmse &0.689633 &	0.689714 &	3.09795 &	0.895648 &	0.714017 \\ \hline 
+mae &0.531353 &	0.531765 &	2.43379 &	0.774972 &	0.550634 \\ \hline 
+smape &1.09478 &	1.09563 &	5.33198 &	1.63203 &	1.13279 \\ \hline 
+m &16.0000 &	16.0000 &	16.0000 &	16.0000 &	16.0000 \\ \hline 
+dfr &3.00000 &	3.00000 &	3.00000 &	3.00000 &	8.00000 \\ \hline 
+df &12.0000 &	12.0000 &	12.0000 &	12.0000 &	7.00000 \\ \hline 
+fStat &491.138 &	491.022 &	20.5365 &	289.553 &	100.165 \\ \hline 
+aic &-8.75748 &	-8.75936 &	-35.8447 &	-12.9397 &	0.686565 \\ \hline 
+bic &-5.66713 &	-5.66900 &	-32.7543 &	-9.84934 &	7.63986 \\ \hline 
+\end{tabular}
+\end{table}
+
+\end{document}
+

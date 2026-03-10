@@ -72,7 +72,7 @@ class Path (name: String, k: Int, val from: Component, val to: Component,
         if abs (l1 - l2) > 2 then
             flaw ("changeLane", s"UNSAFE to cross multiple lanes at once $l1 to #l2")
         val actor = director.theActor.asInstanceOf [Vehicle]
-        val (open, p, s) = laneOpenAt (l2, actor.disp)
+        val (open, _, _) = laneOpenAt (l2, actor.disp)        // (open, p, s)
         if open then
             debug ("changeLane", s"from lane $l1 to lane $l2")
             director.log.trace (this, s"change lane from $l1 to $l2", actor, director.clock)
@@ -90,6 +90,7 @@ class Path (name: String, k: Int, val from: Component, val to: Component,
      *  @param displacement  the displacement (distance from start of the new lane)
      */
     def laneOpenAt (newLane: Int, displacement: Double): (Boolean, Vehicle, Vehicle) =
+        println (s"laneOpenAt: newLane = $newLane, displacement = $displacement")
         (false, null, null)                     // FIX -- use B+Tree to see if there is a car in the way
     end laneOpenAt
 

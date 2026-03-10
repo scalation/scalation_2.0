@@ -69,7 +69,6 @@ class CheckLP (a: MatrixD, b: VectorD, c: VectorD):
             if ax_i > b_i + EPSILON then
                 flaw ("isPrimalFeasible", s"constraint ax_i <= b_i violated for row $i: $ax_i > $b_i")
                 feas = false
-            end if
         end for
         feas
     end isPrimalFeasible
@@ -96,7 +95,6 @@ class CheckLP (a: MatrixD, b: VectorD, c: VectorD):
             if ya_j > c_j + EPSILON then
                 flaw ("isDualFeasible", s"constraint ya_j <= c_j violated for col $j: $ya_j > $c_j")
                 feas = false
-            end if
         end for
         feas
     end isDualFeasible
@@ -115,11 +113,9 @@ class CheckLP (a: MatrixD, b: VectorD, c: VectorD):
        if abs (f - cx) > EPSILON then
            flaw ("isOptimal", s"failed since f = $f != c x = $cx")
            opti = false
-       end if
        if abs (f - yb) > EPSILON then
            flaw ("isOptimal", s"failed since f = $f != y b = $yb")
            opti = false
-       end if
        opti
     end isOptimal
 

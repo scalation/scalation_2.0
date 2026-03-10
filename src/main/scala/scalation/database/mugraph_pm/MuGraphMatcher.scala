@@ -130,7 +130,6 @@ trait MuGraphMatcher (g: MuGraph, q: MuGraph):
         if ans != null then
             for i <- φ.indices do println (s"$i: ${φ(i)} == ? ${ans(i)}")
             for i <- φ.indices do assert (φ(i) == ans(i))
-        end if 
         φ
     end test
 

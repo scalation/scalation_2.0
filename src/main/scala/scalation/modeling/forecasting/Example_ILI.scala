@@ -15,9 +15,12 @@ package scalation
 package modeling
 package forecasting
 
+import scala.collection.mutable.{LinkedHashSet => LSET}
 import scala.math._
 
 import scalation.mathstat._
+
+import TransformT._
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `Example_ILI` object provides a convenient way to load ILI weekly data.
@@ -26,7 +29,8 @@ object Example_ILI:
 
     import scala.collection.mutable.HashMap
 
-    val fileName = "national_illness.csv"
+//  val fileName = "national_illness.csv"               // commonly used ILI dataset
+    val fileName = "national_illness_clip.csv"          // more recent data + 2 years of Covid clipped out
 
     val header = Array ("%WEIGHTED ILI",                // percent per state weighted by population
                         "%UNWEIGHTED ILI",              // aggregated without weighting
@@ -108,7 +112,7 @@ end example_ILITest
  */
 @main def example_ILITest2 (): Unit =
 
-    import scala.collection.mutable.Set
+    import scala.collection.mutable.{LinkedHashSet => LSET}
 
     val (x, y) = loadData (header, response)
 
@@ -120,8 +124,8 @@ end example_ILITest
         xj = scaleV (extreme (xj), (0.0, 2.0))(xj)                      // rescale vector xj to [0, 2]
         val xxj = MatrixD.fromVector (xj)
 //      val mod = SymbolicRegression.quadratic (xxj, y)
-//      val mod = SymbolicRegression.rescale (xxj, y, null, Set (1.0, 2.0, 3.0), cross = false)
-        val mod = SymbolicRegression (xxj, y, null, Set (0.5, 1.0, 2.0, 3.0), cross = false)
+//      val mod = SymbolicRegression.rescale (xxj, y, null, LSET (1.0, 2.0, 3.0), cross = false)
+        val mod = SymbolicRegression (xxj, y, null, LSET (0.5, 1.0, 2.0, 3.0), cross = false)
         mod.trainNtest ()()
         val yp = mod.predict (mod.getX)
         println (mod.summary ())
@@ -154,20 +158,104 @@ end example_ILITest2
 
     new Plot (null, y, null, s"y ($response)", lines = true)
 
-    new NullModel (y, hh).inSampleTest ()
-    new TrendModel (y, hh).inSampleTest ()
-    new SimpleMovingAverage (y, hh).inSampleTest ()
-    new WeightedMovingAverage (y, hh).inSampleTest ()
-    new SimpleExpSmoothing (y, hh).inSampleTest ()
-    new RandomWalk (y, hh).inSampleTest ()
-    new RandomWalkS (y, hh).inSampleTest ()
-    new AR (y, hh).inSampleTest ()
+    new NullModel (y, hh).inSample_Test ()
+    new TrendModel (y, hh).inSample_Test ()
+    new SimpleMovingAverage (y, hh).inSample_Test ()
+    new WeightedMovingAverage (y, hh).inSample_Test ()
+    new SimpleExpSmoothing (y, hh).inSample_Test ()
+    new RandomWalk (y, hh).inSample_Test ()
+    new RandomWalkS (y, hh).inSample_Test ()
+    new AR (y, hh).inSample_Test ()
 
 end example_ILITest3
 
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `example_CovidTest5` main function tests the `Example_ILI` object.
+/** The `example_ILITest4` main function tests the `Example_ILI` object.
+ *  Uses Train-n-Test Split (TnT) with Rolling Validation.
+ *  Runs several baseline models for horizons 1 to 6, see sMAPE metrics below:
+ *
+ *  57.1057,    60.0825,    62.9136,    64.7453,    67.9247,    70.6674  Null
+ *  61.9077,    65.1881,    68.7187,    71.4655,    73.9327,    75.9584  Trend
+ *  22.3044,    30.4325,    45.3661,    55.7217,    67.6973,    77.4038  SMA
+ *  23.8526,    30.0945,    46.9748,    55.8104,    68.7352,    77.7010  WMA
+ *  18.3769,    27.1712,    40.3425,    51.8124,    63.7356,    75.0046  SES
+ *  18.6713,    27.5720,    40.9387,    52.3496,    64.2481,    75.3015  RW
+ *  18.0855,    26.7084,    39.6941,    51.2218,    63.1873,    74.6834  RWS
+ *  19.1590,    31.1975,    44.4850,    55.3120,    65.5536,    74.4969  AR(1)
+ *
+ *  > runMain scalation.modeling.forecasting.example_ILITest4
+ */
+@main def example_ILITest4 (): Unit =
+
+    val y  = Example_ILI.loadData_y (response)
+    val hh = 12                                                           // max forecasting horizon
+
+    new Plot (null, y, null, s"y ($response)", lines = true)
+
+    var mod: Forecaster = null
+
+    banner ("TnT Test: Null Model")
+    mod = new NullModel (y, hh)
+    mod.trainNtest ()()
+    mod.setSkip (0)                                                     // start at beginning of test-set
+    mod.rollValidate ()                                                 // TnT with Rolling Validation
+    mod.diagnoseAll (y, mod.getYf, Forecaster.teRng (y.dim))            // only diagnose on the testing set
+
+    banner ("TnT Test: Trend Model")
+    mod = new TrendModel (y, hh)
+    mod.trainNtest ()()
+    mod.setSkip (0)
+    mod.rollValidate ()                                                 // TnT with Rolling Validation
+    mod.diagnoseAll (y, mod.getYf, Forecaster.teRng (y.dim))            // only diagnose on the testing set
+
+    banner ("TnT Test: Simple Moving Average Model")
+    mod = new SimpleMovingAverage (y, hh)
+    mod.trainNtest ()()
+    mod.setSkip (0)
+    mod.rollValidate ()                                                 // TnT with Rolling Validation
+    mod.diagnoseAll (y, mod.getYf, Forecaster.teRng (y.dim))            // only diagnose on the testing set
+
+    banner ("TnT Test: Weighted Moving Average Model")
+    mod = new WeightedMovingAverage (y, hh)
+    mod.trainNtest ()()
+    mod.setSkip (0)
+    mod.rollValidate ()                                                 // TnT with Rolling Validation
+    mod.diagnoseAll (y, mod.getYf, Forecaster.teRng (y.dim))            // only diagnose on the testing set
+
+    banner ("TnT Test: Simple Exponential Smoothing Model")
+    mod = new SimpleExpSmoothing (y, hh)
+    mod.trainNtest ()()
+    mod.setSkip (0)
+    mod.rollValidate ()                                                 // TnT with Rolling Validation
+    mod.diagnoseAll (y, mod.getYf, Forecaster.teRng (y.dim))            // only diagnose on the testing set
+
+    banner ("TnT Test: Random Walk Model")
+    mod = new RandomWalk (y, hh)
+    mod.trainNtest ()()
+    mod.setSkip (0)
+    mod.rollValidate ()                                                 // TnT with Rolling Validation
+    mod.diagnoseAll (y, mod.getYf, Forecaster.teRng (y.dim))            // only diagnose on the testing set
+
+    banner ("TnT Test: Random Walk Slope Adjusted Model")
+    mod = new RandomWalkS (y, hh)
+    mod.trainNtest ()()
+    mod.setSkip (0)
+    mod.rollValidate ()                                                 // TnT with Rolling Validation
+    mod.diagnoseAll (y, mod.getYf, Forecaster.teRng (y.dim))            // only diagnose on the testing set
+
+    banner ("TnT Test: Auto-Regressive AR(1) Model")
+    mod = new AR (y, hh)
+    mod.trainNtest ()()
+    mod.setSkip (0)
+    mod.rollValidate ()                                                 // TnT with Rolling Validation
+    mod.diagnoseAll (y, mod.getYf, Forecaster.teRng (y.dim))            // only diagnose on the testing set
+
+end example_ILITest4
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `example_ILITest5` main function tests the `Example_ILI` object.
  *  Uses In-Sample Testing (In-ST), i.e., train and test on the same data.
  *  Runs Auto-Regressive AR(p) models for several p values and horizons 1 to 6,
  *  see sMAPE metrics below:
@@ -195,7 +283,7 @@ end example_ILITest3
 
     for p <- 1 to 10 do                                                 // AR hyper-parameter settings
         hp("p") = p
-        new AR (y, hh).inSampleTest ()                                  // create and test an AR model
+        new AR (y, hh).inSample_Test ()                                 // create and test an AR model
     end for
 
 end example_ILITest5
@@ -219,7 +307,7 @@ end example_ILITest5
         banner (s"Test: ${mod.modelName} on ILI Dataset")
         mod.trainNtest ()()                                             // train and test the model on full dataset
 
-//      mod.setSkip (p)                                                 // full ARY-formula available when t >= p
+//      mod.setSkip (p)                                                 // full ARMA-formula available when t >= p
         mod.forecastAll ()                                              // forecast h-steps ahead (h = 1 to hh) for all y
         mod.diagnoseAll (y, mod.getYf, showYf = false)                  // model diagnostics for all horizons
     end for
@@ -240,7 +328,7 @@ end example_ILITest6
     val hh = 12                                                         // maximum forecasting horizon
     hp("spec") = 1                                                      // trend specification
 
-    for p <- 1 to 26 do
+    for p <- 52 to 52 do
         hp("p") = p                                                     // set p (ARY) hyper-parameter
         val mod = ARY (y, hh)                                           // create model for time series data
         banner (s"Test: ${mod.modelName} on ILI Dataset")
@@ -267,7 +355,7 @@ end example_ILITest7
     val hh = 12                                                         // maximum forecasting horizon
     hp("spec") = 1                                                      // trend specification
 
-    for p <- 1 to 26 do
+    for p <- 52 to 52 do
         hp("p") = p                                                     // set p (ARY_D) hyper-parameter
         val mod = ARY_D (y, hh)                                         // create model for time series data
         banner (s"Test: ${mod.modelName} on ILI Dataset")
@@ -285,7 +373,7 @@ end example_ILITest8
 /** The `example_ILITest9` main function test the `Example_ILI` object.
  *  This test compares the `ARIMA` model for several values of p and q.
  *  > runMain scalation.modeling.forecasting.example_ILITest9
- */
+ *
 @main def example_ILITest9 (): Unit =
 
     import AR.hp
@@ -305,10 +393,12 @@ end example_ILITest8
     end for
 
 end example_ILITest9
+ */
+
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `example_ILITest10` main function test the `Example_ILI` object.
- *  This test compares the `ARX_Symb` and `ARX_Symb_D` models for several values of p and q.
+ *  This test compares the `ARX_SR` and `ARX_SR_D` models for several values of p and q.
  *  > runMain scalation.modeling.forecasting.example_ILITest10
  */
 @main def example_ILITest10 (): Unit =
@@ -319,151 +409,47 @@ end example_ILITest9
     val (xe, y)  = loadData (exo_vars, response)
     println (s"xe.dims = ${xe.dims}, y.dim = ${y.dim}")
 
-    val hh = 12                                                          // maximum forecasting horizon
-    val p  = 10
-    val q  = 10
-    val pp = 1.5
+    val hh  = 12                                                          // maximum forecasting horizon
+    val p   = 10
+    val q   = 10
+    val pow = 1.5
     hp("p")     = p                                                     // endo lags
     hp("q")     = q                                                     // exo lags
     hp("spec")  = 1                                                     // trend specification: 0, 1, 2, 3, 5
     hp("lwave") = 20                                                    // wavelength (distance between peaks)
     hp("cross") = 1
-    hp("lambda") = 1.0
+    RidgeRegression.hp("lambda") = 1.0
+    Transform.hp("p") = pow                                             // power to raise lags to
 
-    val ff = Array [Transform] (powForm (VectorD (pp)))
-    val gg = Array [Transform] ()
+    val fEn = LSET (Pow)
+    val fEx = Array (LSET (Pow), LSET (Pow))
 
-    val mod = ARX_Symb (xe, y, hh, fEndo = ff, fExo = gg)               // create model for time series data
-    banner (s"In-ST Forecasts: ${mod.modelName} on COVID-19 Dataset")
+    val mod = ARX_SR (xe, y, hh, fEndo_enab = fEn, fExo_enab = fEx)     // create model for time series data
+    banner (s"In-ST Forecasts: ${mod.modelName} on ILI Dataset")
     mod.trainNtest_x ()()                                               // train and test on full dataset
 
     mod.setSkip(0)
     mod.rollValidate (rc = 2)                                           // TnT with Rolling Validation
-    mod.diagnoseAll (y, mod.getYf, Forecaster.teRng(y.dim), 0)
+    mod.diagnoseAll (y, mod.getYf, Forecaster.teRng(y.dim))
 
     banner ("Feature Selection Technique: stepwise")
     val (cols, rSq) = mod.stepwiseSelAll ()                             // R^2, R^2 bar, sMAPE, R^2 cv
 //  val (cols, rSq) = mod.backwardElimAll ()                            // R^2, R^2 bar, sMAPE, R^2 cv
     val k = cols.size
     println (s"k = $k")
-    new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "sMAPE", "R^2 cv"),
-               s"R^2 vs n for ${mod.modelName}", lines = true)
+    new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for ${mod.modelName}", lines = true)
     println (s"rSq = $rSq")
 
     val modBest = mod.getBest.mod
     val x_fs = modBest.getX
 
-    val yy_D  = MakeMatrix4TS.makeMatrix4Y (y, hh, false)               // FIX - switch to usiing apply method in next line)
-    val mod_D = new ARX_Symb_D (x_fs, yy_D, hh, n_exo = 1, null)
+    val yy_D  = MakeMatrix4TS.makeMatrix4Y (y, hh, false)               // FIX - switch to using apply method in next line
+    val mod_D = new ARX_SR_D (x_fs, yy_D, hh, n_exo = 1, null)
     mod_D.trainNtest_x ()()
 
     mod_D.setSkip (0)
     mod_D.rollValidate (rc = 2)                                         // TnT with Rolling Validation
-    mod_D.diagnoseAll (y, mod_D.getYf, Forecaster.teRng (y.dim), 0)     // only diagnose on the testing set
+    mod_D.diagnoseAll (y, mod_D.getYf, Forecaster.teRng (y.dim))        // only diagnose on the testing set
 
 end example_ILITest10
 
-//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `example_ILITest10` main function test the `Example_ILI` object.
- *  This test compares the several models for several values of p and q.
- *  > runMain scalation.modeling.forecasting.example_ILITest11
- */
-@main def example_ILITest11 (): Unit =
-
-    import MakeMatrix4TS.hp
-
-    //    val exo_vars = Array ("%WEIGHTED ILI", "%UNWEIGHTED ILI")
-    val exo_vars = Array("OT")
-
-    val (xe, y)  = loadData (exo_vars, response)
-    println (s"xe.dims = ${xe.dims}, y.dim = ${y.dim}")
-
-    val hh = 6                                                          // maximum forecasting horizon
-    val p  = 6
-    val q  = 6
-    hp("p")     = p                                                     // endo lags
-    hp("q")     = q                                                     // exo lags
-    hp("spec")  = 1                                                     // trend specification: 0, 1, 2, 3, 5
-    hp("lwave") = 20                                                    // wavelength (distance between peaks)
-    hp("cross") = 0
-    hp("lambda") = 1.0
-
-
-    banner("RandomWalkS")
-    val mod1 = RandomWalkS(y, hh) // create model for time series data
-    banner(s"In-ST Forecasts: ${mod1.modelName} on ILI Dataset")
-    mod1.trainNtest()() // train and test on full dataset
-    mod1.forecastAll() // forecast h-steps ahead (h = 1 to hh) for all y
-    mod1.diagnoseAll(mod1.getY, mod1.getYf)
-
-    println("rollValidate")
-    mod1.setSkip(0)
-    mod1.rollValidate() // TnT with Rolling Validation
-    mod1.diagnoseAll(mod1.getY, mod1.getYf, Forecaster.teRng(y.dim), 0)
-
-
-    banner("AR")
-    val mod2 = AR(y, hh) // create model for time series data
-    banner(s"In-ST Forecasts: ${mod2.modelName} on ILI Dataset")
-    mod2.trainNtest()() // train and test on full dataset
-    mod2.forecastAll() // forecast h-steps ahead (h = 1 to hh) for all y
-    mod2.diagnoseAll(mod2.getY, mod2.getYf)
-
-    println("rollValidate")
-    mod2.setSkip(0)
-    mod2.rollValidate() // TnT with Rolling Validation
-    mod2.diagnoseAll(mod2.getY, mod2.getYf, Forecaster.teRng(y.dim), 0)
-
-
-    banner("ARX")
-    val mod3 = ARX(xe, y, hh) // create model for time series data
-    banner(s"In-ST Forecasts: ${mod3.modelName} on ILI Dataset")
-    mod3.trainNtest_x()() // train and test on full dataset
-    mod3.forecastAll() // forecast h-steps ahead (h = 1 to hh) for all y
-    mod3.diagnoseAll(mod3.getY, mod3.getYf)
-
-    println("rollValidate")
-    mod3.setSkip(0)
-    mod3.rollValidate() // TnT with Rolling Validation
-    mod3.diagnoseAll(mod3.getY, mod3.getYf, Forecaster.teRng(y.dim), 0)
-
-
-    banner("ARX_D")
-    val mod4 = ARX_D(xe, y, hh) // create model for time series data
-    banner(s"In-ST Forecasts: ${mod4.modelName} on ILI Dataset")
-    mod4.trainNtest_x()() // train and test on full dataset
-    mod4.forecastAll() // forecast h-steps ahead (h = 1 to hh) for all y
-    mod4.diagnoseAll(mod4.getY, mod4.getYf)
-
-    println("rollValidate")
-    mod4.setSkip(0)
-    mod4.rollValidate() // TnT with Rolling Validation
-    mod4.diagnoseAll(mod4.getY, mod4.getYf, Forecaster.teRng(y.dim), 0)
-
-
-    banner("ARX_Quad")
-    val mod5 = ARX_Quad(xe, y, hh) // create model for time series data
-    banner(s"In-ST Forecasts: ${mod5.modelName} on ILI Dataset")
-    mod5.trainNtest_x()() // train and test on full dataset
-    mod5.forecastAll() // forecast h-steps ahead (h = 1 to hh) for all y
-    mod5.diagnoseAll(mod5.getY, mod5.getYf)
-
-    println("rollValidate")
-    mod5.setSkip(0)
-    mod5.rollValidate() // TnT with Rolling Validation
-    mod5.diagnoseAll(mod5.getY, mod5.getYf, Forecaster.teRng(y.dim), 0)
-
-
-    banner("ARX_Quad_D")
-    val mod6 = ARX_Quad_D(xe, y, hh) // create model for time series data
-    banner(s"In-ST Forecasts: ${mod6.modelName} on ILI Dataset")
-    mod6.trainNtest_x()() // train and test on full dataset
-    mod6.forecastAll() // forecast h-steps ahead (h = 1 to hh) for all y
-    mod6.diagnoseAll(mod6.getY, mod6.getYf)
-
-    println("rollValidate")
-    mod6.setSkip(0)
-    mod6.rollValidate() // TnT with Rolling Validation
-    mod6.diagnoseAll(mod6.getY, mod6.getYf, Forecaster.teRng(y.dim), 0)
-
-end example_ILITest11

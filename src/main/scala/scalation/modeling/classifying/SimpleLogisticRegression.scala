@@ -44,7 +44,7 @@ class SimpleLogisticRegression (x: MatrixD, y: VectorI, fname_ : Array [String] 
 
     if y != null && x.dim != y.dim then flaw ("init", "dimensions of x and y are incompatible")
 
-    protected val cThresh = hparam ("cThresh")                           // classification/decision threshold
+    protected val cThresh = hparam("cThresh")                            // classification/decision threshold
 
     protected val n       = x.dim2                                       // number of parameters
     protected val k       = n - 1                                        // number of variables (assumes an intercept)
@@ -53,7 +53,7 @@ class SimpleLogisticRegression (x: MatrixD, y: VectorI, fname_ : Array [String] 
     protected var r_dev   = -1.0                                         // residual dev: -2l, for full model
     protected var aic     = -1.0                                         // Akaike’s Information Criterion
 
-    modelName = s"SimpleLogisticRegression_$cThresh"                     // name of the model
+    _modelName = s"SimpleLogisticRegression_$cThresh"                    // name of the model
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute McFaffen's pseudo R-squared.

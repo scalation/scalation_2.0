@@ -33,9 +33,9 @@ import modeling.{RegressionTree  => REG_TREE}                                // 
 class RegressionTreeRF (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
                         use_fb: Boolean = false, hparam: HyperParameter = RegressionTree.hp)
       extends Predictor (x, y, fname_, hparam)
-         with Fit (dfm = x.dim2 - 1, df = x.dim - x.dim2):                    // call resetDF once tree is built
+         with Fit (dfr = x.dim2 - 1, df = x.dim - x.dim2):                    // call resetDF once tree is built
 
-//  private val debug      = debugf ("RegressionTreeRF", false)               // debug function
+    private val debug      = debugf ("RegressionTreeRF", false)               // debug function
     private val flaw       = flawf ("RegressionTreeRF")                       // flaw function
     private val depth      = hparam("maxDepth").toInt                         // the max depth for the base regression trees
     private val nTrees     = hparam("nTrees").toInt                           // number of trees
@@ -48,7 +48,7 @@ class RegressionTreeRF (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
     if bRatio <= 0  || bRatio >= 1  then flaw ("init", "RF bagging ratio restricted to (0, 1)")
     if fbRatio <= 0 || fbRatio >= 1 then flaw ("init", "RF feature bagging ratio restricted to (0, 1)")
 
-    modelName = s"RegressionTreeRF ($depth, $nTrees, $use_fb)"
+    _modelName = s"RegressionTreeRF_${depth}_${nTrees}_$use_fb"
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Train the regression tree RF by selecting thresholds for the features/variables
@@ -61,6 +61,7 @@ class RegressionTreeRF (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
         for k <- 0 until nTrees do
             val (xx, yy, imap) = subSample (x_, y_, sampleSize, k)            // select rows of data matrix
 //          debug ("train", s"for tree$k, imap = ${stringOf (imap)}")
+            debug ("train", s"for tree$k, imap.size = $imap.size}")
 
             forest(k) = new REG_TREE (xx, yy, fname, hparam, use_r_fb = use_fb)  // means/regression in leaves
             forest(k).train (xx, yy)
@@ -98,9 +99,11 @@ class RegressionTreeRF (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Build a sub-model that is restricted to the given columns of the data matrix.
      *  @param x_cols  the columns that the new model is restricted to
+     *  @param fname2  the variable/feature names for the new model (defaults to null)
      */
-    override def buildModel (x_cols: MatrixD): RegressionTreeRF =
-        new RegressionTreeRF (x_cols, y, fname, use_fb, hparam)
+    def buildModel (x_cols: MatrixD, fname2: Array [String] = null): RegressionTreeRF =
+        debug ("buildModel", s"${x_cols.dim} by ${x_cols.dim2}")
+        new RegressionTreeRF (x_cols, y, fname2, use_fb, hparam)
     end buildModel
 
 end RegressionTreeRF
@@ -175,12 +178,12 @@ end regressionTreeRFTest
 //      println (mod.summary ())                                        // parameter/coefficient statistics
 
         banner (s"AutoMPG Regression Tree RF with d = $d Validation")
-        val qof2 = mod.validate ()()                                    // out-of-sampling testing
+        val qof2 = mod.validate ()()._2                                 // out-of-sampling testing
         val iq = QoF.rSq.ordinal                                        // index for rSq
         qual (d-1) = VectorD (qof(iq), qof(iq+1), qof2(iq))             // R^2, R^2 bar, R^2 os
     end for
 
-    new PlotM (VectorD.range (1, dmax+1), qual.transpose, Array ("R^2", "R^2 bar", "R^2 os"),
+    new PlotM (VectorD.range (1, dmax+1), qual.ᵀ, Array ("R^2", "R^2 bar", "R^2 os"),
                "RegressionTreeRF in-sample, out-of-sample QoF vs. depth", lines = true)
     println (s"RegressionTreeRF: qual = $qual")
 
@@ -213,8 +216,7 @@ end regressionTreeRFTest2
         val (cols, rSq) = mod.selectFeatures (tech)                     // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for Regression Tree RF with $tech", lines = true)
+        new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for Regression Tree RF with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 

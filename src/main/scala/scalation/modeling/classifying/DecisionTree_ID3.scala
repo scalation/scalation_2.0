@@ -16,8 +16,8 @@ import scala.collection.mutable.ArrayBuffer
 
 import scalation.mathstat._
 import scalation.mathstat.Probability.{entropy, freq}
-
-import VariableKind.Categorical
+import scalation.theory.Variable
+import scalation.theory.VariableKind.Categorical
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `DecisionTree_ID3` class implements a Decision Tree classifier using the
@@ -40,15 +40,15 @@ class DecisionTree_ID3 (x: MatrixD, y: VectorI, fname_ : Array [String] = null, 
          with DecisionTree:
 
     private val debug     = debugf ("DecisionTree_ID3", false)           // debug function
-    private val height    = hparam ("height").toInt                      // the maximum height of tree
-    private val cutoff    = hparam ("cutoff")                            // cutoff entropy threshold
+    private val height    = hparam("height").toInt                       // the maximum height of tree
+    private val cutoff    = hparam("cutoff")                             // cutoff entropy threshold
 
     private var entropy_0 = entropy (y.freq (k)._2)                      // initial entropy of full vector y
     private val param     = ArrayBuffer [Double] ()                      // parameter vector = feature order
     private val feas      = Array.ofDim [Variable] (x.dim2)              // array of features/variables xj's
     for j <- x.indices2 do feas(j) = Variable (x(?, j), j, Categorical) 
 
-    modelName = s"DecisionTree_ID3_$height"                              // name of the model
+    _modelName = s"DecisionTree_ID3_$height"                             // name of the model
 
     debug ("init", s"entropy of original/full y: entropy_0 = $entropy_0")
 
@@ -141,7 +141,6 @@ class DecisionTree_ID3 (x: MatrixD, y: VectorI, fname_ : Array [String] = null, 
         if parent == null then
             addRoot (node)                                                    // if no parent, add node as root of tree
             debug ("buildTree", s"entropy of root node: entropy_0 = $entropy_0")
-        end if
 
         if ! node.leaf && cindex.dim > 1 then
             val xj      = x_(?, j).toInt                                      // extract feature column j
