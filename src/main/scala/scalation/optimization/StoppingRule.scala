@@ -36,7 +36,6 @@ trait StoppingRule (upLimit: Int = 3):
         else                                                               // getting better
             up = 0
             if loss < loss_best then { loss_best = loss; x_best = x.copy }   // lower loss => save as best
-        end if
         loss0 = loss                                                       // make current the previous
 
         if up > upLimit then
@@ -44,7 +43,6 @@ trait StoppingRule (upLimit: Int = 3):
             (loss_best, x_best)                                            // at limit => return best x
         else
             (loss_best, null)                                              // null => continue search
-        end if
     end stopWhen
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

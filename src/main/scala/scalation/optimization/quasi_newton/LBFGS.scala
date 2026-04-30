@@ -65,6 +65,9 @@ object LBFGS extends PathMonitor:
      *  @param n              the dimensionality of the optimization problem
      *  @param x              the starting point (initial guess)
      *  @param functionLogic  the logic defining the objective function and its gradient
+     *  @param params         the optimization control hyper-parameters (@see `LBFGSPrms`) 
+     *  @param instance       an optional user data segment that may be provided when calling this method
+     *                        (@see `OptimizationLogic`)
      */
     def lbfgsMain (n: Int, x: VectorD, functionLogic: EvaluationLogic | OptimizationLogic,
                    params: LBFGSPrms = LBFGSPrms (), instance: Any = None): LBFGSResults =
@@ -106,7 +109,7 @@ object LBFGS extends PathMonitor:
             if 0 < params.past then pf = new VectorD (params.past)
 
             // Evaluate the function value and its gradient. */
-            val evaluationResults = cd.evaluationLogic.evaluate (cd.instance, x, cd.n, 0)
+            val evaluationResults = cd.evalLogic.evaluate (cd.instance, x, cd.n, 0)
             fx = evaluationResults.objFunctionValue
             g  = evaluationResults.gradientVector
 
@@ -163,7 +166,7 @@ object LBFGS extends PathMonitor:
                     val orthantWisePrms = params.orthantWise.get
                     pg = orthantWisePrms.pseudoGradient (xNew, g)
 
-                /* Compute x and g norms. */
+                // Compute x and g norms
                 xnorm = xNew.norm
 
                 gnorm = if ! useOrthantWiseLogic then g.norm else pg.norm
@@ -208,7 +211,7 @@ object LBFGS extends PathMonitor:
                 ys = y dot s
                 yy = y dot y
 
-                lm(end) = LBFGSIterationData(s, y, ys, 0)
+                lm(end) = LBFGSIterationData (s, y, ys, 0)
 
                 // Recursive formula to compute dir = -(H \cdot g)
                 // This is described in page 779 of: Jorge Nocedal.
@@ -218,27 +221,27 @@ object LBFGS extends PathMonitor:
                 k  += 1
                 end = (end + 1) % m
 
-                // Compute the steepest direction, i.e., the negative of gradients. */
+                // Compute the steepest direction, i.e., the negative of gradients.
                 d = if ! useOrthantWiseLogic then -g else -pg
 
                 j = end
-                for i <- 0 until bound do
+                cfor (0, bound) { _ =>
                     j = (j + m - 1) % m                             // if (--j == -1) j = m-1
                     val it = lm(j)
                     it.alpha = it.s dot d                           // \alpha_{j} = \rho_{j} s^{t}_{j} \cdot q_{k+1}
                     it.alpha = it.alpha / it.ys
                     d += (it.y * (-it.alpha))                       // q_{i} = q_{i+1} - \alpha_{i} y_{i}
-                end for
+                } // cfor
 
                 d *= (ys / yy)
 
-                for i <- 0 until bound do
+                cfor (0, bound) { _ =>
                     val it = lm(j)
                     beta = it.y dot d                               // \beta_{j} = \rho_{j} y^t_{j} \cdot \gamma_{i}
                     beta /= it.ys
                     d += it.s * (it.alpha - beta)                   // \gamma_{i+1} = \gamma_{i} + (\alpha_{j} - \beta_{j}) s_{j}
                     j = (j + 1) % m                                 // if (++j == m) j = 0
-                end for
+                } // cfor
 
                 // Constrain the search direction for orthant-wise updates.
                 if useOrthantWiseLogic then
@@ -253,7 +256,7 @@ object LBFGS extends PathMonitor:
 
             LBFGSResults(LBFGSReturnCode.UnknownError, xNew, Some(fx), None)
         catch
-            case e: OutOfMemoryError => LBFGSResults(LBFGSReturnCode.OutOfMemory, x, None, None)
+            case _ : OutOfMemoryError => LBFGSResults(LBFGSReturnCode.OutOfMemory, x, None, None)
 
     end lbfgsMain
 

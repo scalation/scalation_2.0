@@ -18,11 +18,7 @@ package modeling
 package forecasting
 package multivar
 
-import scala.runtime.ScalaRunTime.stringOf
-
 import scalation.mathstat._
-import scalation.modeling.neuralnet.{RegressionMV => REGRESSION}
-//import scalation.modeling.neuralnet.{RidgeRegressionMV => REGRESSION}
 
 import MakeMatrix4TS.hp
 
@@ -32,12 +28,13 @@ import MakeMatrix4TS.hp
  *  as endogenous variables and are themselves forecasted.  Potentially having more
  *  up-to-date forecasted values feeding into multi-horizon forecasting can improve
  *  accuracy, but may also lead to compounding of forecast errors.
- *  Given multi-variate time series data stored in matrix y, its next value y_t = combination
- *  of last p vector values of y.
+ *  Given multi-variate time series data where matrix x holds the input and matrix y holds
+ *  the output, the next vector value y_t = combination of last p vector values in x.
  *
- *      y_t = b dot x_t + e_t
+ *      y_t = bb dot x_t + e_t
  *
- *  where y_t is the value of y at time t and e_t is the residual/error term.
+ *  where y_t is the value of y at time t, bb is the parameter matrix and e_t is the
+ *  residual/error term.
  *  @param y        the response/output matrix (multi-variate time series data)
  *  @param x        the input lagged time series data
  *  @param hh       the maximum forecasting horizon (h = 1 to hh)
@@ -50,198 +47,18 @@ class VAR (x: MatrixD, y: MatrixD, hh: Int, fname: Array [String] = null,
            tRng: Range = null, hparam: HyperParameter = hp,
            bakcast: Boolean = false)                                      // backcasted values only used in `buildMatrix4TS`
 //    extends Forecaster_D (x, y, hh, tRng, hparam, bakcast):             // no automatic backcasting, @see `VAR.apply`
-      extends Diagnoser (dfm = hparam("p").toInt, df = y.dim - hparam("p").toInt)
-         with ForecastTensor (y, hh, tRng)
-         with Model:
+      extends Forecaster_RegV (x, y, hh, fname, tRng, hparam, bakcast):
 
     private val debug = debugf ("VAR", true)                              // debug function
-    private val flaw  = flawf ("VAR")                                     // flaw function
     private val p     = hparam("p").toInt                                 // use the last p values for each variable
     private val spec  = hparam("spec").toInt                              // trend terms: 0 - none, 1 - constant, 2 - linear, 3 - quadratic
                                                                           //              4 - sine, 5 cosine
-    private val nneg  = hparam("nneg").toInt == 1                         // 0 => unrestricted, 1 => predictions must be non-negative
     private val n     = y.dim2                                            // the number of variables
-    private var bb: MatrixD = null                                        // matrix of parameter values
-    private val yf    = makeForecastTensor (y, hh)                        // make the forecast tensor
 
-    private val reg   = new REGRESSION (x, y, fname, hparam)              // delegate training to multi-variate regression
-
-    modelName = s"VAR($p, $n) on ${stringOf(fname)}"
+    _modelName = s"VAR_${p}_$n"
 
     debug ("init", s"$modelName with additional term spec = $spec")
     debug ("init", s"x = $x")
-
-    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Get the data/input matrix built from lagged y vector values.
-     */
-    def getX: MatrixD = x
-
-    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Return the used response vector y (first colum in matrix).
-     */
-    def getY: VectorD = y(?, 0)
-
-    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Return the used response matrix y.  Mainly for derived classes where y is
-     *  transformed.
-     */
-    override def getYY: MatrixD = y
-
-    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Return the feature/variable names.
-     */
-    def getFname: Array [String] = fname
-
-    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Train/fit an `VAR` model to the times-series data in vector y_.
-     *  Estimate the coefficient matrix bb for a p,q-th order VAR(p, q) model.
-     *  Uses OLS Matrix Factorization to determine the coefficients, i.e., the bb matrix.
-     *  @param x_  the data/input matrix (e.g., full x)
-     *  @param y_  the training/full response matrix (e.g., full y)
-     */
-    def train (x_ : MatrixD, y_ : MatrixD): Unit =
-        debug ("train", s"$modelName, x_.dim = ${x_.dim}, y_.dim = ${y_.dim}")
-        reg.train (x_, y_)                                                // train the multi-variate regression model
-        bb = reg.parameter                                                // coefficients from regression
-        debug ("train", s"parameter matrix bb = $bb")
-    end train
-
-    def train (x_ : MatrixD, y_ : VectorD): Unit =
-        throw new UnsupportedOperationException ("train (MatrixD, VectorD) use the alternative train")
-    end train
-
-    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Train and test the forecasting model y_ = f(y-past) + e and report its QoF
-     *  and plot its predictions.  Return the predictions and QoF.
-     *  NOTE: must use `trainNtest_x` when an x matrix is used, such as in `ARY`.
-     *  @param x_  the training/full data/input matrix (defaults to full x)
-     *  @param y_  the training/full response/output vector (defaults to full y)
-     *  @param xx  the testing/full data/input matrix (defaults to full x)
-     *  @param yy  the testing/full response/output vector (defaults to full y)
-     */
-    def trainNtest_x (x_ : MatrixD = x, y_ : MatrixD = y)(xx: MatrixD = x, yy: MatrixD = y): (MatrixD, MatrixD) =
-        train (x_, y_)                                                    // train the model on training set
-        val (yp, qof) = test (xx, yy)                                     // test the model on testing set
-        for j <- qof.indices do println (report (qof(j)))                 // report on Quality of Fit (QoF)
-        (yp, qof)
-    end trainNtest_x
-
-    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Test PREDICTIONS of a forecasting model y_ = f(lags (y_)) + e
-     *  and return its predictions and  QoF vector.  Testing may be in-sample
-     *  (on the training set) or out-of-sample (on the testing set) as determined
-     *  by the parameters passed in.  Note, must call train before test.
-     *  Must override to get Quality of Fit (QoF).
-     *  @param x_  the data/input matrix (ignored, pass null)
-     *  @param y_  the actual testing/full response/output matrix
-     */
-    def test (x_ : MatrixD, y_ : MatrixD): (MatrixD, MatrixD) =
-        val yp = predictAll (y_)                                          // make all predictions
-        val yy = if bakcast then y_(1 until y_.dim)                       // align the actual values
-                 else y_
-        println (s"yy.dim = ${yy.dim}, yp.dim = ${yp.dim}")
-//      Forecaster.differ (yy, yfh)                                       // uncomment for debugging
-        assert (yy.dim == yp.dim)                                         // make sure the vector sizes agree
-
-        VAR.plotAll (yy, yp, s"test: $modelName")
-        mod_resetDF (yy.dim)                                              // reset the degrees of freedom
-        (yp, diagnose (yy, yp))                                           // return predicted and QoF vectors
-    end test
-
-    def test (x_ : MatrixD, y_ : VectorD): (VectorD, VectorD) =
-        throw new UnsupportedOperationException ("test (MatrixD, VectorD) use the alternative test")
-    end test
-
-    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Return the parameters.
-     */
-    def parameter: VectorD | MatrixD = bb
-
-    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Return the hyper-parameters.
-     */
-    def hparameter: HyperParameter = hparam
-
-    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Diagnose the quality of the model for each variable.
-     *  @param yy  the matrix of actual values
-     *  @param yp  the matrix of predicted values
-     */
-    def diagnose (yy: MatrixD, yp: MatrixD): MatrixD =
-        MatrixD (for j <- yy.indices2 yield diagnose (yy(?, j), yp(?, j)))
-    end diagnose
-
-    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Predict a value for y_t using the 1-step ahead forecast.
-     *
-     *      y_t = b_0 + b_1 y_t-1 + b_2 y_t-2 + ... + b_p y_t-p = b dot x_t
-     *
-     *  FIX - parameter order is in conflict with AR models.
-     *  @param t   the time point being predicted
-     *  @param y_  the actual values to use in making predictions (ignored)
-     */
-    def predict (t: Int, y_ : MatrixD): VectorD =
-        val yp = rectify (reg.predict (x(t-1)), nneg)
-        if t < y_.dim then
-            debug ("predict", s"@t = $t, x(t-1) = ${x(t-1)}, yp = $yp vs. y_ = ${y_(t)}")
-        yp
-    end predict
-
-    def predict (z: VectorD): Double | VectorD =
-        throw new UnsupportedOperationException ("predict (VectorD) use the alternative predict")
-    end predict
-
-    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Predict all values corresponding to the given time series vector y_.
-     *  Update FORECAST TENSOR yf and return PREDICTION MATRIX yp as second (1) column
-     *  of yf with last value removed.
-     *  Note, yf(t, h, j) if the forecast to time t, horizon h, variable j
-     *  @see `forecastAll` to forecast beyond horizon h = 1.
-     *  @see `Forecaster.predictAll` for template implementation for vectors
-     *  @param y_  the actual time series values to use in making predictions
-     */
-    def predictAll (y_ : MatrixD): MatrixD =
-        if bakcast then
-            for t <- 1 until y_.dim do yf(t-1, 1) = predict (t, y_)       // use model to make predictions
-            yf(?, 1)(0 until y_.dim-1)                                    // return yp: first horizon only
-        else
-//          debug ("predictAll", s"y_.dim = ${y_.dim}, yf.dims = ${yf.dims}")
-            for t <- 1 until yf.dim+1 do yf(t-1, 1) = predict (t, y_)     // skip t = 0
-            yf(?, 1)
-    end predictAll
-
-    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Forecast values for all y_.dim time points and all horizons (1 through hh-steps ahead).
-     *  Record these in the FORECAST TENSOR yf, where
-     *
-     *      yf(t, h) = h-steps ahead forecast for y_t
-     *
-     *  @param y_  the actual values to use in making forecasts
-     */
-    def forecastAll (y_ : MatrixD): TensorD =
-        for h <- 2 to hh do forecastAt (h, y_)                            // forecast k-steps into the future
-        yf                                                                // return tensor of forecasted values
-    end forecastAll
-
-    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Forecast values for all y_.dim time points at horizon h (h-steps ahead).
-     *  Assign into FORECAST TENSOR and return the h-steps ahead forecast.
-     *  Note, yf(t, h, j) if the forecast to time t, horizon h, variable j
-     *  Note, `predictAll` provides predictions for h = 1.
-     *  @see `forecastAll` method in `Forecaster` trait.
-     *  @param h   the forecasting horizon, number of steps ahead to produce forecasts
-     *  @param y_  the actual values to use in making forecasts
-     */
-    def forecastAt (h: Int, y_ : MatrixD = y): MatrixD =
-        if h < 2 then flaw ("forecastAt", s"horizon h = $h must be at least 2")
-
-        for t <- y_.indices do                                            // make forecasts over all time points for horizon h
-            val xy   = forge (x(t), yf(t), h)                             // yf(t) = time t, all horizons, all variables
-            val pred = rectify (reg.predict (xy), nneg)                   // slide in prior forecasted values
-//          debug ("forecastAt", s"h = $h, @t = $t, xy = $xy, yp = $pred, y_ = ${y_(t)}")
-            yf(t, h) = pred                                               // record in forecast matrix
-        yf(?, h)                                                          // return the h-step ahead forecast vector
-    end forecastAt
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Forge a new vector from the first spec values of x, the last p-h+1 values
@@ -266,10 +83,6 @@ class VAR (x: MatrixD, y: MatrixD, hh: Int, fname: Array [String] = null,
         xy
     end forge
 
-    def crossValidate (k: Int, rando: Boolean): Array [Statistic] =
-        throw new UnsupportedOperationException ("Use `rollValidate` instead of `crossValidate`")
-    end crossValidate
-
 end VAR
 
 
@@ -292,12 +105,13 @@ object VAR:
      *  @param fname    the feature/variable names
      *  @param tRng     the time range, if relevant (time index may suffice)
      *  @param hparam   the hyper-parameters (defaults to `MakeMatrix4TS.hp`)
+     *  @param bakcast  whether a backcasted value is prepended to the time series (defaults to false)
      */
     def apply (y: MatrixD, hh: Int, fname: Array [String] = null, tRng: Range = null,
                hparam: HyperParameter = hp, bakcast: Boolean = false): VAR =   // backcasted values only used in `buildMatrix4TS`
-        val y_0   = y(?, 0)                                                    // the main endogenous variable (column zero)
-        val yy    = y(?, 1 until y.dim2)                                       // the other endogenous variables (rest of the columns)
-        val x     = ARX.buildMatrix (yy, y_0, hparam, bakcast)                 // add spec trend columns and p|q lags for each column of y
+        val y_0 = y(?, 0)                                                      // the main endogenous variable (column zero)
+        val yy  = y(?, 1 until y.dim2)                                         // the other endogenous variables (rest of the columns)
+        val x   = ARX.buildMatrix (yy, y_0, hparam, bakcast)                   // add spec trend columns and p|q lags for each column of y
         new VAR (x, y, hh, fname, tRng, hparam)
     end apply
 
@@ -351,19 +165,9 @@ object VAR:
     end rollValidate
      */
 
-    //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Plot actual vs. predicted values for all variables (columns of the matrices).
-     *  @param y     the original un-expanded output/response matrix
-     *  @param yp    the predicted values (one-step ahead forecasts) matrix
-     *  @param name  the name of the model run to produce yp
-     */
-    def plotAll (y: MatrixD, yp: MatrixD, name: String): Unit =
-        for j <- y.indices2  do
-            new Plot (null, y(?, j).drop (1), yp(?, j), s"$name, y vs. yp @ var j = $j", lines = true)
-    end plotAll
-
 end VAR
 
+import Forecaster_RegV.plotAll
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `vARTest` main function tests the `VAR` class.
@@ -375,7 +179,7 @@ end VAR
 
     val m  = 30
     val z  = VectorD.range (1, m)
-    val y  = MatrixD (z, -z + m)
+    val y  = MatrixD (z, -z + m).ᵀ
     val hh = 3                                                                 // the forecasting horizon
 
     hp("q") = 2
@@ -388,7 +192,7 @@ end VAR
 
 //      val yy = mod.getY
 //      val yp = mod.predict (mod.getX)
-//      VAR.plotAll (yy, yp, mod.modelName)
+//      plotAll (yy, yp, mod.modelName)
 //      for k <- yp.indices2 do
 //          new Plot (null, yy(?, k), yp(?, k), s"yy_$k vs. yp_$k for ${mod.modelName} (h=${k+1}) with $p lags", lines = true)
     end for
@@ -415,10 +219,10 @@ end vARTest
 
     banner ("Test In-Sample VAR on GasFurnace Data")
     val mod = VAR (y, hh, header)                                              // create model for time series data
-    val (yp, qof) = mod.trainNtest_x ()()                                      // train on full and test on full
+    val yp  = mod.trainNtest_x ()()._1                                         // train on full and test on full
     println (mod.summary)
     val yy_ = y(1 until y.dim)                                                 // can't forecast first values at t = 0
-    VAR.plotAll (yy_, yp, mod.modelName)
+    plotAll (yy_, yp, mod.modelName)
 
 end vARTest2
 
@@ -446,19 +250,18 @@ end vARTest2
         new Plot (null, y(?, j), null, s"y_$j (${vars(j)}) vs. t", lines = true)
 
     banner ("Test In-Sample VAR on COVID-19 Weekly Data")
-    val mod = VAR (y, hh)                                                      // create model for time series data
-    val (yp, qof) = mod.trainNtest_x ()()                                      // train on full and test on full
+    val mod = VAR (y, hh, vars)                                                // create model for time series data
+    mod.trainNtest_x ()()                                                      // train on full and test on full
 //  println (mod.summary ())
 //  val yy_ = y(1 until y.dim)                                                 // can't forecast first values at t = 0
-//  VAR.plotAll (yy_, yp, mod.modelName)
+//  plotAll (yy_, yp, mod.modelName)
 
 /*
     banner (s"Feature Selection Technique: Stepwise")
     val (cols, rSq) = mod.stepRegressionAll (cross = false)                    // R^2, R^2 bar, sMAPE, NA
     val k = cols.size
     println (s"k = $k, n = ${mod.getX.dim2}")
-    new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "sMAPE", "NA"),
-               s"R^2 vs n for VAR with tech", lines = true)
+    new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for VAR with tech", lines = true)
 
     banner ("Feature Importance")
     println (s"Stepwise: rSq = $rSq")
@@ -491,10 +294,10 @@ end vARTest3
     hp("p") = LAGS
     hp("q") = 2
     val mod = VAR (y, hh)                                                      // create model for time series data - with exo
-    val (yp, qof) = mod.trainNtest_x ()()                                      // train on full and test on full
+    mod.trainNtest_x ()()                                                      // train on full and test on full
 //  println (mod.summary ())
 //  val yy_ = y(1 until y.dim)                                                 // can't forecast first values at t = 0
-//  VAR.plotAll (yy_, yp, mod.modelName)
+//  plotAll (yy_, yp, mod.modelName)
 
 //  val tech = SelectionTech.Forward                                           // pick one feature selection technique
 //  val tech = SelectionTech.Backward
@@ -505,8 +308,7 @@ end vARTest3
     val (cols, rSq) = mod.selectFeatures (tech, cross = false)                 // R^2, R^2 bar, sMAPE, NA
     val k = cols.size
     println (s"k = $k, n = ${mod.getX.dim2}")
-    new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "sMAPE", "NA"),
-               s"R^2 vs n for VAR with tech", lines = true)
+    new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for VAR with tech", lines = true)
 
     banner ("Feature Importance")
     println (s"$tech: rSq = $rSq")
@@ -539,10 +341,10 @@ end vARTest4
     hp("q") = 2
     banner ("Test In-Sample VAR on COVID-19 Weekly Data")
     val mod = VAR (y, hh)                                                      // create model for time series data - with exo
-    val (yp, qof) = mod.trainNtest_x ()()                                      // train on full and test on full
+    mod.trainNtest_x ()()                                                      // train on full and test on full
 //  println (mod.summary ())
 //  val yy_ = y(1 until y.dim)                                                 // can't forecast first values at t = 0
-//  VAR.plotAll (yy_, yp, mod.modelName)
+//  plotAll (yy_, yp, mod.modelName)
 
 //  val tech = SelectionTech.Forward                                           // pick one feature selection technique
 //  val tech = SelectionTech.Backward
@@ -553,8 +355,7 @@ end vARTest4
     val (cols, rSq) = mod.selectFeatures (tech, cross = false)                 // R^2, R^2 bar, sMAPE, NA
     val k = cols.size
     println (s"k = $k, n = ${mod.getX.dim2}")
-    new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "sMAPE", "NA"),
-               s"R^2 vs n for VAR with tech", lines = true)
+    new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for VAR with tech", lines = true)
 
     banner ("Feature Importance")
     println (s"$tech: rSq = $rSq")
@@ -566,7 +367,7 @@ end vARTest4
     banner ("Run TnT on Best model")
     val bmod = mod.getBest._3                                                  // get the best model from feature selection
     val (x_, y_, xtest, ytest) = VAR.split_TnT (bmod.getX, bmod.getY)
-    val (yptest, qoftest) = bmod.trainNtest_x (x_, y_)(xtest, ytest)           // train on (x_, y_) and test on (xtest, ytest)
+    val yptest = bmod.trainNtest_x (x_, y_)(xtest, ytest)._1                   // train on (x_, y_) and test on (xtest, ytest)
     new Plot (null, ytest(?, 0), yptest(?, 0), s"${mod.modelName}, ytest vs. yptest", lines = true)
 */
 
@@ -584,7 +385,8 @@ end vARTest5
     val LAGS = 5                                                               // number of lags
     val h    = 6                                                               // forecasting horizon
 
-    val vars = Array ("new_deaths", "icu_patients", "hosp_patients", "new_tests", "people_vaccinated")
+//  val vars = Array ("new_deaths", "icu_patients", "hosp_patients", "new_tests", "people_vaccinated")
+    val vars = Array ("new_deaths", "icu_patients")
     val yy = Example_Covid.loadData_yy (vars)
     val iskip = yy(?, 0).indexWhere (_ >= 6.0)                                 // find day with at least 6 deaths
     println (s"iskip = $iskip is first day with at least 6 deaths")
@@ -594,11 +396,14 @@ end vARTest5
     hp("p") = LAGS
     hp("q") = 2
     banner ("Test In-Sample VAR on COVID-19 Weekly Data")
-    val mod = VAR (y, h)                                                       // create model for time series data - with exo
-    val (yp, qof) = mod.trainNtest_x ()()                                      // train on full and test on full
+    val mod = VAR (y, h, fname = vars)                                         // create model for time series data - with exo
+    mod.trainNtest_x ()()                                                      // train on full and test on full
+    mod.rollValidate ()                                                        // TnT with Rolling Validation default rc = 2
+    mod.diagnoseAll (mod.getYY, mod.getYf, Forecaster.teRng (y.dim), 0)         // only diagnose on the testing set
+
 //  println (mod.summary ())
 //  val yy_ = y(1 until y.dim)                                                 // can't forecast first values at t = 0
-//  VAR.plotAll (yy_, yp, mod.modelName)
+//  plotAll (yy_, yp, mod.modelName)
 
 //  val tech = SelectionTech.Forward                                           // pick one feature selection technique
 //  val tech = SelectionTech.Backward
@@ -609,8 +414,7 @@ end vARTest5
     val (cols, rSq) = mod.selectFeatures (tech, cross = false)                 // R^2, R^2 bar, sMAPE, NA
     val k = cols.size
     println (s"k = $k, n = ${mod.getX.dim2}")
-    new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "sMAPE", "NA"),
-               s"R^2 vs n for VAR with tech", lines = true)
+    new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for VAR with tech", lines = true)
 
     banner ("Feature Importance")
     println (s"$tech: rSq = $rSq")

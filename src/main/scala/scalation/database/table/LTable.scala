@@ -1,6 +1,6 @@
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** @author  John Miller
+/** @author  John Miller, Sahil Varma
  *  @version 2.0
  *  @date    Fri Jul 22 00:20:15 EDT 2022
  *  @see     LICENSE (MIT style license file).
@@ -55,6 +55,56 @@ object LTable:
         s
     end apply
 
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Read/create the linked-table with the given name into memory loading its columns
+     *  with data from the CSV file named fileName.  The attribute names are read from
+     *  the FIRST LINE.
+     *  @param fileName  the file name (or file-path) of the data file
+     *  @param name      the name of the table
+     *  @param domain_   the domains/data-types (as one string) for attributes ('D', 'I', 'L', 'S', 'X', 'T')
+     *  @param key       the attributes forming the primary key
+     *  @param pos       the sequence of column positions in the input file to be used (null => select all)
+     *  @param sep       the element separation string/regex (e.g., "," ";" " +")
+     */
+    def load (fileName: String, name: String, domain_ : String, key: String,
+              pos: Array [Int], sep: String): LTable =
+        load (fileName, name, strim (domain_).map (_.head), key, pos, sep)
+    end load
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Read/create the linked-table with the given name into memory loading its columns
+     *  with data from the CSV file named fileName.  The attribute names are read from
+     *  the FIRST LINE.
+     *  @see scalation.readFileIntoArray
+     *  @param fileName  the file name (or file-path) of the data file
+     *  @param name      the name of the table
+     *  @param domain    the domains/data-types for attributes ('D', 'I', 'L', 'S', 'X', 'T')
+     *  @param key       the attributes forming the primary key
+     *  @param pos_      the sequence of column positions in the input file to be used (null => select all)
+     *  @param sep       the element separation string/regex (e.g., "," ";" " +")
+     */
+    def load (fileName: String, name: String, domain: Domain, key: String = null,
+              pos_ : Array [Int] = null, sep: String = ","): LTable =
+        apply (Table.load (fileName, name, domain, key, pos_, sep))
+    end load
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Read/create the linked-table with the given name into memory loading its columns
+     *  with data from the CSV file named fileName.  The attribute names are read from
+     *  the FIRST LINE.  Use a short-cut (not reliable) to determines the column domains,
+     *  by applying the 'tuple2type' method to the SECOND LINE.
+     *  Note: safer to pull a row without missing or zero values from the middle of the dataset
+     *  @see `tableTest3`
+     *  @see scalation.readFileIntoArray
+     *  @param fileName  the file name (or file-path) of the data file
+     *  @param name      the name of the table
+     *  @param mumCol    the number of columns
+     *  @param key       the attributes forming the primary key
+     */
+    def load (fileName: String, name: String, numCol: Int, key: String): LTable =
+        apply (Table.load (fileName, name, numCol, key))
+    end load
+
 end LTable
 
 import LTable.{cntr, debug, flaw}
@@ -72,41 +122,42 @@ case class LTable (name_ : String, schema_ : Schema, domain_ : Domain, key_ : Sc
      extends Table (name_, schema_, domain_, key_)
         with Serializable:
 
-    private val links = Map [String, Map [ValueType, Tuple]] ()             // fkey -> pkey links
+    private val links = Map [String, Map [ValueType, Tuple]] ()                // fkey -> pkey links
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Add LINKAGE (foreign key reference) from this table to refTab and for each
      *  tuple in this table, add a link to the referenced table, so that the foreign
      *  key is linked to the primary key.
-     *  Caveat: does not handle composite foreign keys
+     *  @caveat:  does not handle composite foreign keys
      *  @param fkey    the foreign key column
      *  @param refTab  the referenced table being linked to
      */
     override def addLinkage (fkey: String, refTab: Table): Unit =
-        if ! refTab.hasIndex then refTab.create_index ()                    // make sure refTab has a primary index
-        links += fkey -> Map [ValueType, Tuple] ()                          // establish links map for fkey
-        for t <- tuples do addLink (fkey, t, refTab)                        // add link for each tuple
+        if ! refTab.hasIndex then refTab.create_index ()                       // make sure refTab has a primary index
+        linkTypes += fkey -> refTab                                            // add foreign key -> parent table (refTab) to link types
+        links     += fkey -> Map [ValueType, Tuple] ()                         // establish links map for fkey
+        for t <- tuples do addLink (fkey, t, refTab)                           // add link for each tuple
+        refTab.children += this                                                // add this table -> parent table (refTab)
     end addLinkage
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** For the given tuple t, add a link to the referenced table, so that the
      *  foreign key is linked to the primary key.
-     *  Caveat: does not handle composite foreign keys
+     *  @caveat:  does not handle composite foreign keys
      *  @param fkey    the foreign key attribute/column
      *  @param t       the tuple containing the foreign key
      *  @param refTab  the referenced table being linked to
      */
     def addLink (fkey: String, t: Tuple, refTab: Table): Unit =
         val t_fkey = pull (t, fkey)
-//      val refTup = refTab.index.getOrElse (new KeyType (t_fkey), null)      // FIX - unify use of indices
+//      val refTup = refTab.index.getOrElse (new KeyType (t_fkey), null)       // FIX - unify use of indices
         val refTup = refTab.index.getOrElse (t_fkey, null)
         if refTup == null then
             flaw ("addLink", s"$name: referential integrity violation for fkey = $fkey, value = $t_fkey")
-        else
+        else if ! (links(fkey) contains t_fkey) then
             val rTup = refTup.asInstanceOf [Tuple]
             debug ("addLink", s"$name: foreign key = $fkey add $t_fkey -> ${stringOf (rTup)}")
             links(fkey) += t_fkey -> rTup
-        end if
     end addLink
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -120,34 +171,48 @@ case class LTable (name_ : String, schema_ : Schema, domain_ : Domain, key_ : Sc
         links(fkey).remove (t_fkey).isDefined
     end removeLink
 
+    // R E L A T I O N   A L G E B R A   O P E R A T O R S
+
+    // Most are inherited from `Table`
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** RENAME this table, returning a shallow copy of this table.
+     *  Usage:  customer rename "client"
+     *--------------------------------------------------------------------------
+     *  @param newName  the new name for the table
+     */
+    override def rename (newName: String): Table =
+        val s = new LTable (newName, schema, domain, key)
+        s.tuples ++= tuples                                                    // shallow copy
+        s
+    end rename
+
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute the EQUI-JOIN via the LINK JOIN (LJ) algorithm that uses direct LINKS
      *  from this linkable-table to the referenced table keeping concatenated tuples
      *  that are equal on the primary key and foreign key attributes.
-     *  Caveat:  Requires the foreign key table to be first [ fkey_table join ((fkey, pkey_table) ].
+     *  @caveat:  Requires the foreign key table to be first [ fkey_table join ((fkey, pkey_table) ].
      *  Usage:   deposit join (("cname", customer))
      *--------------------------------------------------------------------------
      *  @param ref  the foreign key reference (foreign key attribute, referenced table)
      */
     override def join (ref: (String, Table)): LTable =
-        val (fkey, refTab) = ref                                            // foreign key, referenced table
+        val (fkey, refTab) = ref                                               // foreign key, referenced table
 
         val s = new LTable (s"${name}_j_${cntr.inc ()}", disambiguate (schema, refTab.schema),
                             domain ++ refTab.domain, key)
 
-        var link = links.getOrElse (fkey, null)                             // get link for foreign key
+        val link = links.getOrElse (fkey, null)                                // get link for foreign key
         if link == null then
-            addLinkage (fkey, refTab)                                       // add the linkage
-            link = links.getOrElse (fkey, null)                             // try again
-            if link == null then
-                flaw ("join", s"$name: foreign key $fkey not established as a link")
-        end if
-        debug ("join", s"link = $link")
-        for t <- tuples do                                                  // iterate over fkey table
-            val t_fkey = pull (t, fkey)                                     // pull out foreign key value
-            val u = link.getOrElse (t_fkey, null)                           // get tuple from pkey table
-            if u != null then s.tuples += t ++ u                            // add concatenated tuples
-        end for
+            flaw ("join", s"$name: foreign key $fkey not established as a link")
+//      debug ("join", s"link = $link")
+
+        cfor (0, tuples.size) { i =>                                           // iterate over fkey table
+            val t = tuples(i)
+            val t_fkey = pull (t, fkey)                                        // pull out foreign key value
+            val u = link.getOrElse (t_fkey, null)                              // get tuple from pkey table
+            if u != null then s.tuples += t ++ u                               // add concatenated tuples
+        } // cfor
         s
     end join
 
@@ -159,21 +224,36 @@ case class LTable (name_ : String, schema_ : Schema, domain_ : Domain, key_ : Sc
      *  @param r2  the second table
      */
     override infix def join (r2: Table): Table =
-//      val common = schema intersect r2.schema                             // common attributes
-        val common = meet (schema, r2.schema)                               // common attributes
+//      val common = schema intersect r2.schema                                // common attributes
+        val common = meet (schema, r2.schema)                                  // common attributes
         debug ("join", s"common = ${stringOf (common)}")
         val rest   = r2.schema diff common
-        val newKey = if subset (common, key) then r2.key                    // three possibilities for new key
+        val newKey = if subset (common, key) then r2.key                       // three possibilities for new key
                      else if subset (common, r2.key) then key
                      else key ++ r2.key
 
         val s = new Table (s"${name}_j_${cntr.inc ()}", schema ++ rest,
                            domain ++ r2.pull (rest), newKey)
 
-        // implement LJ algorithm
-
+        val link = links.getOrElse (common(0), null)                           // get link for foreign key
+        cfor (0, tuples.size) { i =>
+            val t = tuples(i)
+            val t_fkey = pull (t, common(0))                                   // pull out foreign key value
+            val u = link.getOrElse (t_fkey, null)                              // get tuple from pkey table
+            if u != null then s.tuples += t ++ r2.pull (u, rest)               // add concatenated tuples
+        } // cfor
         s
     end join
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return a copy of this table limited to the first n tuples/rows.
+     *  @param n  the number of tuples/rows to keep
+     */
+    override def limit (n: Int): LTable =
+        val s = new LTable (name + "_$n", schema, domain, key)
+        s.tuples ++= tuples.slice (0, n)
+        s
+    end limit
 
 end LTable
 

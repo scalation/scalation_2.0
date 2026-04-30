@@ -29,7 +29,9 @@ import ActivationFun._
  *  Neural-Network classifiers (k-way).  Given several input vectors and an output vector
  *  (training data), fit the parameters a and b connecting the layers, so that for a new
  *  input vector z, the net can classify the output value, i.e.,
+ *
  *      yp = f1 (b * f (a * z))
+ *
  *  where f and f1 (softmax) are the activation functions and the parameter a and b
  *  are the parameters between input-hidden and hidden-output layers.
  *  @param x       the m-by-n input/data matrix (training data consisting of m input vectors)
@@ -44,13 +46,13 @@ import ActivationFun._
 class NeuralNet_2L_Ck (x: MatrixD, y: MatrixI, fname_ : Array [String] = null,
                        cname_ : Array [String] = Array ("No", "Yes"),
                        nz: Int = -1, hparam: HyperParameter = NeuralNet_2L_Ck.hp,
-                       f: AFF = f_id)
+                       f: AFF = f_reLU)
       extends Classifier (x, y(0).toInt, fname_, y.dim2, cname_, hparam)       // FIX y(0) - may need a new trait
          with FitC ():
 
-    private val debug = debugf ("NeuralNet_2L_Ck", true)                 // debug function
+    private val debug = debugf ("NeuralNet_2L_Ck", true)                    // debug function
 
-    modelName = s"NeuralNet_2L_Ck_${nz}_${f.name}_softmax"                     // name of the model
+    _modelName = s"NeuralNet_2L_Ck_${nz}_${f.name}_softmax"                 // name of the model
 
     def predictI (z: VectorD): Int = ???
     def test (x_ : MatrixD, y_ : VectorI): (VectorI, VectorD) = ???
@@ -215,4 +217,30 @@ end NeuralNet_2L_Ck
     nm.trainNtest ()()
 
 end neuralNet_2L_CkTest
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `neuralNet_2L_CkTest2` main function tests the `NeuralNet_2L_Ck` class.
+ *  It tests the Neural Network three layer classifier on the Reduced MNIST dataset.
+ *  784 -> 128 -> 10
+ *  > runMain scalation.modeling.classifying.neuralNet_2L_CkTest2
+ */
+@main def neuralNet_2L_CkTest2: Unit =
+
+    val nfile = "reduced_MNIST.csv"
+    val xy    = MatrixD.load (nfile)
+    val fn    = null                                                       // feature names -- too many 784
+    val cn    = Array ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9")   // class names
+    val nz    = 128
+
+    banner ("neuralNet_2L_CkTest: reduced_MNIST dataset")
+    val nnc = NeuralNet_2L_Ck (xy, fn, cn, nz)()
+    println (nnc)
+    //nnc.trainNtest ()()
+
+    banner ("NullModel: reduced_MNIST dataset")
+    val nm = NullModel (xy)()
+    nm.trainNtest ()()
+
+end neuralNet_2L_CkTest2
 

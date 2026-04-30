@@ -60,7 +60,7 @@ object Integral:
         var x = a
         val dx = (b - a) / sd
         var sum = f(a) + f(b)
-        for i <- 1 until sd do { x += dx; sum += 2.0 * f(x) }
+        cfor (1, sd) { _ => x += dx; sum += 2.0 * f(x) }
         _1_2 * dx * sum
     end trap
 

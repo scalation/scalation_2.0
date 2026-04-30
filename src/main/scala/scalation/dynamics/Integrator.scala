@@ -14,6 +14,7 @@ package dynamics
 import scalation.mathstat._
 
 /** Function type for derivative functions: f (t, y) where y is a scalar
+ *  In case one the arguments t or y is not used in f, may use @noward on def, or @unused on argument
  */
 type Derivative = (Double, Double) => Double
 
@@ -83,7 +84,6 @@ trait Integrator:
             val y = new VectorD (n)
             for i <- 0 until n do y(i) = integrate (f(i), y0(i), t, t0, step)
             y
-        end if
     end integrateV
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

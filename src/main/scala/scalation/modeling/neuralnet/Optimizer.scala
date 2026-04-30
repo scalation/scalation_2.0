@@ -32,7 +32,7 @@ object Optimizer:
      */
     val hp = new HyperParameter
     hp += ("eta", 0.1, 0.1)                                               // learning/convergence rate (smaller for Adam)
-    hp += ("bSize", 20, 20)                                               // mini-batch size, common range 10 to 40
+    hp += ("bSize", 20, 20)                                               // mini-batch size, common range 16 to 64
     hp += ("maxEpochs", 400, 400)                                         // maximum number of epochs/iterations
     hp += ("lambda", 0.01, 0.01)                                          // regularization/shrinkage hyper-parameter
     hp += ("upLimit", 4, 4)                                               // up-limit hyper-parameter for stopping rule
@@ -122,7 +122,6 @@ trait Optimizer extends MonitorLoss with StoppingRule:
                     best = result                                             // save it, if better
                     b_best = (for l <- b.indices yield b(l).copy).toArray     // save best parameters
                     println (s"auto_optimize: b = ${stringOf (b)}")
-                end if
             end if
         end for
 

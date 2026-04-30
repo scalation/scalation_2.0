@@ -24,7 +24,7 @@ import scalation.random.{Exponential, Uniform}
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `OneWayStreetModel` class simulates a one-lane roead.
- *  Caveat: must add 'from' and 'to' components before transport!!
+ *  @caveat:  must add 'from' and 'to' components before transport!!
  *  @param name       the name of the simulation model
  *  @param reps       the number of independent replications to run
  *  @param animating  whether to animate the model
@@ -55,7 +55,7 @@ class OneWayStreetModel (name: String = "OneWayStreet", reps: Int = 1, animating
     val exit  = Sink ("exit", (600, 290))
     val lane  = Transport ("lane", entry, exit, moveRV, false, 0.25)
 
-    addComponent (entry, exit, lane)                    // Caveat: must add from and to before transport!!
+    addComponent (entry, exit, lane)                    // must add from and to before transport!!
 
     //--------------------------------------------------
     // Specify Scripts for each Type of Simulation Actor

@@ -41,7 +41,6 @@ class SPSA (f: FunctionV2S, max_iter: Int = 100, checkCon: Boolean = false,
     private val flaw  = flawf ("SPSA")                                 // flaw function
 
     private val EPS   = 1E-6
-    private val coin  = Bernoulli ()                                   // Bernoulli (0/1) RVG
     private var alpha = 0.602
     private var gamma = 0.101
     private var A     = 100.0
@@ -76,7 +75,9 @@ class SPSA (f: FunctionV2S, max_iter: Int = 100, checkCon: Boolean = false,
      *  @param stream  the random number stream
      */
     def bernoulliVec (n: Int, p: Double = 0.5, stream: Int = 0): VectorD =
-        VectorD (for i <- 0 until n yield 2.0 * coin.gen - 1.0)
+        val coin = Bernoulli (p, stream)                               // Bernoulli (0/1) RVG
+        VectorD (for _ <- 0 until n yield 2.0 * coin.gen - 1.0)
+    end bernoulliVec
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Solve for an optimal point by moving a distance ak in the -ghat direction.
@@ -112,7 +113,6 @@ class SPSA (f: FunctionV2S, max_iter: Int = 100, checkCon: Boolean = false,
             if f_x < f_best then
                 x_best = x.copy                                        // copy by value
                 f_best = f_x
-            end if
             epochLoss += f_best                                           // record best for k-th epoch
             if (x - x_old).norm < toler then go = false                // stopping rule
         } // cfor

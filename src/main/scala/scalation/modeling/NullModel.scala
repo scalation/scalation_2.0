@@ -17,18 +17,20 @@ import scalation.mathstat._
 /** The `NullModel` class implements the simplest type of predictive modeling technique
  *  that just predicts the response y to be the mean.
  *  Fit the parameter vector b in the null regression equation
- *  <p>
+ *
  *      y  =  b dot x + e  =  b0 + e
- *  <p>
+ *
  *  where e represents the residual/error vector (the part not explained by the model).
  *  @param y  the response/output vector
  */
 class NullModel (y: VectorD)
       extends Predictor (MatrixD.one (y.dim), y, Array ("one"), null)
-         with Fit (dfm = 0, df = y.dim-1)
+         with Fit (dfr = 0, df = y.dim-1)
          with NoSubModels:
 
-    modelName = "NullModel"
+    _modelName = "NullModel"
+
+    override def getBest: BestStep = super [NoSubModels].getBest
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Train the predictor by fitting the parameter vector (b-vector) in the
@@ -116,7 +118,7 @@ end NullModel
     println (s"y = $y")
 
     val mod = new NullModel (y)                             // create a null model
-    mod.trainNtest ()()                                     // train and test the model
+    mod.inSample_Test ()                                    // train and test the model
 
     val z  = VectorD (5)                                    // predict y for one point
     val yp = mod.predict (z)
@@ -137,7 +139,7 @@ end nullModelTest
     println (s"y = $y")
 
     val mod = new NullModel (y)                             // create a null model
-    mod.trainNtest ()()                                     // train and test the model
+    mod.inSample_Test ()                                    // train and test the model
 
     val z  = VectorD (5.0)                                  // predict y for one point
     val yp = mod.predict (z)                                // yp (y-predicted or y-hat)

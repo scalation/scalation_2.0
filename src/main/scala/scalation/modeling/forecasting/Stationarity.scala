@@ -92,7 +92,6 @@ trait UnitRoot (protected val testName: String, protected val nobs: Int,
             computeCV ()                                                // computing critical values
             computePval (stat)                                          // computing p-value
             newTest = false
-        end if
         pval
     end pvalue
 
@@ -133,7 +132,6 @@ trait UnitRoot (protected val testName: String, protected val nobs: Int,
             println (s"   1% ${criticalVals(idx(0))}")
             println (s"   5% ${criticalVals(idx(1))}")
             println (s"  10% ${criticalVals(idx(2))}")
-        end if
 
         println ("  ---------------")
         println ("  Test Conclusion")                                   // outputting test conclusion
@@ -154,13 +152,11 @@ trait UnitRoot (protected val testName: String, protected val nobs: Int,
             if lags < 0 then                                            // number of lags cannot be strictly negative
                 lags = 0
                 println ("\n  WARNING: number of lags cannot be negative, it has been set to 0 by default.\n")
-            end if
             if ! lagsType.isEmpty && lags != prevLags then lagsType = ""   // if user has switched from a default lags value
                                                                            // to a value of his choice (for all tests)
         else if maxLags < 0 then  // maxLags cannot be strictly negative
             maxLags = 0
             println ("\n  WARNING: maximum number of lags cannot be negative, it has been set to a default value (L12-rule).\n")
-        end if
 
         // updating lags only for PP and KPSS tests, for ADF and DFGLS tests lags will be updated at the next optimization or
         // set back to prevLags if maxLags, trend, method and level are the same as before
@@ -176,7 +172,6 @@ trait UnitRoot (protected val testName: String, protected val nobs: Int,
             newTest  = true
             newLags  = true
             prevLags = lags
-        end if
     end setLags
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -188,7 +183,6 @@ trait UnitRoot (protected val testName: String, protected val nobs: Int,
         if lagsType != "long" && lagsType != "short" then
             println("\n  WARNING: unknown default type of lags, long has been selected by default.\n")
             lagsType = "long"                                           // default lags type is long
-        end if
         prevLagsType = lagsType
     end setLagsType
 
@@ -211,13 +205,12 @@ trait UnitRoot (protected val testName: String, protected val nobs: Int,
             trendType = "constant trend"; npar = 3
         else if trend == "ctt" then
             trendType = "quadratic trend"; npar = 4
-        end if
+        println (s"setTrend: trend = $trend, npar = $npar")
 
         if trend != prevTrend then
             newTest   = true
             newTrend  = true
             prevTrend = trend
-        end if
     end setTrend
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

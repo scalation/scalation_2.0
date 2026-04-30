@@ -35,7 +35,7 @@ class RollDice (nDice: Int):
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Roll nDice dice, returning a vector of three integers.
      */
-    def roll: Int = (for i <- 0 until nDice yield dice.igen).sum
+    def roll: Int = (for _ <- 0 until nDice yield dice.igen).sum
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Collect the result of of rolling nDice dice into the counter vector.
@@ -98,7 +98,6 @@ object RollDice:
             var cnt = 0
             for j <- 1 to min (6, k) do cnt += n_ways (n_d - 1, k - j)
             cnt
-        end if
     end n_ways
 
 end RollDice
@@ -118,22 +117,22 @@ import RollDice._
     val count_3 = for k <- 3 to 18 yield coeff_3 (k)
 
     banner ("Monte Carlo: number of ways for 1 Dice")
-    val monte_1  = new RollDice (1)
-    for i <- 0 until samples do monte_1.collect (monte_1.roll)
+    val monte_1 = new RollDice (1)
+    cfor (0, samples) { _ => monte_1.collect (monte_1.roll) }
     val result_1 = monte_1.counts * 6
     println (s"count_2  = $count_1")
     println (s"result_1 = $result_1")
 
     banner ("Monte Carlo: number of ways for 2 Dice")
-    val monte_2  = new RollDice (2)
-    for i <- 0 until samples do monte_2.collect (monte_2.roll)
+    val monte_2 = new RollDice (2)
+    cfor (0, samples) { _ => monte_2.collect (monte_2.roll) }
     val result_2 = monte_2.counts * 6~^2
     println (s"count_2  = $count_2")
     println (s"result_2 = $result_2")
 
     banner ("Monte Carlo: number of ways for 3 Dice")
-    val monte_3  = new RollDice (3)
-    for i <- 0 until samples do monte_3.collect (monte_3.roll)
+    val monte_3 = new RollDice (3)
+    cfor (0, samples) { _ => monte_3.collect (monte_3.roll) }
     val result_3 = monte_3.counts * 6~^3
     println (s"count_3  = $count_3")
     println (s"result_3 = $result_3")
@@ -163,10 +162,10 @@ import scalation.mathstat.Plot
     val dice = Randi (1, 6)
     val x    = VectorD.range (3, 19)
     val freq = new VectorD (16)
-    for i <- 0 until 1000000 do
+    cfor (0, 1000000) { _ =>
         val sum = dice.igen + dice.igen + dice.igen
         freq(sum-3) += 1
-    end for
+    } // cfor
     new Plot (x, freq)
 
 end rollDiceTest3

@@ -33,11 +33,12 @@ import scalation.mathstat._
 class ClusteringPredictor (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
                            hparam: HyperParameter = ClusteringPredictor.hp)
       extends Predictor (x, y, fname_, hparam)
-         with Fit (dfm = x.dim2 - 1, df = x.dim - x.dim2):
+         with Fit (dfr = x.dim2 - 1, df = x.dim - x.dim2)
+         with NoSubModels:
 
     private val debug      = debugf ("ClusteringPredictor", false)   // debug flag
     private val MAX_DOUBLE = Double.PositiveInfinity                 // infinity
-    private val kappa      = hparam ("kappa").toInt                  // the number of nearest neighbors to consider
+    private val kappa      = hparam("kappa").toInt                   // the number of nearest neighbors to consider
     private val topK       = Array.fill (kappa)(-1, MAX_DOUBLE)      // top-kappa nearest points (in reserve order)
 //  private val coin       = Bernoulli ()                            // use a fair coin for breaking ties
 
@@ -47,6 +48,8 @@ class ClusteringPredictor (x: MatrixD, y: VectorD, fname_ : Array [String] = nul
     debug ("init", s" x = $x \n y = $y")
 
     // FIX - currently only works for xx = x and yy = y
+
+    override def getBest: BestStep = super [NoSubModels].getBest
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Training involves resetting the data structures before each prediction.
@@ -105,10 +108,6 @@ class ClusteringPredictor (x: MatrixD, y: VectorD, fname_ : Array [String] = nul
     def reset (): Unit =
         for i <- 0 until kappa do topK(i) = (-1, MAX_DOUBLE)     // initialize top-kappa
     end reset
-
-    override def buildModel (x_cols: MatrixD): Predictor & Fit =
-        throw new UnsupportedOperationException ("ClusteringPredictor does not have feature selection")
-    end buildModel
 
 end ClusteringPredictor
 

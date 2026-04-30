@@ -31,7 +31,7 @@ end sizes2
  *  @param d     fixed size of the 2nd/3rd level/dimension (column/sheet) of the tensor
  */
 def dupDim (dim: Int, d: Int): VectorI =
-    VectorI (for i <- 0 until dim yield d)
+    VectorI (for _ <- 0 until dim yield d)
 end dupDim
 
 
@@ -65,7 +65,6 @@ class RTensorD (val dim: Int, val dim2: VectorI, val dim3: Int,
         for i <- indices do v(i) = Array.ofDim (dim2(i), dim3)
     else if dim != v.length || dim3 != v(0)(0).length then
         flaw ("init", "dimensions are wrong")
-    end if
 
     /** Format string used for printing vector values (change using setFormat)
      */
@@ -162,7 +161,6 @@ class RTensorD (val dim: Int, val dim2: VectorI, val dim3: Int,
             val u = Array.ofDim [Double] (is.size, js.size, dim3)
             for i <- is.indices; j <- js.indices; k <- indices3 do u(i)(j)(k) = v(is(i))(js(j))(k)
             new RTensorD (u)
-        end if
     end apply
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -183,7 +181,6 @@ class RTensorD (val dim: Int, val dim2: VectorI, val dim3: Int,
             val u = Array.ofDim [Double] (is.size, js.size, ks.size)
             for i <- is.indices; j <- js.indices; k <- ks.indices do u(i)(j)(k) = v(is(i))(js(j))(ks(k))
             new RTensorD (u)
-        end if
     end apply
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -233,7 +230,7 @@ class RTensorD (val dim: Int, val dim2: VectorI, val dim3: Int,
      *  @param i  1st dimension (row) index of the tensor
      *  @param x  the matrix to be updated at the above position in the tensor
      */
-    def update (i: Int, x: MatrixD): Unit = v(i) = null   // FIX x.toArray
+    def update (i: Int, x: MatrixD): Unit = v(i) = x.toArray
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Set all the tensor element values to x.
@@ -457,11 +454,9 @@ object RTensorD:
         if z.dim < x.dim then
             flaw ("freq", "z is required to have at the number elements in x")
             return null
-        end if
         if dim2.dim != 2 then
             flaw ("freq", "dim2 must have dimension 2: one for x and one for z")
             return null
-        end if
         val t = RTensorD (dim2(0), dim2(1), dim3)
         for i <- x.indices do t(x(i), z(i), y(i)) += 1
         t

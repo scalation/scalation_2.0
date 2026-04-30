@@ -6,9 +6,14 @@
  *  @see     LICENSE (MIT style license file).
  *
  *  @note    ValueType - Union Datatype for Atomic Database Values
+ *           `Double`, `Int`, `Long`, `String`, `TimeNum`
  *           (includes useful related values and methods)
  *
  *  @see     "type ValueType" below
+ *
+ *  @note    Other Numeric/Numeric-Related Types:
+ *           in Scala 3: `math.BigDecimal`, `math.BigInt`, `Byte`, `Char` `Float`, `Short` 
+ *           in ScalaTion: `Complex`, `Rat`
  */
 
 package scalation
@@ -91,7 +96,8 @@ val sqrt_2byPi = sqrt (2.0 / Pi)
 
 /** Indicators of missing/illegal values per datatype
  */
-val NO_DOUBLE  = -0.0
+//val NO_DOUBLE  = -0.0
+val NO_DOUBLE  = NEGATIVE_INFINITY
 val NO_INT     = java.lang.Integer.MIN_VALUE
 val NO_LONG    = java.lang.Long.MIN_VALUE
 val NO_STRING  = null.asInstanceOf [String]
@@ -185,8 +191,8 @@ def rel_diff (x: Double, y: Double): Double = abs (x - y) / max (abs (x), abs (y
  *  @param y  the second double precision floating point number
  */
 def near_eq (x: Double, y: Double): Boolean =
-    if isNaN (x) && isNaN (y) then return true          // comment out to follow IEEE standard
-    if x == y then return true                          // they are equal
+    if isNaN (x) && isNaN (y) then return true              // comment out to follow IEEE standard
+    if x == y then return true                              // they are equal
 
     val diff  = abs (x - y)
     val norm1 = min (abs (x) + abs (y), MAX_VALUE)
@@ -200,41 +206,62 @@ end near_eq
 def fmt (x: Double): String = "%.6f".format (x)
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** Extend `Int` to include an exponentiation operator (~^), nearly equal (=~) and in/out.
+/** Extend `Int` to include an exponentiation operator (~^), nearly equal (=~), ≤, ≥, ≠, and in/out.
  */
 extension (x: Int)
-    def ~^ (y: Int): Int = pow (x.toDouble, y.toDouble).toInt
-    def =~ (y: Int): Boolean = x == y
-    infix def in (r: (Int, Int)): Boolean = r._1 <= x && x <= r._2
-    infix def out (r: (Int, Int)): Boolean = x < r._1 || r._2 < x
+    inline def ~^ (y: Int): Int = pow (x.toDouble, y.toDouble).toInt
+    inline def =~ (y: Int): Boolean = x == y
+    inline def ≤ (y: Int): Boolean = x <= y
+    inline def ≥ (y: Int): Boolean = x >= y
+    inline def ≠ (y: Int): Boolean = x != y
+    infix  def in (r: (Int, Int)): Boolean = r._1 <= x && x <= r._2
+    inline def ∈ (r: (Int, Int)): Boolean = x in r
+    infix  def out (r: (Int, Int)): Boolean = x < r._1 || r._2 < x
+    inline def ∉ (r: (Int, Int)): Boolean = x out r
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** Extend `Long` to include an exponentiation operator (~^), nearly equal (=~) and in/out.
+/** Extend `Long` to include an exponentiation operator (~^), nearly equal (=~), ≤, ≥, ≠, and in/out.
  */
 extension (x: Long)
-    def ~^ (y: Long): Long = powl (x, y)
-    def =~ (y: Long): Boolean = x == y
-    infix def in (r: (Long, Long)): Boolean = r._1 <= x && x <= r._2
-    infix def out (r: (Long, Long)): Boolean = x < r._1 || r._2 < x
+    inline def ~^ (y: Long): Long = powl (x, y)
+    inline def =~ (y: Long): Boolean = x == y
+    inline def ≤ (y: Long): Boolean = x <= y
+    inline def ≥ (y: Long): Boolean = x >= y
+    inline def ≠ (y: Long): Boolean = x != y
+    infix  def in (r: (Long, Long)): Boolean = r._1 <= x && x <= r._2
+    inline def ∈ (r: (Long, Long)): Boolean = x in r
+    infix  def out (r: (Long, Long)): Boolean = x < r._1 || r._2 < x
+    inline def ∉ (r: (Long, Long)): Boolean = x out r
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** Extend `Double` to include an exponentiation operator (~^), nearly equal (=~) and in/out.
+/** Extend `Double` to include an exponentiation operators (~^, ↑), nearly equal (=~), ≤, ≥, ≠, and in/out.
  */
 extension (x: Double)
-    def ~^ (y: Double): Double = pow (x, y)
-    def =~ (y: Double): Boolean = near_eq (x, y)
-    infix def in (r: (Double, Double)): Boolean = r._1 <= x && x <= r._2
-    infix def out (r: (Double, Double)): Boolean = x < r._1 || r._2 < x
+    inline def ~^ (y: Double): Double = pow (x, y)
+    inline def ↑ (y: Rat): Double = pow_ (x, y)             // extended to a negative base
+    inline def =~ (y: Double): Boolean = near_eq (x, y)
+    inline def ≤ (y: Double): Boolean = x <= y
+    inline def ≥ (y: Double): Boolean = x >= y
+    inline def ≠ (y: Double): Boolean = x != y
+    infix  def in (r: (Double, Double)): Boolean = r._1 <= x && x <= r._2
+    inline def ∈ (r: (Double, Double)): Boolean = x in r
+    infix  def out (r: (Double, Double)): Boolean = x < r._1 || r._2 < x
+    inline def ∉ (r: (Double, Double)): Boolean = x out r
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** Extend `String` to include an exponentiation operator (~^), nearly equal (=~) and in/out,
+/** Extend `String` to include an exponentiation operator (~^), nearly equal (=~), ≤, ≥, ≠, and in/out,
  *  as well operators for numeric types.  Use '.mkDouble' instead of '.toDouble'.
  */
 extension (x: String)
-    def ~^ (y: String): String = "NaN"
-    def =~ (y: String): Boolean = x.toLowerCase () == y.toLowerCase ()
-    infix def in (r: (String, String)): Boolean = r._1 <= x && x <= r._2
-    infix def out (r: (String, String)): Boolean = x < r._1 || r._2 < x
+    inline def ~^ (y: String): String = "NaN"
+    inline def =~ (y: String): Boolean = x.toLowerCase () == y.toLowerCase ()
+    inline def ≤ (y: String): Boolean = x <= y
+    inline def ≥ (y: String): Boolean = x >= y
+    inline def ≠ (y: String): Boolean = x != y
+    infix  def in (r: (String, String)): Boolean = r._1 <= x && x <= r._2
+    inline def ∈ (r: (String, String)): Boolean = x in r
+    infix  def out (r: (String, String)): Boolean = x < r._1 || r._2 < x
+    inline def ∉ (r: (String, String)): Boolean = x out r
     def unary_- : String = "-" + x
     def - (y: String): String = x diff y
     def * (y: String): String = x.repeat (y.toInt)
@@ -255,9 +282,9 @@ def safe_toDouble (s: String): Double =
     try 
         d = java.lang.Double.parseDouble (s)
     catch
-        case ex: java.lang.NullPointerException =>
+        case _ : java.lang.NullPointerException =>
             println ("safe_toDouble: can't parse null string")
-        case ex: java.lang.NumberFormatException =>
+        case _ : java.lang.NumberFormatException =>
             println (s"safe_toDouble: can't parse '$s' to create a Double")
     end try
     d
@@ -273,9 +300,9 @@ def safe_toInt (s: String): Int =
     try
         d = java.lang.Integer.parseInt (s)
     catch
-        case ex: java.lang.NullPointerException =>
+        case _ : java.lang.NullPointerException =>
             println ("safe_toInt: can't parse null string")
-        case ex: java.lang.NumberFormatException =>
+        case _ : java.lang.NumberFormatException =>
             println (s"safe_toInt: can't parse '$s' to create a Int")
     end try
     d
@@ -291,9 +318,9 @@ def safe_toLong (s: String): Long =
     try
         d = java.lang.Long.parseLong (s)
     catch
-        case ex: java.lang.NullPointerException =>
+        case _ : java.lang.NullPointerException =>
             println ("safe_toLong: can't parse null string")
-        case ex: java.lang.NumberFormatException =>
+        case _ : java.lang.NumberFormatException =>
             println (s"safe_toLong: can't parse '$s' to create a Long")
     end try
     d

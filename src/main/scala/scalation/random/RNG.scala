@@ -26,7 +26,6 @@ trait RNG (stream: Int):
 
     if stream < 0 || stream >= RandomSeeds.N_STREAMS then
         flaw ("init`", "the stream must be in the range 0 to " + (RandomSeeds.N_STREAMS - 1))
-    end if
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the theoretical mean for the random number generator's 'gen' method.
@@ -104,7 +103,7 @@ object RNGTester:
         var sum   = 0.0
         val means = new VectorD (tries)
         for i <- 0 until tries do
-            time { for i <- 0 until reps do sum += rn.gen }
+            time { cfor (0, reps) { _ => sum += rn.gen } }
             println (s"gen: sum = $sum")
             println (s"rn.mean = $rn.mean estimate = ${sum / reps.toDouble}")
             means(i) = sum
@@ -130,10 +129,10 @@ object RNGTester:
         val e     = reps / nints                               // expected value: pf (x)
 
         val sum = new VectorD (nints)
-        for i <- 0 until reps do
+        cfor (0, reps) { _ =>
             val j = floor (rn.gen * nints).toInt               // interval number
             if 0 <= j && j < nints then sum (j) += 1
-        end for
+        } // cfor
 
         val hg = new Histogram (sum, nints, s"Histogram for distribution of $name", counts = sum)
         println (s"meansTest: hg = $hg")
@@ -177,7 +176,7 @@ object RNGTester:
 
         val reps = 100000                                      // number of replications
 
-        val y = VectorD (for i <- 0 until reps yield rn.gen)
+        val y = VectorD (for _ <- 0 until reps yield rn.gen)
 
         val cg = new CoGram (y) 
         cg.makeCorrelogram ()

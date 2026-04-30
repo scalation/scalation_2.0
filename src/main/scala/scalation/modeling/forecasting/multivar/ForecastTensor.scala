@@ -61,15 +61,15 @@ trait ForecastTensor (y: MatrixD, hh: Int, tRng: Range = null):
      *  @param hh  the maximum forecasting horizon, number of steps ahead to produce forecasts
      */
     def makeForecastTensor (y_ : MatrixD = y, hh_ : Int = hh): TensorD =
-        val yf_ = new TensorD (y_.dim, hh + 2, y_.dim2)                    // forecasts for all time points t & horizons to h
+        val yf_ = new TensorD (y_.dim, hh_ + 2, y_.dim2)                    // forecasts for all time points t & horizons to h
         debug ("makeForecastTensor", s"forecast tensor: y_.dim = ${y_.dim} --> yf_.dims = ${yf_.dims}")
 
         for j <- y_.indices2 do                                            // for each variable
             for t <- y_.indices do yf_(t, 0, j) = y_(t, j)                 // first column (0) holds the actual time series values
             if tRng == null then
-                for t <- yf_.indices do yf_(t, hh+1, j) = t                // last column (h+1) holds time (logical day)
+                for t <- yf_.indices do yf_(t, hh_ + 1, j) = t             // last column (h+1) holds time (logical day)
             else 
-                for t <- tRng do yf_(t, hh+1, j) = t                       // last column (h+1) holds time (logical day)
+                for t <- tRng do yf_(t, hh_ + 1, j) = t                    // last column (h+1) holds time (logical day)
         end for
         yf_
     end makeForecastTensor
@@ -133,7 +133,7 @@ trait ForecastTensor (y: MatrixD, hh: Int, tRng: Range = null):
         end for
         for j <- yf.indices3 do
             println (s"fitMap QoF for variable $j = ")
-            println (FitM.showFitMap (ftMat (?, ?, j).transpose, QoF.values.map (_.toString)))
+            println (Fit.showFitMap (ftMat (?, ?, j).ᵀ))
         end for
     end diagnoseAll
 
@@ -153,7 +153,7 @@ trait ForecastTensor (y: MatrixD, hh: Int, tRng: Range = null):
 //          println (FitM.fitMap (qof, qoF_names))
         end for
         println ("fitMap QoF = ")
-        println (FitM.showFitMap (ftMat.transpose, QoF.values.map (_.toString)))
+        println (Fit.showFitMap (ftMat.ᵀ))
     end diagnoseAll
 
 end ForecastTensor

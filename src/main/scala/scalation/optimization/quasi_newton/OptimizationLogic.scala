@@ -34,12 +34,10 @@ trait OptimizationLogic extends EvaluationLogic:
      *  is provided to just print the contents of the current iteration of the
      *  optimization.
      *
-     *  @param instance  User data provided by each call of the `lbfgsMain` method of
-     *                   the `LBFGS` object.  Can have `Any` type defined by the user
-     *                   as long as the same type is utilized in the `evaluate` method
-     *                   implementation for the class extending this trait and on the
-     *                   corresponding `lbfgsMain` calls from the `LBFGS` object that
-     *                   relies on this `OptimizationLogic`.
+     *  @param instance  an optional user data segment that may be provided when calling the
+     *                   `LBFGS.lbfgsMain` method and may have `Any` type, but must be the same
+     *                   type used by the `evaluate` method of classes extending this trait.
+     *                   Note, has type `MemorySegment`in `OptimizationLogicC`.
      *  @param x         `VectorD` with the current values of the variables.
      *  @param g         `VectorD` with the current value of the gradient vector.
      *  @param fx        Current value of the objective function.
@@ -50,13 +48,14 @@ trait OptimizationLogic extends EvaluationLogic:
      *  @param k         Iteration count.
      *  @param ls        The number of evaluations called for this iteration.
      *  @return int      Determines if optimization should continue.  Zero continues
-                         optimization. Non-zero values cancel the  optimization.
+     *                   optimization. Non-zero values cancel the  optimization.
      */
     def progress (instance: Any, x: VectorD, g: VectorD, fx: Double, xnorm: Double,
                   gnorm: Double, step: Double, n: Int, k: Int, ls: Int): LBFGSReturnCode =
 
         println (s"""
     Iteration $k:
+    instance \t\t= $instance
     x \t\t= $x
     g \t\t= $g
     fx \t\t= $fx

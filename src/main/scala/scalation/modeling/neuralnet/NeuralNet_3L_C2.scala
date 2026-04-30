@@ -46,13 +46,13 @@ class NeuralNet_3L_C2 (x: MatrixD, y: VectorI, fname_ : Array [String] = null,
          with FitC ():
 
     private val debug   = debugf ("NeuralNet_3L_C2", true)               // debug function
-    private val cThresh = hparam ("cThresh").toDouble                    // classification/decision threshold
+    private val cThresh = hparam("cThresh").toDouble                     // classification/decision threshold
 
     private val ym = fromVector (y.toDouble)                             // y as a matrix
 
     private val nn3 = new NeuralNet_3L (x, ym, fname_, nz, hparam, f, f_sigmoid)
 
-    modelName = s"NeuralNet_3L_C2_${f.name}_sigmoid"                     // name of the model
+    _modelName = s"NeuralNet_3L_C2_${f.name}_sigmoid"                    // name of the model
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Train the classifier, i.e., calculate statistics and create conditional

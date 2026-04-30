@@ -39,7 +39,7 @@ class RandomForest (x: MatrixD, y: VectorI, fname_ : Array [String] = null, k: I
 
     private val debug   = debugf ("RandomForest", true)                       // debug function
     private val flaw    = flawf ("RandomForest")                              // flaw function
-    private val fbRatio = hparam ("fbRatio").toDouble                         // feature bagging ratio
+    private val fbRatio = hparam("fbRatio").toDouble                          // feature bagging ratio
 
     private val nFeats  = (fbRatio * x.dim2).toInt                            // number of features/columns to select
     private val rvg     = RandomVecI (nFeats, x.dim2-1, 0, -1, true)          // random vector generator
@@ -47,7 +47,7 @@ class RandomForest (x: MatrixD, y: VectorI, fname_ : Array [String] = null, k: I
 
     if nFeats < 0 || nFeats > x.dim2 then flaw ("init", "RF feature size restricted to 0 thru number of features")
 
-    modelName = s"RandomForest_${height}_$nTrees"                             // name of the model
+    _modelName = s"RandomForest_${height}_$nTrees"                            // name of the model
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Select subFeatures for input of building trees, return the subFeatures
@@ -256,7 +256,6 @@ end randomForestTest3
         else
             elseSample.set (elseCount, xy(i))
             elseCount  += 1 
-        end if
     end for
 
     val elseFeature = elseSample(?, 0 until elseSample.dim2-1)

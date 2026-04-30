@@ -45,6 +45,7 @@ trait Topological (var elem: Element, var dist: Double)
         val oth = other.asInstanceOf [Topological]
         if elem == oth.elem then Option (dist compare oth.dist)
         else oth.elem `tryCompareTo` oth.elem
+    end tryCompareTo
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the topological objects/tokens in the neighborhood of this token.

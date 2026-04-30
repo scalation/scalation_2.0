@@ -115,7 +115,7 @@ end RoundRegression
     val (x, y) = (xy.not(?, 3), xy(?, 3))                          // (all except column 3, column 3)
 
     val mod = new RoundRegression (x, y)                           // create a rounded regression model
-    mod.trainNtest ()()                                            // train and test the model
+    mod.inSample_Test ()                                           // train and test the model
 
     val yp  = mod.predict (x)
     val ypi = mod.vround (yp)

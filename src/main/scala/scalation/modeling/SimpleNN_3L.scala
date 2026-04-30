@@ -1,0 +1,224 @@
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** @author  John Miller
+ *  @version 2.0
+ *  @date    Mon Oct 20 20:16:25 EDT 2025
+ *  @see     LICENSE (MIT style license file).
+ *
+ *  @note    Simple Neural Networks Using Gradient Descent Optimization
+ *           Tests both Gradient Descent (GD) and Incremental Gradient Descent (IGD)
+ *           Simplified versions of `Regression`, `NN_3L`, `NeuralNet_2L`, and `NeuralNet_3L`
+ *           for illustration/learning, not production
+ *
+ *  @note    the symbol ƒ indicates the derivative of function f, i.e., ƒ = f'
+ */
+
+package scalation
+package modeling
+
+import scalation.mathstat.{VectorD, MatrixD, Plot}
+import scalation.mathstat.VectorDOps._
+import ActivationFun._
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `SimpleNN_3L` object contains a simple dataset for testing Gradient Descent (GD)
+ *  and Incremental Gradient Descent (IGD) optimization algorithms.
+ *  @see https://nowak.ece.wisc.edu/MFML.pdf
+ */
+object SimpleNN_3L:
+
+    // 9 data points:         One    x1    x2    y1   y2
+    val xy = MatrixD ((9, 5), 1.0,  0.1,  0.1,  0.5, 0.25,      // dataset
+                              1.0,  0.1,  0.5,  0.3, 0.49,
+                              1.0,  0.1,  1.0,  0.2, 0.64,
+
+                              1.0,  0.5,  0.1,  0.8, 0.04,
+                              1.0,  0.5,  0.5,  0.5, 0.25,
+                              1.0,  0.5,  1.0,  0.3, 0.49,
+
+                              1.0,  1.0,  0.1,  1.0, 0.0,
+                              1.0,  1.0,  0.5,  0.8, 0.04,
+                              1.0,  1.0,  1.0,  0.5, 0.25)
+
+    val (x, y) = (xy(?, 1 until 3), xy(?, 3 until 5))           // input matrix, output/response vector
+                                                                // don't include the ones-column
+
+end SimpleNN_3L
+
+import SimpleNN_3L._
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `simpleNN_3L1` main function illustrates the use of Gradient Descent (GD) to
+ *  optimize the weights/parameters of a simple (3-layer (1 hidden) Neural Network (NN_3L).
+ *
+ *      Prediction Equation: z = f0(A^T x + α)
+ *                           ŷ = f1(B^T z + β)
+ *
+ *  where x is an input matrix, z is the hidden layer matrix, ŷ is a predicted output matrix, f0, f1
+ *  are the activation functions, A and B are the parameter matrices, and α and β are the bias vectors.
+ *  Computations done at the matrix level: X -> Z -> Y.  R^2 = .299, .432
+ *  > runMain scalation.modeling.simpleNN_3L1
+ */
+@main def simpleNN_3L1 (): Unit =
+
+    import scalation.mathstat.MatrixDOps._
+
+    val (x, y) = (xy(?, 1 until 3), xy(?, 3 until 5))           // input matrix, output/response matrix
+    val sst    = (y - y.mean).normSq                            // sum of squares total
+    println (s"sst = $sst")
+
+    val a = MatrixD ((2, 3), 0.1, 0.1, 0.1,                     // parameter/weight matrix: input -> hidden
+                             0.1, 0.1, 0.1)
+    val α = VectorD (0.1, 0.1, 0.1)                             // hidden layer bias vector
+    val b = MatrixD ((3, 2), 0.1, 0.1,                          // parameter/weight matrix: hidden -> output
+                             0.2, 0.1,
+                             0.1, 0.1)                          // initial weights/parameters (random in practice)
+    val β = VectorD (0.1, 0.1)                                  // output layer bias vector
+
+    val η = 10.0                                                // learning rate (to be tuned)
+    var u, z, v, ŷ, ε, ƒ1, δ1, g1, ƒ0, δ0, g0: MatrixD = null
+
+    for epoch <- 1 to 10 do
+        println (s"Improvement step $epoch")
+
+        // forward prop: input -> hidden -> output
+        v = x * a + α                                           // hidden pre-activation matrix
+        z = f_sigmoid.fM (v)                                    // hidden prediction matrix using f0
+        u = z * b + β                                           // output pre-activation matrix
+        ŷ = f_sigmoid.fM (u)                                    // output prediction matrix using f1
+        ε = y - ŷ                                               // error matrix
+
+        // backward prop: input <- hidden <- output
+        ƒ1 = ŷ ⊙ (1.0 - ŷ)                                      // output derivative (f1') for sigmoid (⊙ => Hadamard product)
+        δ1 = -ε ⊙ ƒ1                                            // output delta correction matrix
+        g1 = z.ᵀ * δ1                                           // output gradient vectors (matrix)
+        ƒ0 = z ⊙ (1.0 - z)                                      // hidden derivative (f0') for sigmoid
+        δ0 = (δ1 * b.ᵀ) ⊙ ƒ0                                    // hidden delta correction matrix
+        g0 = x.ᵀ * δ0                                           // hidden gradient vectors (matrix)
+
+        // parameter updates
+        b -= g1 * η                                             // update output parameter/weight matrix
+        β -= δ1.mean * η                                        // update output bias vector
+        a -= g0 * η                                             // update hidden parameter/weight matrix
+        α -= δ0.mean * η                                        // update hidden bias vector
+
+        val sse = ε.normSq                                      // sum of squared errors
+        val r2  = -(sse / sst - 1.0)                            // R^2 (recoded to avoid Ops clash)
+
+        println (s"""
+        v   = $v
+        z   = $z
+        u   = $u
+        ŷ   = $ŷ
+        ε   = $ε
+        ƒ1  = $ƒ1
+        δ1  = $δ1
+        g1  = $g1
+        ƒ0  = $ƒ0
+        δ0  = $δ0
+        g0  = $g0
+        b   = $b
+        β   = $β
+        a   = $a
+        α   = $α
+        sse = $sse
+        r2  = $r2
+        """)
+    end for
+    new Plot (null, y(?, 0), ŷ(?, 0), "GD for NN_3L y_0", lines = true)
+    new Plot (null, y(?, 1), ŷ(?, 1), "GD for NN_3L y_1", lines = true)
+
+end simpleNN_3L1
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `simpleNN_3L2` main function illustrates the use of Incremental Gradient Descent (IGD)
+ *  to optimize the weights/parameters of a simple (3-layer (1 hidden) Neural Network (NN_3L).
+ *
+ *      Prediction Equation: z = f0(A^T x + α)
+ *                           ŷ = f1(B^T z + β)
+ *
+ *  where xi is the i-th input vector, z is a hidden layer vector, ŷ is a predicted output vector, f0, f1
+ *  are the activation functions, A and B are the parameter matrices, and α and β are the bias vectors.
+ *  @note: Stochastic Gradient Descent (SGD) adds stochastic selection to IGD.  In practice,
+ *  mini-batches of size 32, 64, or 128 are commonly used.
+ *  Computations done at the vector level: X -> Z -> Y.  R^2 = .845, .880
+ *  > runMain scalation.modeling.simpleNN_3L2
+ */
+@main def simpleNN_3L2 (): Unit =
+
+    import scalation.mathstat.MatrixDOps.⊗                      // outer product of two vectors: v1 ⊗ v2 = v1 v1.ᵀ
+                                                                // matrix where m_ij = v1_i * v2_j
+    val sst = (y - y.mean).normSq                               // sum of squares total
+    println (s"sst = $sst")
+
+    val a = MatrixD ((2, 3),  0.2,  0.3,  0.2,                  // parameter/weight matrix: input -> hidden
+                             -0.1, -0.2, -0.1)
+    val α = VectorD (-0.1, -0.1, -0.1)                          // hidden layer bias vector
+    val b = MatrixD ((3, 2), 0.1, -0.1,                         // parameter/weight matrix: hidden -> output
+                             0.2, -0.2,
+                             0.1, -0.1)                         // initial weights/parameters (random in practice)
+    val β = VectorD (-0.1, 0.1)                                 // output layer bias vector
+
+    val η = 10.0                                                // learning rate (to be tuned)
+    var u, z, v, ŷ, ε, ƒ1, δ1, ƒ0, δ0: VectorD = null
+    var g1, g0: MatrixD = null
+    val yp = new MatrixD (y.dim, y.dim2)                        // save each prediction in yp
+
+    for epoch <- 1 to 10 do
+        println (s"Improvement step $epoch")
+        val sse = new VectorD (y.dim2)                          // note: overall loss = sse.sum
+        for i <- x.indices do
+            val (xi, yi) = (x(i), y(i))                         // randomize i for Pure Stochastic Gradient Descent (PSGD)
+
+            // forward prop: input -> hidden -> output
+            v = a.ᵀ * xi + α                                    // hidden pre-activation vector (matrix * vector + vector)
+            z = sigmoid_ (v)                                    // hidden activation vector using f0 = sigmoid
+            u = b.ᵀ * z + β                                     // output pre-activation vector
+            ŷ = sigmoid_ (u)                                    // output prediction vector using f1 = sigmoid
+            ε = yi - ŷ                                          // error vector  [ε_0, ε_0]
+
+            // backward prop: input <- hidden <- output
+            ƒ1 = ŷ * (1.0 - ŷ)                                  // output derivative (f1') for sigmoid (* => vector element-wise product)
+            δ1 = -ε * ƒ1                                        // output delta correction vector
+            g1 = z ⊗ δ1                                         // output gradient vectors (matrix)
+            ƒ0 = z * (1.0 - z)                                  // hidden derivative (f0') for sigmoid
+            δ0 = (b * δ1) * ƒ0                                  // hidden delta correction vector
+            g0 = xi ⊗ δ0                                        // hidden gradient vectors (matrix)
+
+            // parameter updates
+            b -= g1 * η                                         // update output parameter/weight matrix W = B^T
+            β -= δ1 * η                                         // update output bias vector
+            a -= g0 * η                                         // update hidden parameter/weight matrix U = A^T
+            α -= δ0 * η                                         // update hidden bias vector
+
+            yp(i) = ŷ                                           // save i-th prediction
+            sse  += ε * ε                                       // sum of squared errors (for each output)
+        end for
+        val r2 = 1.0 - sse / sst                                // R^2
+
+        println (s"""
+        v   = $v
+        z   = $z
+        u   = $u
+        ŷ   = $ŷ
+        ε   = $ε
+        ƒ1  = $ƒ1
+        δ1  = $δ1
+        g1  = $g1
+        ƒ0  = $ƒ0
+        δ0  = $δ0
+        g0  = $g0
+        b   = $b
+        β   = $β
+        a   = $a
+        α   = $α
+        sse = $sse
+        r2  = $r2
+        """)
+    end for
+    new Plot (null, y(?, 0), yp(?, 0), "IGD for NN_3L y_0", lines = true)
+    new Plot (null, y(?, 1), yp(?, 1), "IGD for NN_3L y_1", lines = true)
+
+end simpleNN_3L2
+

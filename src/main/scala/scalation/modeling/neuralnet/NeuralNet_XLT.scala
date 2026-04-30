@@ -26,7 +26,7 @@ import Optimizer._
  *  network model trained on a related dataset is transferred into that position in this model.
  *  Given several input vectors and output vectors (training data), fit the parameters b
  *  connecting the layers, so that for a new input vector v, the net can predict the output vector.
- *  Caveat: currently only allows the transfer of one layer.
+ *  @caveat:  currently only allows the transfer of one layer.
  *  @param x         the m-by-n input matrix (training data consisting of m input vectors)
  *  @param y         the m-by-ny output matrix (training data consisting of m output vectors)
  *  @param fname_    the feature/variable names (defaults to null)
@@ -51,7 +51,7 @@ class NeuralNet_XLT (x: MatrixD, y: MatrixD, fname_ : Array [String] = null,
               else new NetParam (weightMat (sizes(l), sizes(l+1)),            // parameters weights &
                                  weightVec (sizes(l+1)))).toArray             // biases per active layer
 
-    modelName = s"NeuralNet_XLT_${stringOf (f.map (_.name))}"
+    _modelName = s"NeuralNet_XLT_${stringOf (f.map (_.name))}"
 
     println (s"Create a NeuralNet_XLT with ${x.dim2} input, ${stringOf (nz)} hidden and ${y.dim2} output nodes")
 

@@ -35,10 +35,9 @@ class PolyRegression (t: MatrixD, y: VectorD, ord: Int, fname_ : Array [String] 
       extends Regression (PolyRegression.allForms (t, ord), y, fname_, hparam):
 
     private val flaw = flawf ("PolyRegression")                    // flaw function
-    private val n0   = 1                                           // number of terms/columns originally
     private val nt   = PolyRegression.numTerms (ord)               // number of terms/columns after expansion
 
-    modelName = "PolyRegression"
+    _modelName = s"PolyRegression_$ord"
 
     if t.dim2 != 1 then flaw ("init", "matrix t must have 1 column")
 
@@ -47,7 +46,7 @@ class PolyRegression (t: MatrixD, y: VectorD, ord: Int, fname_ : Array [String] 
      *  i.e., add polynomial terms.
      *  @param z  the un-expanded vector
      */
-    def expand (z: VectorD): VectorD = PolyRegression.forms (z, n0, nt) 
+    def expand (z: VectorD): VectorD = PolyRegression.forms (z, nt) 
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Given the scalar z, expand it and predict the response value.
@@ -97,7 +96,7 @@ object PolyRegression:
      */
     def apply (t: VectorD, y: VectorD, ord: Int, fname: Array [String],
                hparam: HyperParameter): PolyRegression =
-        new PolyRegression (MatrixD (t).transpose, y, ord, fname, hparam)
+        new PolyRegression (MatrixD (t).ᵀ, y, ord, fname, hparam)
     end apply
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -125,10 +124,9 @@ object PolyRegression:
     /** Given a 1-vector/point v, compute the values for all of its polynomial
      *  forms/terms, returning them as a vector.
      *  @param v   the 1-vector (e.g., i-th row of t) for creating forms/terms
-     *  @param k   number of features/predictor variables (not counting intercept) = 1
      *  @param nt  the number of terms
      */
-    def forms (v: VectorD, k: Int, nt: Int): VectorD =
+    def forms (v: VectorD, nt: Int): VectorD =
         val t = v(0)
         VectorD (for j <- 0 until nt yield t~^j)
     end forms
@@ -143,7 +141,7 @@ object PolyRegression:
         val nt = numTerms (ord)
         println (s"allForms: create expanded data matrix with nt = $nt columns from k = $k columns")
         val xe = new MatrixD (x.dim, nt)
-        for i <- x.indices do xe(i) = forms (x(i), k, nt)     // vector with values for all forms/terms
+        for i <- x.indices do xe(i) = forms (x(i), nt)        // vector with values for all forms/terms
         xe                                                    // expanded matrix
     end allForms
 
@@ -171,7 +169,7 @@ end PolyRegression
 
     val order = 4
     val mod   = PolyRegression (t, y, order, null, PolyRegression.hp)
-    mod.trainNtest ()()                                            // train and test the model
+    mod.inSample_Test ()                                           // train and test the model
 
     banner ("test for collinearity")
     println ("corr = " + mod.getX.corr)
@@ -213,7 +211,7 @@ end polyRegressionTest
 
     val order = 6
     val mod   = PolyRegression (t, y, order, null, PolyRegression.hp)
-    mod.trainNtest ()()                                            // train and test the model
+    mod.inSample_Test ()                                           // train and test the model
 
     banner ("test for collinearity")
     println ("corr = " + mod.getX.corr)
@@ -233,4 +231,40 @@ end polyRegressionTest
     FitM.showQofStatTable (stats)
 
 end polyRegressionTest2
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `polyRegressionTest3` main function tests the collinearity/correlation of
+ *  x1, x1^2, x1^3 under centering, standardizing, and min-max normalization,
+ *  Picking an min-max interval like [-2, 2] or [-3, 3] may make the effect somewhat
+ *  similar to standardization.
+ *  > runMain scalation.modeling.polyRegressionTest3
+ */
+@main def polyRegressionTest3 (): Unit =
+
+    import scalation.mathstat.VectorDOps._
+
+    val x1 = VectorD (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+    val x  = MatrixD (x1, x1~^2, x1~^3).ᵀ
+    banner (s"original: x = $x")
+    println (s"original: x.corr = ${x.corr}")
+
+    var z1 = x1 - x1.mean
+    var z  = MatrixD (z1, z1~^2, z1~^3).ᵀ
+    banner (s"centered: z = $z")
+    println (s"centered: z.corr = ${z.corr}")
+
+    z1 = (x1 - x1.mean) / x1.stdev
+    z  = MatrixD (z1, z1~^2, z1~^3).ᵀ
+    banner (s"standardized: z = $z")
+    println (s"standardized: z.corr = ${z.corr}")
+
+    banner ("minmax [a, b]: z = z")
+    for a <- -2 to 2; b <- a+1 to a+4 do
+        z1 = (b - a).toDouble * (x1 - x1.min) / (x1.max - x1.min) + a
+        z  = MatrixD (z1, z1~^2, z1~^3).ᵀ
+//      banner (s"minmax [$a, $b]: z = $z")
+        println (s"minmax [$a, $b]: z.corr = ${z.corr}")
+
+end polyRegressionTest3
 

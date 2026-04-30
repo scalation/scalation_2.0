@@ -30,7 +30,7 @@ class GrainDropping (stream: Int):
      */
     def fraction (n: Int): Double =
         var count = 0
-        for i <- 0 until n do if grain.gen.normSq <= 1.0 then count += 1
+        cfor (0, n) { _ => if grain.gen.normSq <= 1.0 then count += 1 }
         count / n.toDouble
     end fraction
 

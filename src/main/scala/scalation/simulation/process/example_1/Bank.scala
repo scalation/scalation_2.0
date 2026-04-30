@@ -25,7 +25,7 @@ import scalation.random.{Exponential, Uniform}
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `BankModel` class defines a simple process-interaction model of a bank
  *  where service is provided by one or more tellers.
- *  Caveat: must add 'from' and 'to' components before transport!!
+ *  @caveat:  must add 'from' and 'to' components before transport!!
  *  @param name       the name of the simulation model
  *  @param reps       the number of independent replications to run
  *  @param animating  whether to animate the model

@@ -132,7 +132,6 @@ object CDF:
                 cbuf += 1.0
             else
                 cbuf(cbuf.size - 1) += 1.0
-            end if
         end for
         (new VectorD (zbuf.size, zbuf.toArray),
          new VectorD (cbuf.size, cbuf.toArray).cumulate / x.dim.toDouble)
@@ -322,7 +321,6 @@ object CDF:
         else
             if x > 0 then { cum = 1.0; ccum = 0.0 }
             else          { cum = 0.0; ccum = 1.0 }
-        end if
 
         if cum < min then  cum  = 0.0
         if ccum < min then ccum = 0.0
@@ -371,7 +369,6 @@ object CDF:
         else
             val f = z + 1.0 / (z + 2.0/(z + 3.0/(z + 4.0/(z + 13.0/20.0))))
             e / (RT2PI * f)
-        // end if
 
         if x <= 0.0 then c else 1.0 - c
     end _normalCDF
@@ -439,7 +436,6 @@ object CDF:
         if df <= 0.0 then
             flaw ("studentTCDF", "parameter df must be strictly positive")
             return -0.0
-        end if
 
         if df =~ 1.0 then                                  // Cauchy CDF
             0.5 + (1.0/Pi) * atan (x)
@@ -453,7 +449,6 @@ object CDF:
             if x > 0 then 1.0 - z else z
         else                                               // Ordinary Normal Approximation (ONA)
             normalCDF (x)                  
-        end if
     end studentTCDF
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -479,7 +474,6 @@ object CDF:
         if df <= 0.0 then
             flaw ("noncentralTCDF", "parameter df must be strictly positive")
             return -0.0
-        end if
 
         throw new UnsupportedOperationException ("noncentralTCDF in CDF not implemented yet")  // FIX
     end noncentralTCDF
@@ -495,11 +489,9 @@ object CDF:
         if x < 0.0 then
             flaw ("chiSquareCDF", "coordinate x should be nonnegative")
             return 0.0
-        end if
         if df <= 0 then
             flaw ("chiSquareCDF", "parameter df must be strictly positive")
             return -0.0
-        end if
 
         val chi  = ChiSquare (df)        // ChiSquare distribution
         val step = 0.0001
@@ -538,11 +530,9 @@ object CDF:
         if x < 0.0 then
             flaw ("fisherCDF", s"F(x) requires coordinate x = $x to be nonnegative")
             return 0.0
-        end if
         if df1 <= 0 || df2 <= 0 then
             flaw ("fisherCDF", "parameters df1 and df2 must be strictly positive")
             return -0.0
-        end if
        
         val ff = rBetaF (df1 * x / ((df1 * x) + df2), df1 / 2.0, df2 / 2.0)
         if ff > 1.0 then 1.0 else ff                                   // handle possible round-off errors

@@ -4,7 +4,12 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="b2eb790b-a8b8-4ee9-a68f-5c956cb14266" name="Changes" comment="" />
+    <list default="true" id="b2eb790b-a8b8-4ee9-a68f-5c956cb14266" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/scala/scalation/modeling/forecasting/ARX.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/scalation/modeling/forecasting/ARX.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/scala/scalation/modeling/forecasting/Example_ILI.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/scalation/modeling/forecasting/Example_ILI.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/scala/scalation/modeling/forecasting/Forecaster_Reg.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/scalation/modeling/forecasting/Forecaster_Reg.scala" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -30,74 +35,38 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;Application.aRXTest4.executor&quot;: &quot;Run&quot;,
-    &quot;Application.aRX_DTest3.executor&quot;: &quot;Run&quot;,
-    &quot;Application.aRX_DTest4.executor&quot;: &quot;Run&quot;,
-    &quot;Application.aRX_QuadTest3.executor&quot;: &quot;Run&quot;,
-    &quot;Application.aRX_QuadTest4.executor&quot;: &quot;Run&quot;,
-    &quot;Application.aRX_Quad_DTest4.executor&quot;: &quot;Run&quot;,
-    &quot;Application.aRX_SymbTest4.executor&quot;: &quot;Run&quot;,
-    &quot;Application.aRX_Symb_DTest4.executor&quot;: &quot;Run&quot;,
-    &quot;Application.aRYTest4.executor&quot;: &quot;Run&quot;,
-    &quot;Application.aRY_DTest4.executor&quot;: &quot;Run&quot;,
-    &quot;Application.aRY_QuadTest4.executor&quot;: &quot;Run&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;dev__Yousef&quot;,
-    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;C:/Users/youse/OneDrive/Documents/GitHub/scalation_2.0&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;project.structure.last.edited&quot;: &quot;Problems&quot;,
-    &quot;project.structure.proportion&quot;: &quot;0.0&quot;,
-    &quot;project.structure.side.proportion&quot;: &quot;0.2&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Application.aRXTest4.executor": "Run",
+    "Application.aRX_DTest3.executor": "Run",
+    "Application.aRX_DTest4.executor": "Run",
+    "Application.aRX_QuadTest3.executor": "Run",
+    "Application.aRX_QuadTest4.executor": "Run",
+    "Application.aRX_Quad_DTest4.executor": "Run",
+    "Application.aRX_SymbTest4.executor": "Run",
+    "Application.aRX_Symb_DTest3.executor": "Run",
+    "Application.aRX_Symb_DTest4.executor": "Run",
+    "Application.aRYTest4.executor": "Run",
+    "Application.aRY_DTest4.executor": "Run",
+    "Application.aRY_QuadTest4.executor": "Run",
+    "Application.example_ILITest10.executor": "Run",
+    "Application.example_ILITest11.executor": "Run",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "git-widget-placeholder": "dev__Yousef",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "C:/Users/youse/OneDrive/Documents/New Scalation/scalation_2.0",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "project.structure.last.edited": "Problems",
+    "project.structure.proportion": "0.0",
+    "project.structure.side.proportion": "0.2",
+    "vue.rearranger.settings.migration": "true"
   }
-}</component>
-  <component name="RunManager" selected="Application.aRX_Quad_DTest4">
-    <configuration name="aRXTest4" type="Application" factoryName="Application" temporary="true">
-      <option name="MAIN_CLASS_NAME" value="scalation.modeling.forecasting.aRXTest4" />
-      <module name="scalation" />
-      <extension name="coverage">
-        <pattern>
-          <option name="PATTERN" value="scalation.modeling.forecasting.*" />
-          <option name="ENABLED" value="true" />
-        </pattern>
-      </extension>
-      <method v="2">
-        <option name="Make" enabled="true" />
-      </method>
-    </configuration>
-    <configuration name="aRX_DTest4" type="Application" factoryName="Application" temporary="true">
-      <option name="MAIN_CLASS_NAME" value="scalation.modeling.forecasting.aRX_DTest4" />
-      <module name="scalation" />
-      <extension name="coverage">
-        <pattern>
-          <option name="PATTERN" value="scalation.modeling.forecasting.*" />
-          <option name="ENABLED" value="true" />
-        </pattern>
-      </extension>
-      <method v="2">
-        <option name="Make" enabled="true" />
-      </method>
-    </configuration>
-    <configuration name="aRX_QuadTest4" type="Application" factoryName="Application" temporary="true">
-      <option name="MAIN_CLASS_NAME" value="scalation.modeling.forecasting.aRX_QuadTest4" />
-      <module name="scalation" />
-      <extension name="coverage">
-        <pattern>
-          <option name="PATTERN" value="scalation.modeling.forecasting.*" />
-          <option name="ENABLED" value="true" />
-        </pattern>
-      </extension>
-      <method v="2">
-        <option name="Make" enabled="true" />
-      </method>
-    </configuration>
+}]]></component>
+  <component name="RunManager" selected="Application.aRX_Symb_DTest4">
     <configuration name="aRX_Quad_DTest4" type="Application" factoryName="Application" temporary="true">
       <option name="MAIN_CLASS_NAME" value="scalation.modeling.forecasting.aRX_Quad_DTest4" />
       <module name="scalation" />
@@ -111,8 +80,47 @@
         <option name="Make" enabled="true" />
       </method>
     </configuration>
-    <configuration name="aRX_SymbTest4" type="Application" factoryName="Application" temporary="true">
-      <option name="MAIN_CLASS_NAME" value="scalation.modeling.forecasting.aRX_SymbTest4" />
+    <configuration name="aRX_Symb_DTest3" type="Application" factoryName="Application" temporary="true">
+      <option name="MAIN_CLASS_NAME" value="scalation.modeling.forecasting.aRX_Symb_DTest3" />
+      <module name="scalation" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="scalation.modeling.forecasting.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="aRX_Symb_DTest4" type="Application" factoryName="Application" temporary="true">
+      <option name="MAIN_CLASS_NAME" value="scalation.modeling.forecasting.aRX_Symb_DTest4" />
+      <module name="scalation" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="scalation.modeling.forecasting.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="example_ILITest10" type="Application" factoryName="Application" temporary="true">
+      <option name="MAIN_CLASS_NAME" value="scalation.modeling.forecasting.example_ILITest10" />
+      <module name="scalation" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="scalation.modeling.forecasting.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="example_ILITest11" type="Application" factoryName="Application" temporary="true">
+      <option name="MAIN_CLASS_NAME" value="scalation.modeling.forecasting.example_ILITest11" />
       <module name="scalation" />
       <extension name="coverage">
         <pattern>
@@ -126,11 +134,11 @@
     </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Application.aRX_Symb_DTest4" />
+        <item itemvalue="Application.aRX_Symb_DTest3" />
+        <item itemvalue="Application.example_ILITest10" />
+        <item itemvalue="Application.example_ILITest11" />
         <item itemvalue="Application.aRX_Quad_DTest4" />
-        <item itemvalue="Application.aRX_QuadTest4" />
-        <item itemvalue="Application.aRXTest4" />
-        <item itemvalue="Application.aRX_SymbTest4" />
-        <item itemvalue="Application.aRX_DTest4" />
       </list>
     </recent_temporary>
   </component>
@@ -159,6 +167,7 @@
       <workItem from="1743562243849" duration="2094000" />
       <workItem from="1743570723394" duration="1312000" />
       <workItem from="1743610413093" duration="41000" />
+      <workItem from="1745442186542" duration="701000" />
     </task>
     <servers />
   </component>

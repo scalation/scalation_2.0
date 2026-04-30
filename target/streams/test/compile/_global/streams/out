@@ -1,0 +1,19 @@
+[0m[[0m[31merror[0m] [0m[0m[31m[31m-- [E008] Not Found Error: C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0\src\test\scala\testing\mathstat\VectorD_T.scala:12:11 [0m[0m[0m
+[0m[[0m[31merror[0m] [0m[0m[31m12 |[0m[33mimport[0m org.junit.jupiter.api.[33mTest[0m[0m
+[0m[[0m[31merror[0m] [0m[0m[31m[31m   |[0m       ^^^^^^^^^[0m[0m
+[0m[[0m[31merror[0m] [0m[0m[31m   |[0m       value junit is not a member of org[0m
+[0m[[0m[33mwarn[0m] [0m[0m[33m[33m-- Warning: C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0\src\test\scala\testing\mathstat\VectorD_T.scala:292:32 [0m[0m[0m
+[0m[[0m[33mwarn[0m] [0m[0m[33m292 |[0m    test ([32m"set"[0m,            { x set s; x },[0m
+[0m[[0m[33mwarn[0m] [0m[0m[33m[33m    |[0m                                ^^^[0m[0m
+[0m[[0m[33mwarn[0m] [0m[0m[33m    |[0mAlphanumeric method set is not declared [33minfix[0m; it should not be used as infix operator.[0m
+[0m[[0m[33mwarn[0m] [0m[0m[33m    |[0mInstead, use method syntax .set(...) or backticked identifier `set`.[0m
+[0m[[0m[33mwarn[0m] [0m[0m[33m    |[0mThe latter can be rewritten automatically under -rewrite -source 3.4-migration.[0m
+[0m[[0m[33mwarn[0m] [0m[0m[33m[33m-- Warning: C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0\src\test\scala\testing\mathstat\VectorD_T.scala:294:32 [0m[0m[0m
+[0m[[0m[33mwarn[0m] [0m[0m[33m294 |[0m    test ([32m"set"[0m,            { x set y; x },[0m
+[0m[[0m[33mwarn[0m] [0m[0m[33m[33m    |[0m                                ^^^[0m[0m
+[0m[[0m[33mwarn[0m] [0m[0m[33m    |[0mAlphanumeric method set is not declared [33minfix[0m; it should not be used as infix operator.[0m
+[0m[[0m[33mwarn[0m] [0m[0m[33m    |[0mInstead, use method syntax .set(...) or backticked identifier `set`.[0m
+[0m[[0m[33mwarn[0m] [0m[0m[33m    |[0mThe latter can be rewritten automatically under -rewrite -source 3.4-migration.[0m
+[0m[[0m[31merror[0m] [0m[0mNo warnings can be incurred under -Werror[0m
+[0m[[0m[33mwarn[0m] [0m[0mtwo warnings found[0m
+[0m[[0m[31merror[0m] [0m[0mtwo errors found[0m

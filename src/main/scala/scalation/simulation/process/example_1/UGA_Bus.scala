@@ -29,7 +29,7 @@ import scalation.random.{Exponential, Randi, Uniform}
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `UGA_BusModel` class defines a simple process-interaction model of a bus
  *  with four stop around campus (NORTH, EAST, SOUTH, WEST).
- *  Caveat: must add 'from' and 'to' components before transport!!
+ *  @caveat:  must add 'from' and 'to' components before transport!!
  *  @param name       the name of the simulation model
  *  @param reps       the number of independent replications to run
  *  @param animating  whether to animate the model

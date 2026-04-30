@@ -81,7 +81,6 @@ case class RandomSet (count: Int = 10, max: Int = 20, skip: Int = -1, stream: In
     if count > max then
         flaw ("init", "requires count <= max")
         throw new IllegalArgumentException ("RandomSet: count shouldn't be larger than max")
-    end if
 
     private val rng = Randi0 (max, stream)              // random integer generator
 
@@ -223,11 +222,11 @@ end RandomSetW
 
      println ("Test: RandomSet random set generation ------------------------")
      println ("mean = " + rsg.mean)                     // random set generator
-     for k <- 0 until 30 do { rs = rsg.igen;  println (rs) }
+     cfor (0, 30) { _ => rs = rsg.igen; println (rs) }
 
      println ("Test: RandomSet random subset generation ---------------------")
      println ("mean = " + rsg.mean)                     // random set generator
-     for k <- 0 until 30 do println (rsg.igen (rs, 5))
+     cfor (0, 30) { _ => println (rsg.igen (rs, 5)) }
 
 end variateSetTest
 
@@ -243,7 +242,7 @@ end variateSetTest
      var rs:  Set [String]  = null                      // variate set
 
      println ("Test: RandomSetS random set generation ------------------------")
-     for k <- 0 until 30 do { rs = rsg.sgen;  println (rs) }
+     cfor (0, 30) { _ => rs = rsg.sgen; println (rs) }
 
 end variateSetTest2
 
@@ -259,7 +258,7 @@ end variateSetTest2
      var rs:  Set [String]  = null                      // variate set
 
      println ("Test: RandomSetW random set generation ------------------------")
-     for k <- 0 until 30 do { rs = rsg.sgen;  println (rs) }
+     cfor (0, 30) { _ => rs = rsg.sgen; println (rs) }
 
 end variateSetTest3
 

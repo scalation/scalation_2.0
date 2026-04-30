@@ -295,12 +295,12 @@ end differentialTest
     for i <- x.indices do
         var hh = 1E-4
         println (" x \t\t h \t\t deriv \t\t 1-sided \t\t error \t\t 2-sided \t\t error")
-        for k <- 0 until 9 do
+        cfor (0, 9) { _ =>
             resetH (hh)
             val (d0, d1, d2) = (d(x(i)), derivative1 (f, x(i)), derivative (f, x(i)))
             println (s"${x(i)} \t $hh \t $d0 \t $d1 \t ${abs (d1-d0)} \t $d2 \t ${abs (d2-d0)}")
             hh /= 10.0
-        end for
+        } // cfor
         println ()
     end for
 

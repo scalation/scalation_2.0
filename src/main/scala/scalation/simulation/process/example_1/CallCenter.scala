@@ -26,7 +26,7 @@ import scalation.random.{Exponential, Uniform}
 /** The `CallCenterModel` class defines a simple process-interaction model of a call
  *  center where service is provided by one or more tele-service representatives.
  *  Simulates calls coming into a call center where phones have no call waiting.
- *  Caveat: must add 'from' and 'to' components before transport!!
+ *  @caveat:  must add 'from' and 'to' components before transport!!
  *  @param name       the name of the simulation model
  *  @param reps       the number of independent replications to run
  *  @param animating  whether to animate the model

@@ -80,7 +80,6 @@ class CircularQueue [A: ClassTag] (cap: Int):
         if isFull then
             front  = (front + 1) % maxSize                     // isFull => drop oldest element
             nElem -= 1
-        end if
         rear = (rear + 1) % maxSize                            // advance rear index
         store(rear) = elem                                     // store new element
         nElem += 1

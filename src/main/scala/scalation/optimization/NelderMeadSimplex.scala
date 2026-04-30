@@ -71,7 +71,6 @@ class NelderMeadSimplex (f: FunctionV2S, n: Int)
             for j <- i+1 to n if simplex(j)._1 > simplex(im)._1 do im = j
             if im != i then
                 val t = simplex(i); simplex(i) = simplex(im); simplex(im) = t
-            end if
         end for
     end sort
 

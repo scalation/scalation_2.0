@@ -46,8 +46,8 @@ object TableGen:
         /** Make tuples: (1) random unique values for primary key attributes,
          *  (2) copies of primary keys from fkt for foreign key attributes, or
          *  (3) random values based on domain for other attributes.
-         *  Caveat: for a composite primary key (sid, cid) pulling primary keys from
-         *          Student.sid and Course.cid may results in a duplicate primary key
+         *  @caveat:  for a composite primary key (sid, cid) pulling primary keys from
+         *            Student.sid and Course.cid may results in a duplicate primary key
          */
         def makeTuples (): Unit =
             val col = Array.ofDim [Vectr] (n)                         // generate column-by-column
@@ -58,12 +58,11 @@ object TableGen:
 
                 if pkey contains atrj then                            // >> case PRIMARY KEY
                     col(j) = if fkt == null then genUnique (j)        // generate unique keys for attributes in pkey
-                             else pullPkeys (atrj, fkt, j)            // primary and foreign = copy pkey from fkt
+                             else pullPkeys (fkt, j)                  // primary and foreign = copy pkey from fkt
                 else if fkt != null then                              // >> case FOREIGN KEY
-                    col(j) = pullPkeys (atrj, fkt, j)                 // foreign key = copy pkey from fkt
+                    col(j) = pullPkeys (fkt, j)                       // foreign key = copy pkey from fkt
                 else                                                  // >> case REGULAR ATTRIBUTE
                     col(j) = genValue (j)                             // generate value for a regular attribute
-                end if
                 j += 1                                                // increase attribute counter
             end while
 
@@ -76,12 +75,11 @@ object TableGen:
 
         //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
         /** Randomly pull m primary key values out of the foreign key table (fkt).
-         *  Caveat:  Currently only works for non-composite foreign keys.
-         *  @param fkey  the foreign key attribute
+         *  @caveat:  Currently only works for non-composite foreign keys.
          *  @param fkt   the foreign key table (fkt) this_table references fkt
          *  @param strm  the random number stream to use (reduce redundancy)
          */
-        def pullPkeys (fkey: String, fkt: Table, strm: Int): Vectr =
+        def pullPkeys (fkt: Table, strm: Int): Vectr =
             val k     = fkt.rows                                      // number of rows in fkt
             val ranRw = RandomVecI (dim = m, max = k-1, min = 0, unique = false, stream = strm)
             val rows  = ranRw.igen                                    // randomly select m rows

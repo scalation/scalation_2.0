@@ -111,7 +111,6 @@ case class Graph0 (ch: Array [SET [Int]], label: Array [ValueType],
                     flaw ("checkEdges", s"child of $u, with vertex id $u_c not in bounds 0..$maxId")
                     okay = false
                     break ()
-                end if
             end for
         } // breakable
         okay
@@ -148,9 +147,8 @@ case class Graph0 (ch: Array [SET [Int]], label: Array [ValueType],
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Print this digraph in a deep sense with all the information.
-     *  @param clip whether to clip out "Set(" and ")"
      */
-    def printG (clip: Boolean = true): Unit =
+    def printG (): Unit =
         println (s"Graph0 ($name, $inverse, $size")
         for i <- ch.indices do println (toLine (i))
         println (")")
@@ -177,7 +175,6 @@ case class Graph0 (ch: Array [SET [Int]], label: Array [ValueType],
             end for
         else
             for i <- vset do lv(i) = g.label(i)                 // direct correspondence for labels 
-        end if
         (lv, vmap)
     end addVertices
 

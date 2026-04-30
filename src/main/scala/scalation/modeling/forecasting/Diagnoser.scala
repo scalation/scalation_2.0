@@ -15,13 +15,13 @@ package forecasting
 import scalation.mathstat._
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `Diagnoser` trait provides methods to determine basic Quality of Fit QoF measures.
- *  @param y_   the response vector (time series)
- *  @param dfm  the degrees of freedom for model/regression (0 or more)
+/** The `Diagnoser` trait provides methods to determine basic Quality of Fit QoF measures
+ *  for time series where forecasting at early time points may not be feasible.
+ *  @param dfr  the degrees of freedom for regression/model (0 or more)
  *  @param df   the degrees of freedom for error
  */
-abstract class Diagnoser (dfm: Double, df: Double)
-         extends Fit (dfm, df):
+abstract class Diagnoser (dfr: Double, df: Double)
+         extends Fit (dfr, df):
 
     // For In-Sample Testing (In-ST), can't forecast for t = 0 (no past data, unless backcasting)
     // first value in time series may be atypical (but not an necessarily an outlier) => skip first 2
@@ -29,6 +29,13 @@ abstract class Diagnoser (dfm: Double, df: Double)
     // Call `setSkip` to change from the DEFAULT value of 2
     // When comparing different models, should use the same skip value for all models
 
+    // Setting skip to 'max (p, q+1)' is common for ARMA (p, q) models, e.g., the state space in
+    // Kalman Filters need to hold p past values as well as the q past errors and the current error
+    // to be fully populated from data (e.g., not just zeroed out).
+    // For ARIMA using a Kalman Filter, it would be 'd + max(p, q+1)'.
+    // Some software avoids this burn-in issue by using a diffuse Kalman filter
+
+    private   val debug = debugf ("Diagnoser", false)                      // debug function
     protected var skip: Int = 2                                            // number of beginning elements to skip
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -44,7 +51,7 @@ abstract class Diagnoser (dfm: Double, df: Double)
      *  Note:  Degrees of Freedom are mainly relevant for full and train, not test.
      *  @param size  the size of dataset (full, train, or test sets)
      */
-    def mod_resetDF (size: Int): Unit = resetDF (dfm, size - dfm)
+    def mod_resetDF (size: Int): Unit = resetDF (dfr, size - dfr)
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Diagnose the health of the model by computing the Quality of Fit (QoF) measures,
@@ -56,7 +63,7 @@ abstract class Diagnoser (dfm: Double, df: Double)
      *  @param w   the weights on the instances (defaults to null)
      */
     override def diagnose (y: VectorD, yp: VectorD, w: VectorD = null): VectorD =
-        println (s"diagnose: skip = $skip")
+        debug ("diagnose", s"skip = $skip")
         if skip > 0 then
             super.diagnose (y.drop (skip), yp.drop (skip),
                             if w != null then w.drop (skip) else null)

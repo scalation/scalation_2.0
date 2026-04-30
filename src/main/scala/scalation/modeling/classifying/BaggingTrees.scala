@@ -38,9 +38,9 @@ class BaggingTrees (x: MatrixD, y: VectorI, fname_ : Array [String] = null, k: I
 
     private   val debug      = debugf ("BaggingTrees", true)                     // debug function
     private   val flaw       = flawf ("BaggingTrees")                            // flaw function
-    protected val nTrees     = hparam ("nTrees").toInt                           // number of trees
-    protected val bRatio     = hparam ("bRatio").toDouble                        // bagging ratio 
-    protected val height     = hparam ("height").toInt                           // height limit
+    protected val nTrees     = hparam("nTrees").toInt                            // number of trees
+    protected val bRatio     = hparam("bRatio").toDouble                         // bagging ratio 
+    protected val height     = hparam("height").toInt                            // height limit
 
     protected val trees      = Array.ofDim [DecisionTree_C45] (nTrees)           // many decision trees
     protected val sampleSize = (bRatio * x.dim).toInt                            // size of matrix sub-samples
@@ -48,7 +48,7 @@ class BaggingTrees (x: MatrixD, y: VectorI, fname_ : Array [String] = null, k: I
     if nTrees <= 0 then                flaw ("init", "BT number of tree must be at least one")
     if bRatio <= 0 || bRatio >= 1 then flaw ("init", "BT bagging ratio restricted to (0, 1)")
 
-    modelName = s"BaggingTrees_${height}_$nTrees"                                // name of the model
+    _modelName = s"BaggingTrees_${height}_$nTrees"                               // name of the model
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the vector of model parameter vector.
@@ -269,7 +269,6 @@ end baggingTreesTest3
         else
             elseSample.set (elseCount, xy(i))
             elseCount  += 1 
-        end if
     end for
 
     val elseFeature = elseSample(?, 0 until elseSample.dim2-1)

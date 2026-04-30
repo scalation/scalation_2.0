@@ -93,7 +93,7 @@ class GoldenSectionLS (f: FunctionS2S, τ: Double = 1E-5)
         var matched = false
 
         breakable {
-            for k <- 1 to MAX_IT do                         // expand right to try to find a down-up pattern
+            for _ <- 0 until MAX_IT do                      // expand right to try to find a down-up pattern
                 val dist = x3 - x1
                 x2 = x1 + G_SECTION * dist
                 f2 = f(x2)
@@ -111,7 +111,6 @@ class GoldenSectionLS (f: FunctionS2S, τ: Double = 1E-5)
             x2 = x1 + G_SECTION * (xmax - x1)
             f2 = f(x2)
             gsection (true, x1, x2, xmax, f2)               // apply golden section search on original interval
-        end if
     end lsearch
  
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

@@ -5,7 +5,7 @@
  *  @date    Fri Feb 16 16:14:34 EST 2018
  *  @see     LICENSE (MIT style license file).
  *
- *  @note    Model: Null Model Classifier
+ *  @note    Model: Null Model Classifier (Picks Most Frequent Class Label)
  */
 
 package scalation
@@ -17,7 +17,7 @@ import scalation.mathstat._
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `NullModel` class implements a Null Model Classifier, which is a simple
  *  classifier for discrete input data.  The classifier is trained just using a
- *  classification vector y.  Picks the most frequent class.
+ *  classification vector y.  Picks the most frequent class label.
  *  Each data instance is classified into one of k classes numbered 0, ..., k-1.
  *  Note: the train method in the super class suffices.
  *  @param y       the response/output m-vector (class values where y(i) = class for instance i)
@@ -30,7 +30,7 @@ class NullModel (y: VectorI, k: Int = 2, cname_ : Array [String] = Array ("No", 
 
     private val debug = debugf ("NullModel", true)                      // debug function
 
-    modelName = "NullModel"                                             // name of the model
+    _modelName = "NullModel"                                            // name of the model
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Test the predictive model y_ = f(x_) + e and return its predictions and QoF vector.

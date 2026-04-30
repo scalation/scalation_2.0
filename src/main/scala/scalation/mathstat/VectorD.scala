@@ -17,10 +17,9 @@ package mathstat
 //import java.lang.foreign.ValueLayout.JAVA_DOUBLE
 import java.util.Arrays.copyOf
 
-import scala.collection.immutable.{IndexedSeq => IIndexedSeq}
-import scala.collection.immutable.Set
-import scala.collection.generic._
-import scala.collection.mutable._
+import scala.collection.generic.DefaultSerializable
+import scala.collection.immutable.{IndexedSeq => IIndexedSeq, Set}
+import scala.collection.mutable.{ArrayBuffer, IndexedSeq}
 import scala.runtime.ScalaRunTime.stringOf
 import scala.util.control.Breaks.{break, breakable}
 
@@ -57,7 +56,6 @@ class VectorD (val dim: Int,
     else if dim > v.length then
         flaw ("init", s"vector dimension is larger than space: dim = $dim > v.length = ${v.length}")
         assert (dim <= v.length)                                  // make this a fatal flaw
-    end if
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the length of this vector.
@@ -90,7 +88,7 @@ class VectorD (val dim: Int,
     /** Return the elements in range r of this vector, making sure not to go beyond
      *  the end of vector.
      *  Usage: x(2 until 5)
-     *  Caveat:  Only verified for "a until b" ranges, not "a to b" ranges
+     *  @caveat:  Only verified for "a until b" ranges, NOT "a to b" ranges
      *  @param r  the index range of elements to return
      */
     def apply (r: Range): VectorD = 
@@ -109,15 +107,18 @@ class VectorD (val dim: Int,
      *  @param idx  the index sequence of elements to return
      */
     def apply (idx: IndexedSeq [Int]): VectorD =
-        new VectorD (idx.size, cfor (idx.size) { i => v(idx(i)) })
+        val v_ = v                                             // local access is faster
+        new VectorD (idx.size, cfor (idx.size) { i => v_(idx(i)) })
     end apply
 
     def apply (idx: IIndexedSeq [Int]): VectorD =
-        new VectorD (idx.size, cfor (idx.size) { i => v(idx(i)) })
+        val v_ = v                                             // local access is faster
+        new VectorD (idx.size, cfor (idx.size) { i => v_(idx(i)) })
     end apply
 
     def apply (idx: Array [Int]): VectorD =
-        new VectorD (idx.size, cfor (idx.size) { i => v(idx(i)) })
+        val v_ = v                                             // local access is faster
+        new VectorD (idx.size, cfor (idx.size) { i => v_(idx(i)) })
     end apply
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -125,9 +126,10 @@ class VectorD (val dim: Int,
      *  @param ix  the index to skip/exclude
      */
     def not (ix: Int): VectorD = 
-        val a = Array.ofDim [Double] (dim-1)
-        cfor (0, ix) { i => a(i) = v(i) }
-        cfor (ix+1, dim) { i => a(i) = v(i) }
+        val v_ = v                                             // local access is faster
+        val a  = Array.ofDim [Double] (dim-1)
+        cfor (0, ix) { i => a(i) = v_(i) }
+        cfor (ix+1, dim) { i => a(i) = v_(i) }
         new VectorD (dim-1, a)
     end not
 
@@ -137,8 +139,9 @@ class VectorD (val dim: Int,
      *  @param idx  the index sequence of elements to skip/exclude
      */
     def not (idx: IndexedSeq [Int]): VectorD =
-        val a = ArrayBuffer [Double] ()
-        cfor (0, dim) { i => if ! (idx `contains` i) then a += v(i) }
+        val v_ = v                                             // local access is faster
+        val a  = ArrayBuffer [Double] ()
+        cfor (0, dim) { i => if ! (idx `contains` i) then a += v_(i) }
         new VectorD (a.size, a.toArray)
     end not
 
@@ -149,22 +152,31 @@ class VectorD (val dim: Int,
     override def drop (n: Int = 1): VectorD = new VectorD (dim - n, v.drop (n))
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return a vector containing all but the last n elements of this vector.
+     *  @author Yousef Fekri Dabanloo
+     *  @param n  the number of elements to be dropped
+     */
+    override def dropRight (n: Int = 1): VectorD = new VectorD (dim - n, v.dropRight (n))
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Split the elements from this vector to form two vectors:  one from the elements in
      *  idx (e.g., testing set) and the other from elements not in idx (e.g., training set).
      *  Note split and split_ produce different element orders.
      *  @param idx  the set of element indices to include/exclude
      */
     def split (idx: Set [Int]): (VectorD, VectorD) =
+        val v_  = v                                            // local access is faster
         val len = idx.size
         val a   = new VectorD (len)
         val b   = new VectorD (dim - len)
         var j, k = 0
+
         cfor (indices) { i =>
             if idx `contains` i then
-                a.v(j) = v(i)
+                a.v(j) = v_(i)
                 j += 1
             else
-                b.v(k) = v(i)
+                b.v(k) = v_(i)
                 k += 1
         } // cfor
         (a, b)
@@ -195,7 +207,7 @@ class VectorD (val dim: Int,
     def chop (k: Int): Array [VectorD] =
         if k <= 0 then flaw ("chop", s"k = $k must be at least one")
         val pieces = Array.ofDim [VectorD] (k)
-        val size = dim / k
+        val size   = dim / k
         cfor (0, k-1) { i => pieces(i) = this (i*size until (i+1)*size) }
         pieces(k-1) = this ((k-1)*size until dim)
         pieces
@@ -208,32 +220,35 @@ class VectorD (val dim: Int,
      *  @param t  the index from which prior values are sought (exclusive)
      */
     def prior (p: Int, t: Int): VectorD =
-        val a = Array.ofDim [Double] (p)
-        cfor (t-p, t) { j => a(j+p-t) = if j <= 0 then v(0) else v(j) }
+        val v_ = v                                            // local access is faster
+        val a  = Array.ofDim [Double] (p)
+        cfor (t-p, t) { j => a(j+p-t) = if j <= 0 then v_(0) else v_(j) }
         new VectorD (p, a)
     end prior
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Update the i-th element (or in range) of this vector.
      *  @param i  the index of the element to update
-     *  @param a  the updated value to assign
+     *  @param a  the updated value to be assigned
      */
     def update (i: Int, a: Double): Unit = v(i) = a
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Update the i-th element (or in range) of this vector.
      *  @param i  the index of the element to update
-     *  @param a  the update value to assign
+     *  @param a  the update value to be assigned
      */
     def update (r: Range, a: Double): Unit = cfor (r) { i => v(i) = a }
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Update the i-th element (or in range) of this vector.
      *  @param i  the index of the element to update
-     *  @param y  the update vector/indexed sequence to assign
+     *  @param y  the update vector/indexed sequence to be assigned
      */
-    def update (r: Range, y: VectorD): Unit = cfor (r) { i => v(i) = y.v(i) }
-    def update (r: Range, y: IndexedSeq [Double]): Unit = cfor (r) { i => v(i) = y(i) }
+    def update (r: Range, y: VectorD): Unit = 
+        cfor (r) { i => v(i) = y.v(i - r.start) }
+    def update (r: Range, y: IndexedSeq [Double]): Unit =
+        cfor (r) { i => v(i) = y(i - r.start) }
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Set all elements in this vector to scalar zero.
@@ -257,7 +272,9 @@ class VectorD (val dim: Int,
     /** Iterate over this vector element by element applying the given function.
      *  @param f  the function to apply
      */
-    override def foreach [U] (f: Double => U): Unit = { var i = 0; while i < dim do { f (v(i)); i += 1 } }
+    override def foreach [U] (f: Double => U): Unit = 
+        val v_ = v                                            // local access is faster
+        var i = 0; while i < dim do { f (v_(i)); i += 1 }
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Map the elements of this vector by applying the mapping function f.
@@ -271,13 +288,14 @@ class VectorD (val dim: Int,
      *  @param bb  the other vector
      */
     infix def tryCompareTo [B >: VectorD: AsPartiallyOrdered] (bb: B): Option [Int] =
+        val v_ = v                                            // local access is faster
         if ! bb.isInstanceOf [VectorD] then return None
         val b  = bb.asInstanceOf [VectorD]
         var le = true
         var ge = true
         cfor (v.indices) { i =>
-            if      ge && v(i) < b(i) then ge = false
-            else if le && v(i) > b(i) then le = false
+            if      ge && v_(i) < b(i) then ge = false
+            else if le && v_(i) > b(i) then le = false
         } // cfor
         if ge && le then Some (0)
         else if le  then Some (-1)
@@ -312,89 +330,247 @@ class VectorD (val dim: Int,
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the negative of this vector (unary minus).
      */
-//  def unary_- : VectorD = VectorD (for i <- v.indices yield -v(i))       // for ... yield is too slow
-    def unary_- : VectorD = new VectorD (dim, cfor (dim) { i => -v(i) })
+    def unary_- : VectorD =
+        val v_ = v                                            // local access is faster
+        val a  = Array.ofDim [Double] (dim)
+        cfor (0, dim) { i => a(i) = -v_(i) }
+        new VectorD (dim, a)
+    end unary_-
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Compute the element-wise sum (or difference, product, quotient) of vectors this and y.
+    /** Compute the element-wise sum of vectors this and y.
      *  @param y  the other vector/indexed sequence
      */
-    def + (y: VectorD): VectorD = new VectorD (dim, cfor (dim) { i => v(i) + y.v(i) })
-    def + (y: IndexedSeq [Double]): VectorD = new VectorD (dim, cfor (dim) { i => v(i) + y(i) })
+    def + (y: VectorD): VectorD =
+        val v_ = v                                            // local access is faster
+        val a  = Array.ofDim [Double] (dim)
+        cfor (0, dim) { i => a(i) = v_(i) + y.v(i) }
+        new VectorD (dim, a)
+    end +
 
-    def - (y: VectorD): VectorD = new VectorD (dim, cfor (dim) { i => v(i) - y.v(i) })
-    def - (y: IndexedSeq [Double]): VectorD = new VectorD (dim, cfor (dim) { i => v(i) - y(i) })
-
-    def * (y: VectorD): VectorD = new VectorD (dim, cfor (dim) { i => v(i) * y.v(i) })
-    def * (y: IndexedSeq [Double]): VectorD = new VectorD (dim, cfor (dim) { i => v(i) * y(i) })
-
-    def / (y: VectorD): VectorD = new VectorD (dim, cfor (dim) { i => v(i) / y.v(i) })
-    def / (y: IndexedSeq [Double]): VectorD = new VectorD (dim, cfor (dim) { i => v(i) / y(i) })
+    def + (y: IndexedSeq [Double]): VectorD =
+        val v_ = v                                            // local access is faster
+        val a  = Array.ofDim [Double] (dim)
+        cfor (0, dim) { i => a(i) = v_(i) + y(i) }
+        new VectorD (dim, a)
+    end +
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Compute the element-wise sum (or difference, product, quotient) of this and scalar a.
+    /** Compute the element-wise difference of vectors this and y.
+     *  @param y  the other vector/indexed sequence
+     */
+    def - (y: VectorD): VectorD =
+        val v_ = v                                            // local access is faster
+        val a  = Array.ofDim [Double] (dim)
+        cfor (0, dim) { i => a(i) = v_(i) - y.v(i) }
+        new VectorD (dim, a)
+    end -
+
+    def - (y: IndexedSeq [Double]): VectorD =
+        val v_ = v                                            // local access is faster
+        val a  = Array.ofDim [Double] (dim)
+        cfor (0, dim) { i => a(i) = v_(i) - y(i) }
+        new VectorD (dim, a)
+    end -
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the element-wise product of vectors this and y.
+     *  @param y  the other vector/indexed sequence
+     */
+    def * (y: VectorD): VectorD =
+        val v_ = v                                            // local access is faster
+        val a  = Array.ofDim [Double] (dim)
+        cfor (0, dim) { i => a(i) = v_(i) * y.v(i) }
+        new VectorD (dim, a)
+    end *
+
+    def * (y: IndexedSeq [Double]): VectorD =
+        val v_ = v                                            // local access is faster
+        val a  = Array.ofDim [Double] (dim)
+        cfor (0, dim) { i => a(i) = v_(i) * y(i) }
+        new VectorD (dim, a)
+    end *
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the element-wise quotient of vectors this and y.
+     *  @param y  the other vector/indexed sequence
+     */
+    def / (y: VectorD): VectorD =
+        val v_ = v                                            // local access is faster
+        val a  = Array.ofDim [Double] (dim)
+        cfor (0, dim) { i => a(i) = v_(i) / y.v(i) }
+        new VectorD (dim, a)
+    end /
+
+    def / (y: IndexedSeq [Double]): VectorD =
+        val v_ = v                                            // local access is faster
+        val a  = Array.ofDim [Double] (dim)
+        cfor (0, dim) { i => a(i) = v_(i) / y(i) }
+        new VectorD (dim, a)
+    end /
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the element-wise sum of this and scalar a.
      *  @param a  the scalar second operand
      */
-    def + (a: Double): VectorD = new VectorD (dim, cfor (dim) { i => v(i) + a })
-    def - (a: Double): VectorD = new VectorD (dim, cfor (dim) { i => v(i) - a })
-    def * (a: Double): VectorD = new VectorD (dim, cfor (dim) { i => v(i) * a })
-    def / (a: Double): VectorD = new VectorD (dim, cfor (dim) { i => v(i) / a })
+    inline def + (a: Double): VectorD =
+        val v_ = v                                            // local access is faster
+        val b  = Array.ofDim [Double] (dim)
+        cfor (0, dim) { i => b(i) = v_(i) + a }
+        new VectorD (dim, b)
+    end +
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Compute the element-wise sum (or difference, product, quotient) of vectors this and y.
+    /** Compute the element-wise difference of this and scalar a.
+     *  @param a  the scalar second operand
+     */
+    inline def - (a: Double): VectorD =
+        val v_ = v                                            // local access is faster
+        val b  = Array.ofDim [Double] (dim)
+        cfor (0, dim) { i => b(i) = v_(i) - a }
+        new VectorD (dim, b)
+    end -
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the element-wise product of this and scalar a.
+     *  @param a  the scalar second operand
+     */
+    inline def * (a: Double): VectorD =
+        val v_ = v                                            // local access is faster
+        val b  = Array.ofDim [Double] (dim)
+        cfor (0, dim) { i => b(i) = v_(i) * a }
+        new VectorD (dim, b)
+    end *
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the element-wise quotient of this and scalar a.
+     *  @param a  the scalar second operand
+     */
+    inline def / (a: Double): VectorD =
+        val v_ = v                                            // local access is faster
+        val b  = Array.ofDim [Double] (dim)
+        cfor (0, dim) { i => b(i) = v_(i) / a }
+        new VectorD (dim, b)
+    end /
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the element-wise sum of vectors this and y.
      *  Perform operations in-place (destructive) to reduce memory allocations.
      *  @param y  the other vector/indexed sequence
      */
-    def += (y: VectorD): VectorD = { cfor (0, dim) { i => v(i) += y.v(i) }; this }
-    def += (y: IndexedSeq [Double]): VectorD = { cfor (0, dim) { i => v(i) += y(i) }; this }
+    def += (y: VectorD): VectorD = 
+        cfor (0, dim) { i => v(i) += y.v(i) }; this
 
-    def -= (y: VectorD): VectorD = { cfor (0, dim) { i => v(i) -= y.v(i) }; this }
-    def -= (y: IndexedSeq [Double]): VectorD = { cfor (0, dim) { i => v(i) -= y(i) }; this }
-
-    def *= (y: VectorD): VectorD = { cfor (0, dim) { i => v(i) *= y.v(i) }; this }
-    def *= (y: IndexedSeq [Double]): VectorD = { cfor (0, dim) { i => v(i) *= y(i) }; this }
-
-    def /= (y: VectorD): VectorD = { cfor (0, dim) { i => v(i) /= y.v(i) }; this }
-    def /= (y: IndexedSeq [Double]): VectorD = { cfor (0, dim) { i => v(i) /= y(i) }; this }
+    def += (y: IndexedSeq [Double]): VectorD = 
+        cfor (0, dim) { i => v(i) += y(i) }; this
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Compute the element-wise sum (or difference, product, quotient) of this and scalar a.
+    /** Compute the element-wise difference of vectors this and y.
+     *  Perform operations in-place (destructive) to reduce memory allocations.
+     *  @param y  the other vector/indexed sequence
+     */
+    def -= (y: VectorD): VectorD = 
+        cfor (0, dim) { i => v(i) -= y.v(i) }; this
+
+    def -= (y: IndexedSeq [Double]): VectorD = 
+        cfor (0, dim) { i => v(i) -= y(i) }; this
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the element-wise product of vectors this and y.
+     *  Perform operations in-place (destructive) to reduce memory allocations.
+     *  @param y  the other vector/indexed sequence
+     */
+    def *= (y: VectorD): VectorD = 
+        cfor (0, dim) { i => v(i) *= y.v(i) }; this
+
+    def *= (y: IndexedSeq [Double]): VectorD = 
+        cfor (0, dim) { i => v(i) *= y(i) }; this
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the element-wise quotient of vectors this and y.
+     *  Perform operations in-place (destructive) to reduce memory allocations.
+     *  @param y  the other vector/indexed sequence
+     */
+    def /= (y: VectorD): VectorD = 
+        cfor (0, dim) { i => v(i) /= y.v(i) }; this
+
+    def /= (y: IndexedSeq [Double]): VectorD = 
+        cfor (0, dim) { i => v(i) /= y(i) }; this
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the element-wise sum of this and scalar a.
      *  Perform operations in-place (destructive) to reduce memory allocations.
      *  @param a  the scalar second operand
      */
-    def += (a: Double): VectorD = { cfor (0, dim) { i => v(i) += a} ; this }
-    def -= (a: Double): VectorD = { cfor (0, dim) { i => v(i) -= a} ; this }
-    def *= (a: Double): VectorD = { cfor (0, dim) { i => v(i) *= a} ; this }
-    def /= (a: Double): VectorD = { cfor (0, dim) { i => v(i) /= a} ; this }
+    def += (a: Double): VectorD = 
+        cfor (0, dim) { i => v(i) += a }; this 
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the element-wise difference of this and scalar a.
+     *  Perform operations in-place (destructive) to reduce memory allocations.
+     *  @param a  the scalar second operand
+     */
+    def -= (a: Double): VectorD = 
+        cfor (0, dim) { i => v(i) -= a }; this 
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the element-wise product of this and scalar a.
+     *  Perform operations in-place (destructive) to reduce memory allocations.
+     *  @param a  the scalar second operand
+     */
+    def *= (a: Double): VectorD = 
+        cfor (0, dim) { i => v(i) *= a }; this
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the element-wise quotient of this and scalar a.
+     *  Perform operations in-place (destructive) to reduce memory allocations.
+     *  @param a  the scalar second operand
+     */
+    def /= (a: Double): VectorD = 
+        cfor (0, dim) { i => v(i) /= a }; this
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Add this vector and scalar a only at position i, e.g., x + (3, 5.5).
      *  @param ia = (i, a)  the (index position, scalar) to add
      */
-    def + (ia: (Int, Double)): VectorD = { val c = copy; c.v(ia._1) += ia._2; c }
+    def + (ia: (Int, Double)): VectorD = 
+        val c = copy; c.v(ia._1) += ia._2; c
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Subtract from this vector the scalar a only at position i, e.g., x - (3, 5.5).
      *  @param ia = (i, a)  the (index position, scalar) to subtract
      */
-    def - (ia: (Int, Double)): VectorD = { val c = copy; c.v(ia._1) -= ia._2; c }
+    def - (ia: (Int, Double)): VectorD =
+        val c = copy; c.v(ia._1) -= ia._2; c
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute the element-wise power function of this vector raised to scalar a.
-     *  @param  the scalar second operand
+     *  @param a  the scalar second operand (double)
      */
-    def ~^ (a: Double): VectorD = new VectorD (dim, cfor (dim) { i => v(i) ~^ a })
+    def ~^ (a: Double): VectorD =
+        val v_ = v                                            // local access is faster
+        new VectorD (dim, cfor (dim) { i => v_(i) ~^ a })
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the element-wise power function of this vector raised to scalar a.
+     *  Extended to handle a negative base.
+     *  @param a  the scalar second operand (rational number)
+     */
+    def ↑ (a: Rat): VectorD =
+        val v_ = v                                            // local access is faster
+        new VectorD (dim, cfor (dim) { i => v_(i) ↑ a })
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Determine whether this vector and vector y are nearly equal.
      *  @param y  the other vector
      */
     def =~ (y: VectorD): Boolean =
+        val v_ = v                                            // local access is faster
         if dim != y.dim then return false
         var close = true
         breakable {
             cfor (0, dim) { i =>
-                if ! (v(i) =~ y.v(i)) then { close = false; break () }
+                if ! (v_(i) =~ y.v(i)) then { close = false; break () }
             } // cfor
         } // breakable
         close
@@ -447,8 +623,9 @@ class VectorD (val dim: Int,
     /** Determine whether this vector is sorted in ascending order.
      */
     def isSorted: Boolean = 
-        var i = 0
-        while i < dim-1 do if v(i) > v(i+1) then return false else i += 1
+        val v_ = v                                            // local access is faster
+        var i  = 0
+        while i < dim-1 do if v_(i) > v_(i+1) then return false else i += 1
         true
     end isSorted
 
@@ -502,7 +679,8 @@ class VectorD (val dim: Int,
      *  @param p  the filter predicate based on element values
      */
     def filterPos (p: Double => Boolean): IIndexedSeq [Int] =
-        for i <- indices if p(v(i)) yield i
+        val v_ = v                                            // local access is faster
+        for i <- indices if p(v_(i)) yield i
     end filterPos
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -511,35 +689,38 @@ class VectorD (val dim: Int,
      *  @param y  the other vector/indexed sequence
      */
     infix def dot (y: VectorD): Double =
+        val v_  = v                                           // local access is faster
         var sum = 0.0
-        cfor (0, dim) { i => sum += v(i) * y.v(i) }
+        cfor (0, dim) { i => sum += v_(i) * y.v(i) }
         sum
     end dot
 
     infix def dot (y: IndexedSeq [Double]): Double =
+        val v_  = v                                           // local access is faster
         var sum = 0.0
-        cfor (0, dim) { i => sum += v(i) * y(i) }
+        cfor (0, dim) { i => sum += v_(i) * y(i) }
         sum
     end dot
 
     infix def dot (y: IIndexedSeq [Double]): Double =
+        val v_  = v                                           // local access is faster
         var sum = 0.0
-        cfor (0, dim) { i => sum += v(i) * y(i) }
+        cfor (0, dim) { i => sum += v_(i) * y(i) }
         sum
     end dot
 
-    inline def ∙ (y: VectorD): Double = dot (y)                 // unicode bullet point
+    inline def ∙ (y: VectorD): Double = dot (y)                 // Unicode bullet point
 
-    inline def ∙ (y: IndexedSeq [Double]): Double = dot (y)     // unicode bullet point
+    inline def ∙ (y: IndexedSeq [Double]): Double = dot (y)     // Unicode bullet point
 
-    inline def ∙ (y: IIndexedSeq [Double]): Double = dot (y)    // unicode bullet point
+    inline def ∙ (y: IIndexedSeq [Double]): Double = dot (y)    // Unicode bullet point
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the 'valid' (no padding) convolution of cofilter vector c and input vector x.
      *  Take the dot product of c (this) with a slice of x, shift by one and repeat.
      *  Usage:  c conv x
-     *  Caveat:  does not include reversal.
-     *  @see `scalation.modeling.neuralnet.CoFilter_1D
+     *  @caveat:  does not include reversal.
+     *  @see `scalation.modeling.neuralnet.CoFilter_1D`
      *  @param x  the input/data vector
      */
     infix def conv (x: VectorD): VectorD =
@@ -560,15 +741,17 @@ class VectorD (val dim: Int,
     inline infix def conv_ (x: VectorD): VectorD = reverse.conv (x)
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Return the 'same' (with padding) convolution of cofilter vector c and input vector x.
+    /** Return the 'same' (with zero padding) convolution of cofilter vector c and
+     *  input vector x.
      *  Same means that the size of the result is the same as the input.
      *  Usage:  c convs x
      *  @param x  the input/data vector
-     */
+     */  
     infix def convs (x: VectorD): VectorD =
-        val y = new VectorD (x.dim)
+        val v_ = v                                            // local access is faster
+        val y  = new VectorD (x.dim)
         cfor (y.indices) { k =>
-            y(k) = Σ (indices) { j => if k-j in (0, x.dim-1) then v(j) * x(k-j) else 0.0 }
+            cfor (indices) { j => if k+j > 0 && k+j <= x.dim then y(k) += v_(j) * x(k+j-1) }
         } // cfor
         y
     end convs
@@ -577,12 +760,14 @@ class VectorD (val dim: Int,
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the 'full' convolution of cofilter vector c and input vector x.
+     *  @note:  `convf` is less common than `conv` or convs`
      *  @param x  the input/data vector
      */
     infix def convf (x: VectorD): VectorD =
-        val y = new VectorD (dim + x.dim - 1)
+        val v_ = v                                            // local access is faster
+        val y  = new VectorD (dim + x.dim - 1)
         cfor (y.indices) { k =>
-            y(k) = Σ (0, math.min (k+1, dim)) { j => if k-j < x.dim then v(j) * x(k-j) else 0.0 }
+            y(k) = Σ (0, math.min (k+1, dim)) { j => if k-j < x.dim then v_(j) * x(k-j) else 0.0 }
         } // cfor
         y
     end convf
@@ -593,7 +778,8 @@ class VectorD (val dim: Int,
     /** Return a new vector consisting of the maximum of this vector elements and zero.
      */
     inline def max0: VectorD =
-        new VectorD (dim, cfor (dim) { i => if v(i) < 0.0 then 0.0 else v(i) })
+        val v_ = v                                            // local access is faster
+        new VectorD (dim, cfor (dim) { i => if v_(i) < 0.0 then 0.0 else v_(i) })
     end max0
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -601,11 +787,13 @@ class VectorD (val dim: Int,
      *  @param y  the other vector/indexed sequence
      */
     infix def maxv (y: VectorD): VectorD =
-        new VectorD (dim, cfor (dim) { i => if v(i) >= y(i) then v(i) else y.v(i) })
+        val v_ = v                                            // local access is faster
+        new VectorD (dim, cfor (dim) { i => if v_(i) >= y(i) then v_(i) else y.v(i) })
     end maxv
 
     infix def maxv (y: IndexedSeq [Double]): VectorD =
-        new VectorD (dim, cfor (dim) { i => if v(i) >= y(i) then v(i) else y(i) })
+        val v_ = v                                            // local access is faster
+        new VectorD (dim, cfor (dim) { i => if v_(i) >= y(i) then v_(i) else y(i) })
     end maxv
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -613,11 +801,13 @@ class VectorD (val dim: Int,
      *  @param y  the other vector/indexed sequence
      */
     infix def minv (y: VectorD): VectorD =
-        new VectorD (dim, cfor (dim) { i => if v(i) <= y(i) then v(i) else y.v(i) })
+        val v_ = v                                            // local access is faster
+        new VectorD (dim, cfor (dim) { i => if v_(i) <= y(i) then v_(i) else y.v(i) })
     end minv
 
     infix def minv (y: IndexedSeq [Double]): VectorD =
-        new VectorD (dim, cfor (dim) { i => if v(i) <= y(i) then v(i) else y(i) })
+        val v_ = v                                            // local access is faster
+        new VectorD (dim, cfor (dim) { i => if v_(i) <= y(i) then v_(i) else y(i) })
     end minv
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -630,8 +820,9 @@ class VectorD (val dim: Int,
      *  @param e  the ending index (exclusive) for the search
      */
     def argmax (e: Int = dim): Int =
-        var j = 0
-        cfor (1, e) { i => if v(i) > v(j) then j = i }
+        val v_ = v                                            // local access is faster
+        var j  = 0
+        cfor (1, e) { i => if v_(i) > v_(j) then j = i }
         j
     end argmax
 
@@ -641,8 +832,9 @@ class VectorD (val dim: Int,
      *  @param e  the ending index (exclusive) for the search
      */
     def argmax (s: Int, e: Int): Int =
-        var j = s
-        cfor (s+1, e) { i => if v(i) > v(j) then j = i }
+        val v_ = v                                            // local access is faster
+        var j  = s
+        cfor (s+1, e) { i => if v_(i) > v_(j) then j = i }
         j
     end argmax
 
@@ -651,8 +843,9 @@ class VectorD (val dim: Int,
      *  @param e  the ending index (exclusive) for the search
      */
     def argmin (e: Int = dim): Int =
-        var j = 0
-        cfor (1, e) { i => if v(i) < v(j) then j = i }
+        val v_ = v                                            // local access is faster
+        var j  = 0
+        cfor (1, e) { i => if v_(i) < v_(j) then j = i }
         j
     end argmin
 
@@ -662,8 +855,9 @@ class VectorD (val dim: Int,
      *  @param e  the ending index (exclusive) for the search
      */
     def argmin (s: Int, e: Int): Int =
-        var j = s
-        cfor (s+1, e) { i => if v(i) < v(j) then j = i }
+        val v_ = v                                            // local access is faster
+        var j  = s
+        cfor (s+1, e) { i => if v_(i) < v_(j) then j = i }
         j
     end argmin
 
@@ -672,8 +866,9 @@ class VectorD (val dim: Int,
      *  @param e  the ending index (exclusive) for the search
      */
     def argmag (e: Int = dim): Int =
-        var j = 0
-        cfor (1, e) { i => if math.abs (v(i)) > math.abs (v(j)) then j = i }
+        val v_ = v                                            // local access is faster
+        var j  = 0
+        cfor (1, e) { i => if math.abs (v_(i)) > math.abs (v_(j)) then j = i }
         j
     end argmag
 
@@ -687,11 +882,12 @@ class VectorD (val dim: Int,
      *  @param k  the integer specifying the size of the prefix
      */
     def sums (k: Int): (Double, Double, Double) =
+        val v_ = v                                            // local access is faster
         var s0, s1, s2 = 0.0
         cfor (0, dim) { i =>
-           if i < k then          s0 += v(i)
-           else if i < dim-k then s1 += v(i)
-           else s2 += v(i)
+           if i < k then          s0 += v_(i)
+           else if i < dim-k then s1 += v_(i)
+           else s2 += v_(i)
         } // cfor
         (s0, s1, s2)
     end sums
@@ -701,11 +897,12 @@ class VectorD (val dim: Int,
      *  @param k  the integer specifying the size of the prefix
      */
     def normSqs (k: Int): (Double, Double, Double) =
+        val v_ = v                                            // local access is faster
         var s0, s1, s2 = 0.0
         cfor (0, dim) { i =>
-           if i < k then          s0 += v(i) * v(i)
-           else if i < dim-k then s1 += v(i) * v(i)
-           else s2 += v(i) * v(i)
+           if i < k then          s0 += v_(i) * v_(i)
+           else if i < dim-k then s1 += v_(i) * v_(i)
+           else s2 += v_(i) * v_(i)
         } // cfor
         (s0, s1, s2)
     end normSqs
@@ -720,6 +917,17 @@ class VectorD (val dim: Int,
     /** Compute the Manhattan norm (1-norm) of this vector.
      */
     def norm1: Double = v.fold (0.0)((s, e) => s + math.abs (e))
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the q-norm (with the root) of this vector, i.e., ||x||_q^q
+     *  @param q  the power (^q) to apply to each element e
+     */
+    def norm_qq (q: Double): Double = v.fold (0.0)((s, e) => s + math.abs (e~^q))
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the infinity norm (max absolute value) of this vector.
+     */
+    def normInf: Double = math.max (math.abs (min), math.abs (max))
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the vector that is the element-wise absolute value of this vector.
@@ -758,12 +966,33 @@ class VectorD (val dim: Int,
     def expm1: VectorD = map (math.expm1 (_))
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Cos transform this vector by using math.cos (the inverse of acos).
+     */
+    def cos: VectorD = map (math.cos (_))
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Inverse cos transform this vector by using math.acos (the inverse of cos).
+     */
+    def acos: VectorD = map (math.acos (_))
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Sin transform this vector by using math.sin (the inverse of asin).
+     */
+    def sin: VectorD = map (math.sin (_))
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Inverse sin transform this vector by using math.asin (the inverse of sin).
+     */
+    def asin: VectorD = map (math.asin (_))
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the vector containing the mid-points between adjacent elements.
      *  VectorD (for i <- 1 until dim yield 0.5 * (v(i) + v(i-1)))
      */
     def mids: VectorD = 
-        val a = Array.ofDim [Double] (dim-1)
-        cfor (1, dim) { i => a(i) = 0.5 * (v(i) + v(i-1)) }
+        val v_ = v                                            // local access is faster
+        val a  = Array.ofDim [Double] (dim-1)
+        cfor (1, dim) { i => a(i) = 0.5 * (v_(i) + v_(i-1)) }
         new VectorD (dim-1, a)
     end mids
 
@@ -773,9 +1002,10 @@ class VectorD (val dim: Int,
      *  var sum = 0.0; VectorD (for i <- v.indices yield { sum += v(i); sum })
      */
     def cumulate: VectorD =
+        val v_  = v                                            // local access is faster
         val a   = Array.ofDim [Double] (dim)
         var sum = 0.0
-        cfor (0, dim) { i => sum += v(i); a(i) = sum }
+        cfor (0, dim) { i => sum += v_(i); a(i) = sum }
         new VectorD (dim, a)
     end cumulate
 
@@ -808,16 +1038,18 @@ class VectorD (val dim: Int,
     /** Count the number of zero elements in the this vector.
      */
     def countZero: Int =
-        (Σ (indices) { i => if v(i) == 0.0 then 1 else 0 }).toInt
+        val v_ = v                                             // local access is faster
+        (Σ (indices) { i => if v_(i) == 0.0 then 1 else 0 }).toInt
     end countZero
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Convert vector to a string.
      */
     override def toString: String =
+        val v_ = v                                             // local access is faster
         val sb = new StringBuilder ("VectorD(")
         if dim == 0 then return sb.append (")").mkString
-        cfor (indices) { i => sb.append (fString.format (v(i))) }
+        cfor (indices) { i => sb.append (fString.format (v_(i))) }
         sb.replace (sb.length-2, sb.length, ")").mkString
     end toString
 
@@ -874,6 +1106,11 @@ class VectorD (val dim: Int,
     end quantile
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the first Q1 (1/4) and third Q3 (3/4) quartiles.  Note: IQR = Q3 - Q1.
+     */
+    def q1_q3: VectorD = VectorD (quantile (0.25), quantile (0.75)) 
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute the averaged median, which is the median when dim is odd and
      *  the average of the median and the next k-median when dim is even.
      */
@@ -886,7 +1123,8 @@ class VectorD (val dim: Int,
      *  @param rank  the rank order of elements in this vector
      */
     def reorder (rank: Array [Int]): VectorD =
-        new VectorD (dim, cfor (dim) { i => v(rank(i)) })
+        val v_ = v                                             // local access is faster
+        new VectorD (dim, cfor (dim) { i => v_(rank(i)) })
     end reorder
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -903,7 +1141,7 @@ class VectorD (val dim: Int,
             var (p_, r_) = (p, r)                          // use local cursors
             while p_ < r_ do
                 val pivot = ipartition (rk, p_, r_)        // partition into left (<=) and right (>=)
-                if pivot - p_ < r_ - pivot then            // recurse on the smaller subarray
+                if pivot - p_ < r_ - pivot then            // recurse on the smaller sub-array
                     iqsort (rk, p_, pivot - 1)             // recursively sort left partition
                     p_ = pivot + 1
                 else
@@ -940,9 +1178,10 @@ class VectorD (val dim: Int,
      *  @param r   the right cursor (inclusive)
      */
     private def iselsort (rk: Array [Int], p: Int, r: Int): Array [Int] =
+        val v_ = v                                             // local access is faster
         cfor (p, r+1) { i =>
             var k = i
-            cfor (i+1, r+1) { j => if v(rk(j)) < v(rk(k)) then k = j }
+            cfor (i+1, r+1) { j => if v_(rk(j)) < v_(rk(k)) then k = j }
             if i != k then iswap (rk, i, k)
         } // cfor
         rk
@@ -959,10 +1198,11 @@ class VectorD (val dim: Int,
      *  @param stop  only sort stop number of smallest elements
      */
     def iselsort (stop: Int = dim): Array [Int] = 
+        val v_ = v                                             // local access is faster
         val rk = Array.range (0, dim)
         cfor (0, stop) { i =>
             var k = i
-            cfor (i+1, dim) { j => if v(rk(j)) < v(rk(k)) then k = j }
+            cfor (i+1, dim) { j => if v_(rk(j)) < v_(rk(k)) then k = j }
             if i != k then iswap (rk, i, k)
         } // cfor
         rk.slice (0, stop)
@@ -976,9 +1216,10 @@ class VectorD (val dim: Int,
      *  @param r   the right cursor
      */
     private def ipartition (rk: Array [Int], p: Int, r: Int): Int =
-        val x = v(rk(r))                                   // pivot
-        var i = p - 1
-        cfor (p, r) { j => if v(rk(j)) <= x then { i += 1; iswap (rk, i, j) }}
+        val v_ = v                                             // local access is faster
+        val x  = v_(rk(r))                                     // pivot
+        var i  = p - 1
+        cfor (p, r) { j => if v_(rk(j)) <= x then { i += 1; iswap (rk, i, j) }}
         iswap (rk, i + 1, r)
         i + 1
     end ipartition
@@ -994,7 +1235,6 @@ class VectorD (val dim: Int,
             if v(j) < v(k) then j else if v(i) < v(k) then k else i
         else
             if v(j) > v(k) then j else if v(i) > v(k) then k else i
-        end if
     end med3
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -1021,16 +1261,18 @@ class VectorD (val dim: Int,
      *  @param k  the ending index (exclusive)
      */
     def mean (j: Int, k: Int = dim): Double =
-        if k <= j then v(j)
-        else (Σ (j, k) { i => v(i) }) / (k - j)
+        val v_ = v                                             // local access is faster
+        if k <= j then v_(j)
+        else (Σ (j, k) { i => v_(i) }) / (k - j)
     end mean
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute the centered norm-squared of this vector.
      */
     def cnormSq: Double =
+        val v_ = v                                             // local access is faster
         var e, s, ss = 0.0
-        cfor (indices) { i => e = v(i); s += e; ss += e * e }
+        cfor (indices) { i => e = v_(i); s += e; ss += e * e }
         ss - s * s / nd
     end cnormSq
 
@@ -1093,10 +1335,11 @@ class VectorD (val dim: Int,
      *  @param adjusted  whether to adjust to account for the number of elements in the sum Σ (or use dim-1)
      */
     def acov (k: Int = 1, adjusted: Boolean = true): Double =
+        val v_ = v                                             // local access is faster
         if k >= dim then flaw ("acov", s"the vector is not long enough to compute acov for lag k = $k")
         val n  = if adjusted then dim - k else dim - 1
         val mu = mean
-        (Σ (0, dim-k) { i => (v(i) - mu) * (v(i+k) - mu) }) / n
+        (Σ (0, dim-k) { i => (v_(i) - mu) * (v_(i+k) - mu) }) / n
     end acov
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -1107,9 +1350,10 @@ class VectorD (val dim: Int,
      *  @param adjusted  whether to adjust to account for the number of elements in the sum Σ (or use dim-1)
      */
     def acov (k: Int, mu: Double, adjusted: Boolean): Double =
+        val v_ = v                                             // local access is faster
         if k >= dim then flaw ("acov", s"the vector is not long enough to compute acov for lag k = $k")
         val n = if adjusted then dim - k else dim - 1
-        (Σ (0, dim-k) { i => (v(i) - mu) * (v(i+k) - mu) }) / n
+        (Σ (0, dim-k) { i => (v_(i) - mu) * (v_(i+k) - mu) }) / n
     end acov
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -1121,8 +1365,9 @@ class VectorD (val dim: Int,
      *  @param mu_y  the pre-computed mean for y
      */
     def ccov (k: Int, mu: Double, y: VectorD, mu_y: Double): Double =
+        val v_ = v                                             // local access is faster
         if k >= dim then flaw ("ccov", s"the vector is not long enough to compute ccov for lag k = $k")
-        (Σ (0, dim-k) { i => (v(i) - mu) * (y.v(i+k) - mu_y) }) / (dim-1)
+        (Σ (0, dim-k) { i => (v_(i) - mu) * (y.v(i+k) - mu_y) }) / (dim-1)
     end ccov
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -1130,11 +1375,12 @@ class VectorD (val dim: Int,
      *  @param k  the lag parameter (0 <= k < n) 
      */
     def acov_ (k: Int = 1): Double =
+        val v_ = v                                             // local access is faster
         if k >= dim then flaw ("acov_", s"the vector is not long enough to compute acov_ for lag k = $k")
         val n  = dim - k
         val ss = sums (k)
         val mu = ((ss._1 + ss._2) / n, (ss._2 + ss._3) / n)
-        (Σ (0, n) { i => (v(i) - mu._1) * (v(i+k) - mu._2) }) / n
+        (Σ (0, n) { i => (v_(i) - mu._1) * (v_(i+k) - mu._2) }) / n
     end acov_
 
 // Compute Auto-Correlation
@@ -1191,6 +1437,7 @@ class VectorD (val dim: Int,
      *  @param k  the lag parameter (0 <= k < n) 
      */
     def acorr_ (k: Int = 1): Double =
+        val v_ = v                                             // local access is faster
         if k >= dim then flaw ("acorr_", s"the vector is not long enough to compute acorr_ for lag k = $k")
         val n   = dim - k
         val ss  = sums (k)
@@ -1198,14 +1445,14 @@ class VectorD (val dim: Int,
         val mu  = ((ss._1 + ss._2) / n, (ss._2 + ss._3) / n)
         val vr  = ((sq._1 + sq._2 - (mu._1 * mu._1) * n) / n,
                    (sq._2 + sq._3 - (mu._2 * mu._2) * n) / n)
-        val s = Σ (0, n) { i => (v(i) - mu._1) * (v(i+k) - mu._2) }
+        val s = Σ (0, n) { i => (v_(i) - mu._1) * (v_(i+k) - mu._2) }
         (s / n) / (math.sqrt (vr._1) * math.sqrt (vr._2))
     end acorr_
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute Spearman's rank correlation of this vector with vector y.
      *  The `iqsort` method gives the rank order of a vector.
-     *  @see  en.wikipedia.org/wiki/Spearman%27s_rank_correlation_coefficient
+     *  @see en.wikipedia.org/wiki/Spearman%27s_rank_correlation_coefficient
      *  @param y  the other vector
      */
     infix def scorr (y: VectorD): Double =
@@ -1214,6 +1461,13 @@ class VectorD (val dim: Int,
         val s = Σ (v.indices) { i => (rk1(i) - rk2(i))~^2 }
         1 - 6 * s / (nd * (nd*nd - 1))
     end scorr
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute distance correlation of this vector with vector y.
+     *  @see en.wikipedia.org/wiki/Distance_correlation
+     *  @param y  the other vector
+     */
+//  infix def dCor (y: VectorD): Double =  // FIX -- TBD
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute the skewness of this vector.  Negative skewness indicates the
@@ -1278,6 +1532,12 @@ object VectorD:
      *  @param xs  the varargs of `Double` numbers
      */
     def apply (x: Double, xs: Double*): VectorD = new VectorD (xs.size + 1, x +: xs.toArray)
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Create a `VectorD` from a 2-tuple of doubles (`Double`, `Double`).
+     *  @param x_y  the 2-tuple of doubles
+     */
+    def apply (x_y: (Double, Double)): VectorD = new VectorD (2, Array (x_y._1, x_y._2))
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Create a `VectorD` from one or more values (repeated values String*).
@@ -1364,17 +1624,18 @@ end VectorD
  *  operations, so that one can write 2.0 + x as well as x + 2.0.
  */
 object VectorDOps:
-    extension (a: Double)
 
-        //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-        /** Compute the element-wise sum (or difference, product, quotient) of scalar a and vector x.
-         *  @param a  the scalar first operand
-         *  @param x  the vector second operand
-         */
-        def + (x: VectorD): VectorD = x + a
-        def - (x: VectorD): VectorD = -x + a
-        def * (x: VectorD): VectorD = x * a
-        def / (x: VectorD): VectorD = x.recip * a
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Extension methods for `Double` <+> `VectorD`.  Compute the element-wise sum
+     *  (or difference, product, quotient) of scalar a and vector x.
+     *  @param a  the scalar first operand
+     *  @param x  the vector second operand
+     */
+    extension (a: Double)
+        inline def + (x: VectorD): VectorD = x + a
+        inline def - (x: VectorD): VectorD = -x + a
+        inline def * (x: VectorD): VectorD = x * a
+        inline def / (x: VectorD): VectorD = x.recip * a
 
 end VectorDOps
 
@@ -1679,4 +1940,47 @@ end vectorDTest5
     println (s"case 1: time = ${tims(3)}")
 
 end vectorDTest6
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `vectorDTest7` test the dot product implementations.  Run this code for performance results.
+ *  Note, due to JIT, reordering the code may change the relative performance.
+ *  @see Timer.scala
+ *  > runMain scalation.mathstat.vectorDTest7
+ */
+@main def vectorDTest7 (): Unit =
+
+    import scala.math.sqrt
+
+    val n    = 1                          // number of repeats to get average time (gauge's amplify parameter)
+    val skip = false                      // whether to skip timing the first time through code (slow due to JIT)
+    val sz   = 1000000
+
+    val tims = Array.ofDim [Double] (4)
+
+    val x: VectorD = new VectorD (sz); cfor (0, sz) { i => x(i) = i }
+    val y: VectorD = new VectorD (sz); cfor (0, sz) { i => y(i) = sqrt (i) }
+    var z: VectorD = null
+
+// Show results
+
+    println (s"x(2) = ${x(2)}, y(2) = ${y(2)}")
+
+    tims(0) = gauge (n, skip) { z = x + y }
+    banner (s"z = x + y; z(2) = ${z(2)}")
+    println (s"case 0: z.dim = ${z.dim}, time = ${tims(0)}")
+
+    tims(1) = gauge (n, skip) { z = x - y }
+    banner (s"z = x - y; z(2) = ${z(2)}")
+    println (s"case 1: z.dim = ${z.dim}, time = ${tims(1)}")
+
+    tims(2) = gauge (n, skip) { z = x * y }
+    banner (s"z = x * y; z(2) = ${z(2)}")
+    println (s"case 2: z.dim = ${z.dim}, time = ${tims(2)}")
+
+    tims(3) = gauge (n, skip) { z = x / y }
+    banner (s"z = x / y; z(2) = ${z(2)}")
+    println (s"case 3: z.dim = ${z.dim}, time = ${tims(3)}")
+
+end vectorDTest7
 

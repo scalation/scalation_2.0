@@ -1,0 +1,95 @@
+2026.04.30 13:55:37 INFO  Started: Metals version 1.6.7 in folders 'C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0' for client Visual Studio Code 1.118.1.
+2026.04.30 13:55:37 INFO  Memory monitor started
+2026.04.30 13:55:38 WARN  Using H2 2.4.240 which is newer than the version Flyway has been verified with. The latest verified version of H2 is 2.3.232.
+Apr 30, 2026 1:55:43 PM org.eclipse.lsp4j.jsonrpc.services.GenericEndpoint notify
+INFO: Unsupported notification method: $/setTrace
+Apr 30, 2026 1:55:44 PM org.eclipse.lsp4j.jsonrpc.services.GenericEndpoint notify
+INFO: Unsupported notification method: $/setTrace
+Apr 30, 2026 1:55:47 PM org.eclipse.lsp4j.jsonrpc.services.GenericEndpoint notify
+INFO: Unsupported notification method: $/setTrace
+2026.04.30 13:55:49 INFO  running 'C:\Program Files\Java\jdk-21\bin\java.exe -Djline.terminal=jline.UnsupportedTerminal -Dsbt.log.noformat=true -Dfile.encoding=UTF-8 -jar C:\Users\youse\AppData\Local\Temp\metals16519119283091790918\sbt-launch.jar -Dbloop.export-jar-classifiers=sources bloopInstall'
+2026.04.30 13:55:49 INFO  no build target found for C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0\project\metals.sbt. Using presentation compiler with project's scala-library version: 3.3.7
+2026.04.30 13:55:49 WARN  no build target for: C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0\project\metals.sbt
+2026.04.30 13:55:49 WARN  no build target for: C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0\project\project\metals.sbt
+2026.04.30 13:55:54 INFO  [info] welcome to sbt 1.10.1 (Oracle Corporation Java 21.0.8)
+2026.04.30 13:55:55 INFO  no build target found for C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0\project\project\metals.sbt. Using presentation compiler with project's scala-library version: 3.3.7
+2026.04.30 13:55:59 INFO  [info] loading settings for project scalation_2-0-build-build from metals.sbt ...
+2026.04.30 13:56:01 INFO  [info] loading project definition from C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0\project\project
+2026.04.30 13:56:08 INFO  [info] loading settings for project scalation_2-0-build from metals.sbt ...
+2026.04.30 13:56:08 INFO  [info] loading project definition from C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0\project
+2026.04.30 13:56:18 INFO  [success] Generated .bloop\scalation_2-0-build.json
+2026.04.30 13:56:18 INFO  [success] Total time: 10 s, completed Apr 30, 2026, 1:56:19 PM
+2026.04.30 13:56:23 INFO  [info] loading settings for project scalation from build.sbt ...
+2026.04.30 13:56:23 INFO  [info] set current project to scalation (in build file:/C:/Users/youse/OneDrive/Documents/GitHub/scalation_2.0/)
+2026.04.30 13:56:26 INFO  [success] Generated .bloop\scalation-test.json
+2026.04.30 13:56:26 INFO  [success] Generated .bloop\scalation.json
+2026.04.30 13:56:26 INFO  [success] Total time: 1 s, completed Apr 30, 2026, 1:56:26 PM
+2026.04.30 13:56:26 INFO  time: ran 'sbt bloopInstall' in 37s
+2026.04.30 13:56:26 INFO  Attempting to connect to the build server...
+2026.04.30 13:56:26 INFO  Found a Bloop server running
+2026.04.30 13:56:26 INFO  tracing is disabled for protocol BSP, to enable tracing of incoming and outgoing JSON messages create an empty file at C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0\.metals\bsp.trace.json or C:\Users\youse\AppData\Local\scalameta\metals\cache\bsp.trace.json
+2026.04.30 13:56:26 INFO  Attempting to connect to the build server...
+2026.04.30 13:56:26 INFO  Found a Bloop server running
+2026.04.30 13:56:26 INFO  tracing is disabled for protocol BSP, to enable tracing of incoming and outgoing JSON messages create an empty file at C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0\project\.metals\bsp.trace.json or C:\Users\youse\AppData\Local\scalameta\metals\cache\bsp.trace.json
+2026.04.30 13:56:32 INFO  time: Connected to build server in 6.07s
+2026.04.30 13:56:32 INFO  Connected to Build server: Bloop v2.0.19
+2026.04.30 13:56:32 INFO  time: Imported build in 0.29s
+2026.04.30 13:57:05 WARN  Using H2 2.4.240 which is newer than the version Flyway has been verified with. The latest verified version of H2 is 2.3.232.
+2026.04.30 13:57:44 INFO  time: indexed workspace in 1m12s
+2026.04.30 15:10:26 INFO  Created report: Optional.empty
+2026.04.30 15:10:26 INFO  Unexpected error when compiling scalation: java.io.FileNotFoundException: <WORKSPACE>\src\main\scala... (full report at: "C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0\.metals\.reports\bloop\2026-04-30\r_Unexpected error whe..._15-10-26-090.md")
+2026.04.30 15:11:11 INFO  Created report: Optional.empty
+2026.04.30 15:11:11 INFO  Unexpected error when compiling scalation: java.io.FileNotFoundException: <WORKSPACE>\src\main\scala... (full report at: "C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0\.metals\.reports\bloop\2026-04-30\r_Unexpected error whe..._15-11-11-418.md")
+Exception in thread "metals-watch-callback-thread" java.nio.file.FileSystemException: C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0\src\main\scala\scalation\database\Normalization.scala: The process cannot access the file because it is being used by another process
+	at java.base/sun.nio.fs.WindowsException.translateToIOException(WindowsException.java:92)
+	at java.base/sun.nio.fs.WindowsException.rethrowAsIOException(WindowsException.java:103)
+	at java.base/sun.nio.fs.WindowsException.rethrowAsIOException(WindowsException.java:108)
+	at java.base/sun.nio.fs.WindowsFileSystemProvider.newByteChannel(WindowsFileSystemProvider.java:234)
+	at java.base/java.nio.file.Files.newByteChannel(Files.java:379)
+	at java.base/java.nio.file.Files.newByteChannel(Files.java:431)
+	at java.base/java.nio.file.Files.readAllBytes(Files.java:3268)
+	at scala.meta.internal.io.PlatformFileIO$.slurp(PlatformFileIO.scala:38)
+	at scala.meta.internal.io.FileIO$.slurp(FileIO.scala:18)
+	at scala.meta.internal.mtags.ScalametaCommonEnrichments$XtensionAbsolutePath.toInput(ScalametaCommonEnrichments.scala:519)
+	at scala.meta.internal.metals.MetalsEnrichments$XtensionAbsolutePathBuffers.toInputFromBuffers(MetalsEnrichments.scala:632)
+	at scala.meta.internal.metals.Compilers.$anonfun$didChange$2(Compilers.scala:336)
+	at scala.Option.getOrElse(Option.scala:201)
+	at scala.meta.internal.metals.Compilers.originInput$1(Compilers.scala:336)
+	at scala.meta.internal.metals.Compilers.$anonfun$didChange$4(Compilers.scala:353)
+	at scala.Option.getOrElse(Option.scala:201)
+	at scala.meta.internal.metals.Compilers.$anonfun$didChange$3(Compilers.scala:352)
+	at scala.Option.map(Option.scala:242)
+	at scala.meta.internal.metals.Compilers.didChange(Compilers.scala:340)
+	at scala.meta.internal.metals.MetalsLspService.onCreate(MetalsLspService.scala:389)
+	at scala.meta.internal.metals.ProjectMetalsLspService.didChangeWatchedFiles(ProjectMetalsLspService.scala:553)
+	at scala.meta.internal.metals.ProjectMetalsLspService.$anonfun$fileWatcher$3(ProjectMetalsLspService.scala:118)
+	at scala.meta.internal.metals.ProjectMetalsLspService.$anonfun$fileWatcher$3$adapted(ProjectMetalsLspService.scala:117)
+	at scala.meta.internal.metals.watcher.ProjectFileWatcher$$anon$1.loop(ProjectFileWatcher.scala:201)
+	at scala.meta.internal.metals.watcher.ProjectFileWatcher$$anon$1.run(ProjectFileWatcher.scala:205)
+2026.04.30 15:11:25 INFO  compiling scalation (40 scala sources)
+2026.04.30 15:12:10 INFO  time: compiled scalation in 44s
+2026.04.30 15:12:10 INFO  compiling scalation (578 scala sources)
+2026.04.30 15:15:01 INFO  time: code lens generation in 19s
+Apr 30, 2026 3:15:01 PM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 12
+Apr 30, 2026 3:15:02 PM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 14
+Apr 30, 2026 3:15:02 PM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 18
+Apr 30, 2026 3:15:02 PM org.eclipse.lsp4j.jsonrpc.RemoteEndpoint handleCancellation
+WARNING: Unmatched cancel notification for request id 23
+2026.04.30 15:15:09 INFO  time: compiled scalation in 2m57s
+exception caught when loading class module-info: java.lang.AssertionError: assertion failed: attempt to parse java.lang.Object from classfile
+Exception in thread "pool-8-thread-1" java.lang.InterruptedException
+	at scala.meta.internal.metals.FutureCancelToken.checkCanceled(FutureCancelToken.scala:29)
+	at scala.meta.internal.pc.CompilerAccess.onCompilerJobQueue$$anonfun$1(CompilerAccess.scala:244)
+	at scala.meta.internal.pc.CompilerJobQueue$Job.run(CompilerJobQueue.scala:153)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+2026.04.30 15:40:24 INFO  Shutting down server
+2026.04.30 15:40:24 INFO  Memory monitor stopped
+2026.04.30 15:40:24 INFO  shutting down Metals
+2026.04.30 15:40:24 INFO  Shut down connection with build server.
+2026.04.30 15:40:24 INFO  Shut down connection with build server.
+2026.04.30 15:40:25 INFO  Exiting server

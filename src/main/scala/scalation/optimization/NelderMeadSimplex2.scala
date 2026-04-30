@@ -76,7 +76,6 @@ class NelderMeadSimplex2 (f: FunctionV2S, n: Int, checkCon: Boolean = false,
             for j <- i+1 to n if simplex(j)._1 > simplex(im)._1 do im = j
             if im != i then
                 val t = simplex(i); simplex(i) = simplex(im); simplex(im) = t
-            end if
         end for
     end sort
 
@@ -176,11 +175,11 @@ class NelderMeadSimplex2 (f: FunctionV2S, n: Int, checkCon: Boolean = false,
         var diff =  simplex(0)._1 - simplex(n)._1                   // difference between f_h and f_l
 
         breakable {
-            for k <- 1 to MAX_IT do
+            for _ <- 0 until MAX_IT do
                 f_h = simplex(0)._1                                        // functional value for x_h (highest/worst)
                 f_s = simplex(1)._1                                        // functional value for x_s (second worst)
                 f_l = simplex(n)._1                                        // functional value for x_l (lowest/best)
-                val (f_c, x_c) = centroid ()                               // compute best-side centroid of simplex
+                val (_, x_c) = centroid ()                                 // compute best-side centroid of simplex, f_c not used
                 val (f_r, x_r) = reflect (x_c)                             // compute reflection point
                 val smaller = f_r <  f_l                                   // f_r smaller than best
                 val larger  = f_r >= f_s                                   // f_r at least as large as second worst
@@ -191,7 +190,6 @@ class NelderMeadSimplex2 (f: FunctionV2S, n: Int, checkCon: Boolean = false,
                     val (f_e, x_e) = expand (x_c, x_r)                     // expand beyond reflection point
                     if f_e < f_r then  { replace (x_e); break () }         // replace worst x_h with x_e
                     else { replace (x_r); break () }                       // replace worst x_h with x_r
-                end if
 
                 if larger then                                             // contract back from reflection point
                     if f_r < f_h then                                      // f_r between second worst and worst
@@ -200,7 +198,6 @@ class NelderMeadSimplex2 (f: FunctionV2S, n: Int, checkCon: Boolean = false,
                     else                                                   // f_r at least as large as worst
                         val (f_ci, x_ci) = contractIn (x_c)
                         if f_ci <= f_h then { replace (x_ci); break () }   // replace worst x_h with x_ci
-                    end if
                 end if
 
                 shrink ()                                                  // shrink the size of the simplex

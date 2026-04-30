@@ -2,35 +2,78 @@
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** @author  John Miller
  *  @version 2.0
- *  @date    Sat Mar 16 15:34:14 EDT 2024
+ *  @date    Wed Apr  2 15:37:57 EDT 2025
  *  @see     LICENSE (MIT style license file).
+ *
+ *  @see     https://github.com/scalation/scalation_2.0
  *
  *  @note    Support Functions for Database Normalization Based on Functional Dependencies (FDs)
  *           Includes implementations of the BCNF Decomposition Algorithm
+ *                                   and the 4NF  Decomposition Algorithm
  *                                   and the 3NF  Synthesis Algorithm
  *
+ *  Relation r(R) defined of Schema R
+ *  Assume X, Y ⊆ R
+ *
+ *  Functional Dependency (FD)  X -> Y
+ *           for any t, u in r,  t[X] = u[X]  =>  t[Y] = u[Y]
+ *
+ *  Multi-Valued Dependency (MVD)  X ->> Y
+ *           assuming R = XYZ, whenever (x, y1, z1) and (x, y2, z2) in r  =>
+ *                                      (x, y1, z2) and (x, y2, z1) must also be in r
+ *
  *  BCNF     Boyce-Codd Normal Form -- for all nontrivial X -> Y, X must be a superkey
+ *  4NF      Fourth Normal Form     -- for all nontrivial X ->> Y, X must be a superkey
  *  3NF      Third Normal Form      -- for all nontrivial X -> Y, X must be a superkey OR
  *                                  -- Y must consist of prime attributes
+ *
+ *  FIX: (1) improve 4NF Decomposition, (2) finish Chase Algorithm that handles both FDs and MVDs,
+ *       (3) remove the current limit for `Tableau` on the number of attributes, currently 26 "A" to "Z".
+ *       (4) remove "TreeSet" prefix when printing `Attr` without constantly calling the `cut` method
  */
 
 package scalation
 package database
 
 import scala.collection.mutable.{ArrayBuffer => VEC, SortedSet => SET}
+//import scala.runtime.ScalaRunTime.stringOf
 import scala.util.boundary, boundary.break
 
-type Attrs = SET [Char]
+// @note:  &~ means set difference (alias for diff)
+
+type Attrs   = SET [Char]                                          // type for set of attributes
+type Symbols = Array [String]                                      // types for array of symbols (@see `Tableau`)
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** Cut out "TreeSet" from the `Attrs` toString method.
+ *  @param a  the given set of attributes
+ */
+def cut (a: Attrs): String = 
+    val sa = a.toString
+    val n  = sa.indexOf ('(')
+    sa.drop (n)
+end cut
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** Cut out the prefix (e.g., "ArrayBuffer") from the `Attrs` toString method.
+ *  @param a  the given collection of sets of attributes
+ */
+def cut (a: VEC [Attrs]): String = 
+    val sa = a.toString
+    val n  = sa.indexOf ('(')
+    sa.drop (n)
+end cut
+
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `FD` case class is used to represent a Functional Dependency (x -> y).
+ *  @caveat:  Can also be be used for a Multi-Valued Dependency (MVD) x ->> y as well
  *  @param x  the Left-Hand Side (LHS) attributes of the FD
  *  @param y  the Right-Hand Side (RHS) attributes of the FD
  */
 case class FD (x: Attrs, y: Attrs):
 
-    override def toString: String =
-        s"${x.toString.replace ("TreeSet", "")} -> ${y.toString.replace ("TreeSet", "")}"
+    override def toString: String = s"${x.toString.drop (7)} -> ${y.toString.drop (7)}"
 
 end FD
 
@@ -38,8 +81,8 @@ end FD
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `Normalization` class provides methods useful in normalization theory
  *  that can be used to assist in designing relational databases.
- *  These include Closure, Superkey, Key, Losslessness, Dependency
- *  Preservation, BCNF Decomposition, Minimal Cover, and 3NF Synthesis.
+ *  These include Closure, Superkey, Key, Losslessness, Dependency, Preservation,
+ *  BCNF Decomposition, 4NF Decomposition, Minimal Cover, and 3NF Synthesis.
  *  @see `scalation.SetExt`, scalation.database.BinTree`
  *  @param r   the schema or complete set of attributes R
  *  @param fd  the given collection of Functional Dependencies (FDs)
@@ -71,7 +114,7 @@ class Normalization (r: Attrs, fd: VEC [FD]):
      *  @param fd_  the set of Functional Dependencies (FDs) to use (defaults to fd)
      */
     def rclosure (z: Attrs, ri: Attrs, fd_ : VEC [FD] = fd): Attrs =
-        closure (z & ri, fd_) & ri
+        closure (z ∩ ri, fd_) ∩ ri
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute the restricted closure of z (Z+_p) with respect to db design (set of tables)
@@ -139,8 +182,39 @@ class Normalization (r: Attrs, fd: VEC [FD]):
      */
     def key (z: Attrs, ri: Attrs = r, fd_ : VEC [FD] = fd): Boolean =
         if ! superkey (z, ri, fd_) then return false
-        z.forall ( (a: Char) => ! superkey (z &~ SET (a), ri, fd_) )
+        z.∄ ( (a: Char) => superkey (z &~ SET (a), ri, fd_) )
     end key
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Find a (global) key for relational schema R efficiently using
+     *  Algorithm based on Section 3 with modifications of
+     *  An Efficient Algorithm to Compute the Candidate Keys of a Relational Database Schema.
+     *  @author  Charles Moseley (of code)
+     *  @see https://people.eecs.ku.edu/~hossein/Pub/Journal/1996-Saiedian-TCJ.pdf
+     *  @param fd_mc  the minimal cover (mc) set of Functional Dependencies (FDs) to use (defaults to fd)
+     */
+    def findKey (fd_mc : VEC [FD] = fd): Attrs = boundary:
+                                                                   // Step 1: form sets nrhs, bhs
+        val lhs = SET [Char] ()                                    // LHS attributes
+        val rhs = SET [Char] ()                                    // RHS attributes
+        for f <- fd_mc do { lhs ++= f.x; rhs ++= f.y }             // collect sets of LHS and RHS attributes
+        val nrhs = r &~ rhs                                        // attributes not in any RHS
+        val bhs  = lhs ∩ rhs                                       // attributes in both LHS and RHS
+        debug ("findKey", s"bhs = $bhs, nrhs = $nrhs")
+
+        if closure (nrhs, fd_mc) == r then                         // Step 2: is the attribute set nrhs a key?
+            debug ("findKey", s"return since nrhs = $nrhs is a key")
+            break (nrhs)                                           // found that nrhs is a key, return skipping Step 3
+
+        for n <- 1 to bhs.size do                                  // Step 3: start with nrhs and try adding subsets of bhs
+            for ss <- bhs.subsets (n) do                           // subsets of bhs of length n
+                val key = nrhs ++ ss                               // form a possible key
+                if closure (key, fd_mc) == r then                  // is it a key?
+                    debug ("findKey", s"return since key = $key is a key")
+                    break (key)                                    // found a key, return
+
+        SET [Char] ()                                              // empty set => no key found
+    end findKey
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Determine whether the two sub-schemas { r1, r2 } represent a lossless decomposition
@@ -150,7 +224,7 @@ class Normalization (r: Attrs, fd: VEC [FD]):
      *  @param fd_  the set of Functional Dependencies (FDs) to use (defaults to fd)
      */
     def lossless (r1: Attrs, r2: Attrs, fd_ : VEC [FD] = fd): Boolean =
-        val z = closure (r1 & r2, fd_)                             // take the closure of the intersection
+        val z = closure (r1 ∩ r2, fd_)                             // take the closure of the intersection
         r1 ⊆ z || r2 ⊆ z
     end lossless
 
@@ -164,6 +238,61 @@ class Normalization (r: Attrs, fd: VEC [FD]):
         p.exists (r ⊆ rclosure_p (_, p, fd_))
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Determine whether the db design p is lossless by applying the chase algorithm
+     *  for FDs (equality generating dependencies).  When the LHSs of two rows in
+     *  a tableau agree, make their RHSs the same (i.e., make their symbols the same). 
+     *  Given FD  x ->  y and two rows (x, y1, z1) and (x, y2, z2) update the second row to (x, y1, z2).
+     *  If one of the symbols is distinguished, make both distinguished.
+     *  @param tbl  the given tableau
+     *  @param fd_  the set of Functional Dependencies (FDs) to use (defaults to fd)
+     */
+    def chaseFD (tbl: Tableau, fd_ : VEC [FD] = fd): Unit =
+        var changes = true
+        while changes do
+            changes = false
+            for f <- fd_ do changes = tbl.equateSymbols (f)
+    end chaseFD
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Determine whether the db design p is lossless by applying the chase algorithm
+     *  for MVDs (tuple generating dependencies),
+     *  Given MVD x ->> y and two rows (x, y1, z1) and (x, y2, z2) add a new row (x, y1, z2).
+     *  @param tbl  the given tableau
+     *  @param mvd  the set of Multi-Valued Dependencies (MVDs) to use
+     */
+    def chaseMVD (tbl: Tableau, mvd: VEC [FD]): Unit =
+        var changes = true
+        while changes do
+            changes = false
+            for f <- mvd do changes = tbl.genTuples (f)
+            changes = false                                   // FIX - infinite loop otherwise
+    end chaseMVD
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Determine whether the db design p is lossless by applying the chase algorithm
+     *  for FDs (equality generating dependencies) and MVDs (tuple generating dependencies).
+     *  @see `Tableau`
+     *  @param p    the set of sub-schemas defining the tables
+     *  @param fd_  the set of Functional Dependencies (FDs) to use (defaults to fd)
+     *  @param mvd  the set of Multi-Valued Dependencies (MVDs) to use
+     */
+    def chase (p: VEC [Attrs], fd_ : VEC [FD] = fd, mvd: VEC [FD] = null): Boolean =
+        val tbl = new Tableau (r, p)
+        banner (s"The initial tableau for database design p = ${cut(p)}")
+
+        if fd_ != null then chaseFD (tbl, fd_)
+        banner (s"The post FD tableau for database design p = ${cut(p)}")
+
+        if mvd != null then chaseMVD (tbl, mvd)
+        val lossless = tbl.allDistinguished ()
+        banner (s"The final tableau for database design p = ${cut(p)} is lossless = $lossless")
+        tbl.printTableau ()
+        lossless
+    end chase
+
+//  B C N F
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Find the first Functional Dependency (FD) explicitly in fd_ that violates
      *  the BCNF rule that the LHS of all applicable, nontrivial FDs are superkeys.
      *  Return null if none found.
@@ -173,7 +302,7 @@ class Normalization (r: Attrs, fd: VEC [FD]):
     def find_not_bcnf (ri: Attrs, fd_ : VEC [FD] = fd): FD = boundary:
         for f <- fd_ if f.x ⊆ ri do                                // LHS must be in Ri
             if ! superkey (f.x, ri, fd_) then                      // not a superkey w.r.t. Ri (violates BCNF)
-                val y = f.y & ri                                   // y is relevant RHS of f.y in Ri
+                val y = f.y ∩ ri                                   // y is relevant RHS of f.y in Ri
                 if y.nonEmpty then break (FD (f.x, y))             // return FD: f.x -> y
         null                                                       // none found
     end find_not_bcnf
@@ -188,7 +317,7 @@ class Normalization (r: Attrs, fd: VEC [FD]):
     def find_not_bcnf_Fp (ri: Attrs, fd_ : VEC [FD] = fd): FD = boundary:
         val k = ri.size
         for x <- ri.subsets () if x.size in (1, k-1) do            // consider possible LHSs
-            val y = rclosure (x, ri, fd_) diff x                   // nontrivial FD x -> y inside Ri
+            val y = rclosure (x, ri, fd_) &~ x                   // nontrivial FD x -> y inside Ri
             if y.nonEmpty && ! superkey (x, ri, fd_) then          // y is nonempty and x is not a superkey w.r.t Ri
                 break (FD (x, y))                                  // return FD: x -> y
         null                                                       // none found
@@ -198,25 +327,45 @@ class Normalization (r: Attrs, fd: VEC [FD]):
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** BCNF DECOMPOSITION ALGORITHM that builds a BCNF decomposition tree.
-     *  Caveat: Comment out find_not_bcnf_Fp line to only consider FDs in F.
-     *          Reorder FDs so that those with prime attributes come last.
+     *  @caveat:  Comment out find_not_bcnf_Fp line to only consider FDs in F.
+     *            Reorder FDs so that those with prime attributes come last.
      *  @param tree  the tree (sub-tree) to work off of (defaults to bcnf_root)
      *  @param ri    the i-th sub-table (defaults to r)
      *  @param fd_   the set of Functional Dependencies (FDs) to use (defaults to fd)
      */
     def bcnf_decomp (tree: BinTree [Attrs] = bcnf_root, ri: Attrs = r, fd_ : VEC [FD] = fd): Unit =
-        val f = find_not_bcnf (ri, fd_)                            // find FD in F that violates BCNF
-//      if f == null then f = find_not_bcnf_Fp (ri, fd_)           // find FD in F+ that violates BCNF
+        var f = find_not_bcnf (ri, fd_)                            // find FD in F that violates BCNF
+        if f == null then f = find_not_bcnf_Fp (ri, fd_)           // find FD in F+ that violates BCNF <<<<
         println (s"use FD $f to decompose $ri")
 
         if f != null then
-            val (r1, r2) = (f.x | f.y, ri diff f.y)
+            val (r1, r2) = (f.x ∪ f.y, ri &~ f.y)
             println (s"decompose $ri into ($r1, $r2)")
             val tleft = tree.addLeft (r1)                          // add r1 as left child
             val trigh = tree.addRigh (r2)                          // add r2 as right child
             if r1.size > 2 then bcnf_decomp (tleft, r1, fd_)       // recursive call on left sub-tree
             if r2.size > 2 then bcnf_decomp (trigh, r2, fd_)       // recursive call on right sub-tree
     end bcnf_decomp
+
+//  4 N F
+
+    private [database] val _4nf_root = new BinTree [Attrs] (r)     // root of the 4NF Decomposition Tree
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** 4NF DECOMPOSITION ALGORITHM that builds a 4NF decomposition tree.
+     *  @caveat:  Reorder FDs so that those with prime attributes come last.
+     *  FIX - order of FD and MVD can be important - defer when prime on RHS
+     *  @param mvd   the set of Multi-Valued Dependencies (MVDs) to use
+     *  @param tree  the tree (sub-tree) to work off of (defaults to _4nf_root)
+     *  @param ri    the i-th sub-table (defaults to r)
+     *  @param fd_   the set of Functional Dependencies (FDs) to use (defaults to fd)
+     */
+    def _4nf_decomp (mvd: VEC [FD], tree: BinTree [Attrs] = _4nf_root, ri: Attrs = r, fd_ : VEC [FD] = fd): Unit =
+        val deps = fd_ ++ mvd
+        bcnf_decomp (tree, ri, deps)
+    end _4nf_decomp
+
+//  3 N F
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Shrink the LHS of each Functional Dependency (FD) that contains extraneous attributes.
@@ -227,7 +376,7 @@ class Normalization (r: Attrs, fd: VEC [FD]):
             var changes = true
             while changes do
                changes = false
-               for b <- f.x if f.y ⊆ closure (f.x diff SET (b)) do 
+               for b <- f.x if f.y ⊆ closure (f.x &~ SET (b)) do 
                    f.x -= b                                        // remove extraneous attribute B
                    changes = true
     end shrink_LHS
@@ -292,45 +441,14 @@ class Normalization (r: Attrs, fd: VEC [FD]):
     end subset_tables
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Find a (global) key for relational schema R efficiently using
-     *  Algorithm based on Section 3 with modifications of
-     *  An Efficient Algorithm to Compute the Candidate Keys of a Relational Database Schema.
-     *  @author  Chaeles Moseley (of code)
-     *  @see https://people.eecs.ku.edu/~hossein/Pub/Journal/1996-Saiedian-TCJ.pdf
-     *  @param fd_mc  the minimal cover (mc) set of Functional Dependencies (FDs) to use (defaults to fd)
-     */
-    def findKey (fd_mc : VEC [FD] = fd): Attrs = boundary:
-                                                                   // Step 1: form sets nrhs, bhs
-        val lhs = SET [Char] ()                                    // LHS attributes
-        val rhs = SET [Char] ()                                    // RHS attributes
-        for f <- fd_mc do { lhs ++= f.x; rhs ++= f.y }             // collect sets of LHS and RHS attributes
-        val nrhs = r &~ rhs                                        // attributes not in any RHS
-        val bhs  = lhs & rhs                                       // attributes in both LHS and RHS
-        debug ("findKey", s"bhs = $bhs, nrhs = $nrhs")
-
-        if closure (nrhs, fd_mc) == r then                         // Step 2: is the attribute set nrhs a key?
-            debug ("findKey", s"return since nrhs = $nrhs is a key")
-            break (nrhs)                                           // found that nrhs is a key, return skipping Step 3
-
-        for n <- 1 to bhs.size do                                  // Step 3: start with nrhs and try adding subsets of bhs
-            for ss <- bhs.subsets (n) do                           // subsets of bhs of length n
-                val key = nrhs ++ ss                               // form a possible key
-                if closure (key, fd_mc) == r then                  // is it a key?
-                    debug ("findKey", s"return since key = $key is a key")
-                    break (key)                                    // found a key, return
-
-        SET [Char] ()                                              // empty set => no key found
-    end findKey
-
-    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** 3NF SYNTHESIS ALGORITHM that synthesizes tables from Functional Dependencies (FDs).
-     *  Caveat: Assumes the Functional Dependencies (FDs) constitute a MINIMAL/CANONICAL COVER.
+     *  @caveat:  Assumes the Functional Dependencies (FDs) constitute a MINIMAL/CANONICAL COVER.
      *  @param fd_mc  the minimal cover (mc) set of Functional Dependencies (FDs) to use (defaults to fd)
      */
     def _3nf_synthesis (fd_mc: VEC [FD] = fd): VEC [Attrs] =
         val mfd = merge_fds (fd_mc)                                // STEP 1: MERGE FDs with common LHS
         val p   = VEC [Attrs] ()
-        for f <- mfd do p += f.x | f.y                             // STEP 2: each FD FORMS a table
+        for f <- mfd do p += f.x ∪ f.y                             // STEP 2: each FD FORMS a table
 
         p --= subset_tables (p)                                    // STEP 3: REMOVE all SUBSET tables
 
@@ -343,6 +461,155 @@ class Normalization (r: Attrs, fd: VEC [FD]):
     end _3nf_synthesis
 
 end Normalization
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `Tableau` class support the creation is tableaux, i.e., abstract tables
+ *  containing rows of symbols (distinguished and non-distinguished).
+ *  @param r  the complete set of attributes 
+ *  @param p  the set of sub-schemas defining the tables
+ */
+class Tableau (r: Attrs, p: VEC [Attrs]):
+
+    private val debug = debugf ("Tableau", true)                    // the debug function
+    private val _A    = 'A'.toInt                                   // integer values of letter A
+    private val _a    = 'a'.toInt                                   // integer values of letter a
+    private val m     = p.size                                      // number of sub-schema/rows
+    private val n     = r.size                                      // number of attributes/columns
+    private val tabl  = new VEC [Symbols] (m)                       // storage for two-dimensional abstract table
+
+    for i <- p.indices do tabl += makeRow (p(i), i)                 // add all rows to the tableau
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Make a row for Tableau tabl, the abstract table of strings, where for row i, element j
+     *  is a distinguished (e.g., b) symbols when character j is in sub-relation p_i,
+     *  and is otherwise a non-distinguished symbol (e.g., b3).
+     *  @param ri  the cuurent sub-schema
+     *  @param i   the i-th row
+     */
+    def makeRow (ri: Attrs, i: Int): Symbols =
+        val row = Array.ofDim [String] (n)
+        for j <- 0 until n do
+            val ch: Char = (_A + j).toChar
+            val dsym = (_a + j).toChar.toString                // distinguished symbol
+            row(j) = if ri contains ch then dsym else dsym + i
+        row
+    end makeRow
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Make a new row for Tableau tabl by crossing row i with row j as follows:
+     *  Given MVD x ->> y and two rows (x, y1, z1) and (x, y2, z2) add a new row (x, y2, z1).
+     *  @param x  the LHS attributes of the MVD
+     *  @param y  the RHS attributes of the MVD
+     *  @param i  the first row
+     *  @param h  the second row
+     */
+    def makeRow (x: Attrs, y: Attrs, i: Int, j: Int): Symbols =
+        println (s"makeRow based on MVD: $x ->> $y")
+        val row = Array.ofDim [String] (n)
+        for k <- 0 until n do
+            val ch: Char = (_A + k).toChar
+            row(k) = if y contains ch then tabl(j)(k) else tabl(i)(k)
+        row
+    end makeRow
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Project the given row in the tableau onto attributes x".
+     *  @param x    the given attributes
+     *  @param row  the given row in the tableau
+     */
+    def onto (x: Attrs, row: Symbols): Symbols =
+//      debug ("onto", s"project row = ${stringOf (row)} onto attributes x = $x")
+        (for ai <- x yield { val i = ai - _A; row(i) }).toArray
+    end onto
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Equate RHS symbols for attributes/columns in the tableau for rows i and j.
+     *  @param y  the attributes to equate (make the same)
+     *  @param i  index of i-th row
+     *  @param j  index of j-th row
+     */
+    def equateRHS (y: Attrs, i: Int, j: Int): Boolean =
+        val same = onto (y, tabl(i)) sameElements onto (y, tabl(j))
+        if ! same then
+             for ak <- y do
+                 val k = ak - _A
+                 if tabl(i)(k) < tabl(j)(k) then tabl(j)(k) = tabl(i)(k)
+                 else tabl(i)(k) = tabl(j)(k)
+        end if
+        ! same
+    end equateRHS
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** For Functional Dependency (FD) f, try to equate symbols in the tableau
+     *  by comparing each row with every other row.  When two rows agree on their LHSs,
+     *  make their RHSs the same.  Return whether any symbols were changed.
+     *  @param f  the FD to use to try to equate symbols
+     */
+    def equateSymbols (f: FD): Boolean =
+        printTableau ()
+        debug ("equateSymbols", s"use FD $f to equate symbols in the tableau")
+        var change = false
+        for i <- tabl.indices; j <- 0 until i if j != i do
+            if onto (f.x, tabl(i)) sameElements onto (f.x, tabl(j)) then
+                println (s"for f.x = ${f.x}: rows i = $i and j = $j have same LHS")
+                if equateRHS (f.y, i, j) then change = true
+        end for
+        change
+    end equateSymbols
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** For Multi-Valued Dependency (MVD) f, try to generate and add new rows into the tableau
+     *  by comparing each row with every other row.  When two rows agree on their LHSs,
+     *  make their RHSs the same.  Return whether any symbols were changed.
+     *  @param f  the MVD to use to try to equate symbols
+     */
+    def genTuples (f: FD): Boolean =
+        printTableau ()
+        debug ("genTuples", s"use MVD $f to generate tuples add into the tableau")
+        var change = false
+        val nrows  = tabl.size
+        for i <- 0 until nrows; j <- 0 until i if j != i do
+            if onto (f.x, tabl(i)) sameElements onto (f.x, tabl(j)) then
+                println (s"for f.x = ${f.x}: rows i = $i and j = $j have same LHS")
+                val newRow = makeRow (f.x, f.y, i, j)
+                if ! (newRow sameElements tabl(i)) then
+                     tabl += newRow
+                     change = true
+            end if
+        end for
+        change
+    end genTuples
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Determine whether the final tableau contains a row of all distinguished symbols.
+     *  Distinguished symbols "a" to "z".  Non-distinguished symbols "a1" to "z25" where
+     *  e.g. 25 is the number of rows in the tableau.
+     */
+    def allDistinguished (): Boolean =
+        cfor (0, m) { i =>
+            if tabl(i).forall (_.length == 1) then
+                debug ("allDistinguished", s"row i = $i of tableau has all distinguished symbols")
+                return true
+        } // cfor
+        false
+    end allDistinguished
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Print the tableau.
+     */
+    def printTableau (): Unit =
+        println ("-" * (27 + 3 * n))
+        println (f"| Tableau              | ${cut (r)} |")
+        println ("-" * (27 + 3 * n))
+        for i <- 0 until m do
+            print (f"| ${cut (p(i))}%20s |")
+            for j <- 0 until n do print (f"${tabl(i)(j)}%3s")
+            println ("  |")
+        println ("-" * (27 + 3 * n))
+    end printTableau
+
+end Tableau
 
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -404,7 +671,7 @@ end normalizationTest
 /** The `normalizationTest2` main method tests the `Normalization` class.
  *  For this example some FDs may not be preserved.
  *
- *  fd = sid -> sname address phone       A -> BCD
+ *  fd = sid -> sname addr phone          A -> BCD
  *       cid -> cname desc hours pid      E -> FGHI
  *       pid -> pname rank                I -> JK
  *       sid cid -> grade                 AE -> L
@@ -419,8 +686,8 @@ end normalizationTest
 
     val r  = SET ('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L')
     val fd = VEC (FD (SET ('A'), SET ('B', 'C', 'D')),
-                  FD (SET ('E'), SET ('F', 'G', 'H', 'I')),
-                  FD (SET ('I'), SET ('J', 'K')),
+                  FD (SET ('E'), SET ('F', 'G', 'H', 'I')),        // what happens unpon swap
+                  FD (SET ('I'), SET ('J', 'K')),                  // FD order
                   FD (SET ('A', 'E'), SET ('L')))
     val p  = VEC (SET ('A', 'B', 'C', 'D'),
                   SET ('E', 'F', 'G', 'H', 'I'),
@@ -450,6 +717,7 @@ end normalizationTest
 
     banner ("Lossless?")
     println (s"lossless_ (p) = ${db.lossless_ (p)}")
+    db.chase (p, fd)
 
     banner ("Dependency Preservation?")
     for f <- fd do
@@ -463,6 +731,77 @@ end normalizationTest2
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `normalizationTest3` main method tests the `Normalization` class.
+ *  For this example some FDs may not be preserved.  Also, has an MVD.
+ *
+ *  fd = sid -> sname addr phone          A -> BCD
+ *       pid -> pname rank                I -> JK
+ *       cid -> cname desc hours pid      E -> FGHI
+ *       sid cid -> grade                 AE -> L
+ *       did -> dname office              M -> NO
+ *
+ *  mvd = pid ->> did                     I ->> M
+ *
+ *  Comment out line (1) => success
+ *  Comment out line (2) => Dependency Preservation fails
+ *  Comment out lines (1 and 2) => Losslessness and Dependency Preservation fail
+ *
+ *  > runMain scalation.database.normalizationTest3
+ */
+@main def normalizationTest3 (): Unit =
+
+    val r   = SET ('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O')
+    val fd  = VEC (FD (SET ('A'), SET ('B', 'C', 'D')),
+                  FD (SET ('I'), SET ('J', 'K')),                  // FD order
+                  FD (SET ('E'), SET ('F', 'G', 'H', 'I')),        // what id swapped
+                  FD (SET ('A', 'E'), SET ('L')),
+                  FD (SET ('M'), SET ('N', 'O')))
+    val mvd = VEC (FD (SET ('I'), SET ('M')))
+    val p   = VEC (SET ('A', 'B', 'C', 'D'),
+                  SET ('E', 'F', 'G', 'H', 'I'),
+                  SET ('E', 'J', 'K'),                             // (1) a BCNF Decomposition
+//                SET ('I', 'J', 'K'),                             // (2) 3NF Synthesis
+                  SET ('A', 'E', 'L'))
+
+    val db = Normalization (r, fd)
+
+    banner ("Schema r, Functional Dependencies fd, and DB Design p")
+    println (s"r  = $r")
+    println (s"fd = $fd")
+    println (s"p  = $p")
+
+    banner ("LHS Superkey?")
+    for f <- fd do
+        val x = f.x
+        println (s"f = $f, closure ($x) = ${db.closure (x)}, " +
+                        s"superkey ($x) = ${db.superkey (x)}")
+
+    banner ("FD Violating BCNF?")
+    println (s"find_not_bcnf (r) = ${db.find_not_bcnf (r)}")
+
+    banner ("BCNF Decomposition?")
+    db.bcnf_decomp ()
+    db.bcnf_root.printTree ()
+
+    banner ("Lossless?")
+    println (s"lossless_ (p) = ${db.lossless_ (p)}")
+    db.chase (p, fd, mvd)
+
+    banner ("Dependency Preservation?")
+    for f <- fd do
+        println (s"f = $f, preserve (f, p) = ${db.preserve (f, p)}")
+
+    banner ("Find a Global Key")
+    println (s"findKey () = ${db.findKey ()}")
+
+    banner ("4NF Decomposition?")
+    db._4nf_decomp (mvd)
+    db._4nf_root.printTree ()
+
+end normalizationTest3
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `normalizationTest4` main method tests the `Normalization` class.
  *  This example tests the BCNF Decomposition Algorithm and 3NF Synthesis Algorithm.
  *  U = Course, Teacher, Student, Grade, Hour, Room
  *
@@ -472,9 +811,9 @@ end normalizationTest2
  *       HS -> R
  *       HT -> R
  *
- *  > runMain scalation.database.normalizationTest3
+ *  > runMain scalation.database.normalizationTest4
  */
-@main def normalizationTest3 (): Unit =
+@main def normalizationTest4 (): Unit =
 
     val r  = SET ('C', 'T', 'H', 'R', 'S', 'G')
     val fd = VEC (FD (SET ('C'), SET ('T')),
@@ -502,11 +841,11 @@ end normalizationTest2
     banner ("Find a Global Key")
     println (s"findKey () = ${db.findKey ()}")
 
-end normalizationTest3
+end normalizationTest4
 
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `normalizationTest4` main method tests the `Normalization` class.
+/** The `normalizationTest5` main method tests the `Normalization` class.
  *  This example tests the 3NF Synthesis Algorithm.
  *
  *  fd = C -> ST          Cname  -> Street cciTy
@@ -514,9 +853,9 @@ end normalizationTest3
  *       B -> EY          Bname  -> assEts bcitY
  *       L -> BCM         Loanno -> Bname Cname aMount
  *
- *  > runMain scalation.database.normalizationTest4
+ *  > runMain scalation.database.normalizationTest5
  */
-@main def normalizationTest4 (): Unit =
+@main def normalizationTest5 (): Unit =
 
     val r  = SET ('A', 'B', 'C', 'E', 'L', 'M', 'N', 'S', 'T', 'Y')
     val fd = VEC (FD (SET ('C'), SET ('S')),                       // MINIMAL COVER
@@ -547,11 +886,11 @@ end normalizationTest3
     banner ("Find a Global Key")
     println (s"findKey () = ${db.findKey ()}")
 
-end normalizationTest4
+end normalizationTest5
 
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `normalizationTest5` main method tests the `Normalization` class.
+/** The `normalizationTest6` main method tests the `Normalization` class.
  *  This example tests the Minimal Cover Algorithm.
  *
  *  fd = C -> ST          Cname  -> Street cciTy
@@ -559,9 +898,9 @@ end normalizationTest4
  *       B -> EY          Bname  -> assEts bcitY
  *       L -> BCM         Loanno -> bname cname aMount
  *
- *  > runMain scalation.database.normalizationTest5
+ *  > runMain scalation.database.normalizationTest6
  */
-@main def normalizationTest5 (): Unit =
+@main def normalizationTest6 (): Unit =
 
     val r  = SET ('A', 'B', 'C', 'E', 'L', 'M', 'N', 'S', 'T', 'Y')
     val fd = VEC (FD (SET ('C'), SET ('S', 'T')),
@@ -582,11 +921,11 @@ end normalizationTest4
     banner ("Find a Global Key")
     println (s"findKey () = ${db.findKey ()}")
 
-end normalizationTest5
+end normalizationTest6
 
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `normalizationTest6` main method tests the `Normalization` class.
+/** The `normalizationTest7` main method tests the `Normalization` class.
  *  This example tests the Dependency Preservation of db design p.
  *
  *  fd = A -> B
@@ -595,9 +934,9 @@ end normalizationTest5
  *       D -> A
  *  p = { AB, BC, CD }
  *
- *  > runMain scalation.database.normalizationTest6
+ *  > runMain scalation.database.normalizationTest7
  */
-@main def normalizationTest6 (): Unit =
+@main def normalizationTest7 (): Unit =
 
     val r  = SET ('A', 'B', 'C', 'D')
     val fd = VEC (FD (SET ('A'), SET ('B')),
@@ -617,11 +956,11 @@ end normalizationTest5
     banner ("Find a Global Key")
     println (s"findKey () = ${db.findKey ()}")
 
-end normalizationTest6
+end normalizationTest7
 
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `normalizationTest7` main method tests the `Normalization` class.
+/** The `normalizationTest8` main method tests the `Normalization` class.
  *  This example tests the Dependency Preservation of db design p.
  *  Compare with Test6.
  *
@@ -631,9 +970,9 @@ end normalizationTest6
  *       A -> D                                                    // LHS & RHS swapped for this FD
  *  p = { AB, BC, CD }
  *
- *  > runMain scalation.database.normalizationTest7
+ *  > runMain scalation.database.normalizationTest8
  */
-@main def normalizationTest7 (): Unit =
+@main def normalizationTest8 (): Unit =
 
     val r  = SET ('A', 'B', 'C', 'D')
     val fd = VEC (FD (SET ('A'), SET ('B')),
@@ -653,11 +992,11 @@ end normalizationTest6
     banner ("Find a Global Key")
     println (s"findKey () = ${db.findKey ()}")
 
-end normalizationTest7
+end normalizationTest8
 
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `normalizationTest8` main method tests the `Normalization` class.
+/** The `normalizationTest9` main method tests the `Normalization` class.
  *  This example tests the findKey method (see Example 2 from FindKey paper).
  *
  *  fd = AD -> B
@@ -666,9 +1005,9 @@ end normalizationTest7
  *       B  -> C
  *       AC -> F
  *
- *  > runMain scalation.database.normalizationTest8
+ *  > runMain scalation.database.normalizationTest9
  */
-@main def normalizationTest8 (): Unit =
+@main def normalizationTest9 (): Unit =
 
     val r  = SET ('A', 'B', 'C', 'D', 'E', 'F')                    // key = AB
 //  val r  = SET ('A', 'B', 'C', 'D', 'E', 'F', 'G')               // key = ABG
@@ -685,5 +1024,5 @@ end normalizationTest7
     banner ("Find a Global Key")
     println (s"findKey () = ${db.findKey ()}")
 
-end normalizationTest8
+end normalizationTest9
 

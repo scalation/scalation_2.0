@@ -52,7 +52,6 @@ class DualSim (g: Graph, q: Graph)
                             φ(u) -= v                                  // remove vertex v from φ(u)
                             if φ(u).isEmpty then break ()              // no match for vertex u => no overall match
                             alter = true
-                        end if
                         // build newφ to contain only those vertices in φ(u_c) which also have a parent in φ(u)
                         newφ ++= φInt
                     end for
@@ -95,7 +94,6 @@ class DualSim (g: Graph, q: Graph)
                             φ(u) -= v                                  // remove vertex v from φ(u)
                             if φ(u).isEmpty then break ()              // no match for vertex u => no overall match
                             alter = true
-                        end if
                         // build newφ to contain only those vertices in φ(u_c) which also have a parent in φ(u)
                         newφ ++= φInt
                     end for

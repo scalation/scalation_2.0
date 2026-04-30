@@ -1,0 +1,25 @@
+
+-- Train on full dataset & test of full dataset (use sMAPE)
+Test5:      Forward   Backward   Stepwise   Beam-8-4   Beam-12-6
+ARX:        10.8518   10.8698    10.7936    12.1139    12.1139
+ARX_Quad:   11.0873   11.0252    10.2772    12.0658    12.0658
+ARX_SR:     10.6865   10.2134    10.7845    11.6818    11.6818
+
+-- Train on training set & test of training set (use sMAPE)
+Test6:      Forward   Backward   Stepwise   Beam-8-4   Beam-12-6
+ARX:        13.3092   12.5552    13.3092    12.2730    12.2730
+ARX_Quad:   12.8435   12.9810    13.3092    11.7798    11.7798
+ARX_SR:     11.9916   10.6376    12.8840    10.1302    10.0934
+
+-- Train on training set & test of testing set (use sMAPE)
+Test7:      Forward   Backward   Stepwise   Beam-8-4   Beam-12-6
+ARX:        13.6669   13.5415    13.6669    10.8397
+ARX_Quad:   13.5659   11.5914    13.6669    11.1094
+ARX_SR:     15.1287   14.0852    13.7285    12.2422    
+
+-- Train on training set & test of testing set (use sMAPEc)
+Test8:      Forward   Backward   Stepwise   Beam-8-4   Beam-12-6
+ARX:        
+ARX_Quad:   
+ARX_SR:     
+

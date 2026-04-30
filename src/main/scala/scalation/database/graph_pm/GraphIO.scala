@@ -172,9 +172,8 @@ object GraphIO:
      *      to which the current vertex is adjacent.
      *  @param lFile  the file containing the graph labels
      *  @param eFile  the file the edges (to create adjacency sets)
-     *  @param inverse   whether to store inverse adjacency sets (parents)
      */
-    def read2Files (lFile: String, eFile: String, inverse: Boolean = false): Graph =
+    def read2Files (lFile: String, eFile: String): Graph =
         val lLines = fromFile (lFile).getLines ()                  // get the lines from lFile
         val label  = lLines.map (x => toLabel (x.trim)).toArray    // make the label array
         val eLines = fromFile (eFile).getLines ()                  // get the lines from eFile
@@ -189,11 +188,10 @@ object GraphIO:
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Read a graph from TWO specially formatted Pajek files.
-     *  @param lFile     the file containing the graph labels
-     *  @param eFile     the file the edges (to create adjacency sets)
-     *  @param inverse   whether to store inverse adjacency sets (parents)
+     *  @param lFile  the file containing the graph labels
+     *  @param eFile  the file the edges (to create adjacency sets)
      */
-    def read2PajekFile (lFile: String, eFile: String, inverse: Boolean = false): Graph =
+    def read2PajekFile (lFile: String, eFile: String): Graph =
         val lLines = fromFile (lFile).getLines ()                  // get the lines from lFile
         val label  = lLines.map (x => toLabel (x.trim)).toArray
         val ch     = Array.ofDim [SET [Int]] (label.size)
@@ -229,7 +227,7 @@ end GraphIO
 
     val ran_graph = gGen.genRandomGraph (size, nLabels, eLabels, avDegree, inverse, "ran_graph")
     println (s"ran_graph = $ran_graph")
-    ran_graph.printG (false)
+    ran_graph.printG ()
     ran_graph.printG ()
 
     // Write the graph to a file

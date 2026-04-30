@@ -1,0 +1,141 @@
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** @author  John Miller
+ *  @version 2.0
+ *  @date    Tue Nov  4 13:44:23 EST 2025
+ *  @see     LICENSE (MIT style license file).
+ *
+ *  @note    Simple Convolutional Neural Networks (CNNs) Using Gradient Descent Optimization
+ *           Tests Incremental Gradient Descent (IGD)
+ *           Simplified version of `CNN_1D` for illustration/learning, not production
+ *
+ *  @note    the symbol ƒ indicates the derivative of function f, i.e., ƒ = f'
+ */
+
+package scalation
+package modeling
+package neuralnet
+
+import scalation.mathstat.{VectorD, MatrixD, Plot}
+import scalation.modeling.ActivationFun.reLU_                   // sigmoid activation function
+import scalation.modeling.forecasting.MakeMatrix4TS
+
+import CoFilter_1D.convs                                        // convolutional operators (s => same/padding)
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `SimpleCNN` object contains a simple dataset for testing Incremental Gradient
+ *  Descent (IGD) optimization algorithms.
+ *  @see https://nowak.ece.wisc.edu/MFML.pdf
+ */
+object SimpleCNN:
+
+    /** Sequential Data, e.g., time series or acoustic signal
+     */
+    val yy = VectorD (1, 3, 4, 2, 5, 7, 9, 8, 6, 3, 4, 2, 7, 6, 3, 1, 5, 7, 9, 8)
+
+    /** Build an input/predictor matrix (default number of lags p = 3)
+     */
+    //  MakeMatrix4TS.hp("p") = 3
+    //  val xx = ARY.buildMatrix (yy, MakeMatrix4TS.hp).drop (1)       // no intercept
+    val xx = MakeMatrix4TS.makeMatrix4L (yy, 3)
+
+end SimpleCNN
+
+import SimpleCNN.{yy, xx}
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `simpleCNN1` main function illustrates the use of Incremental Gradient Descent (IGD)
+ *  to optimize the weights/parameters of a simple (3-layer (1 hidden) 1D CNN.
+ *
+ *  Prediction Equation: z = f0(c *_c x + α)
+ *                       ŷ = f1(B^T z + β)
+ *
+ *  where x is an input vector, z is the hidden layer vector, ŷ is a predicted output vector, f0, f1
+ *  are the activation functions, c is the shared weight vector and B is the parameter matrix,
+ *  and α and β are the bias scalars/vectors.
+ *  @note: Stochastic Gradient Descent (SGD) adds stochastic selection to IGD.  In practice,
+ *  mini-batches of size 32, 64, or 128 are commonly used.
+ *  > runMain scalation.modeling.neuralnet.simpleCNN1
+ */
+@main def simpleCNN1 (): Unit =
+
+    import scalation.mathstat.MatrixDOps.⊗                      // outer product of two vectors: v1 ⊗ v2 = v1 v1.ᵀ
+                                                                // matrix where m_ij = v1_i * v2_j
+    val nx  = xx.dim2                                           // size of input data row
+    val sst = (yy - yy.mean).normSq                             // sum of squares total, per column
+    val c   = VectorD (0.1, 0.2, 0.1)                           // convolutional parameter/weight vector
+    val b   = MatrixD ((3, 1), 0.1, 0.1, 0.1)                   // parameter/weight matrix: hidden -> output
+    var α   = 0.1                                               // convolutional bias scalar
+                                                                // initial weights/parameters (random in practice)
+    val β   = VectorD (1.0)                                     // output bias vector
+    val nc  = c.dim                                             // size of convolutional filter
+
+    println (s"nx = $nx, nc = $nc, sst = $sst, xx = $xx, yy = $yy")
+
+    val η = 0.009                                               // reLU learning rate (to be tuned)
+    var u, z, v, ŷ, ε, ƒ1, δ1, ƒ0, δ0: VectorD = null
+    var g1: MatrixD = null
+    val yp = new MatrixD (yy.dim, 1)                            // save each prediction in yp
+
+    for epoch <- 1 to 10 do
+        println (s"Improvement step $epoch")
+        val sse = VectorD (0.0)
+        for i <- xx.indices do
+            val (xi, yi) = (xx(i), VectorD (yy(i)))             // randomize i for Stochastic Gradient Descent (SGD)
+
+            // forward prop: input -> hidden -> output
+            v  =                                                // convolutional pre-activation vector via 'same' convolution convs
+            z  =                                                // convolutional vector from f0 = reLU activation
+            u  =                                                // output pre-activation vector
+            ŷ  =                                                // output/prediction vector from f1 = id activation
+            ε  =                                                // error vector
+
+            // backward prop: input <- hidden <- output
+            ƒ1 =                                                // derivative (f1') for id
+            δ1 =                                                // delta correction vector via elementwise product
+            g1 =                                                // gradients vectors (matrix) via outer product ⊗
+            ƒ0 =                                                // derivative (f0') for reLU (use z.map (...))
+            δ0 =                                                // delta correction vector
+
+            // parameter updates
+            b -= g1 * η                                         // update output parameter/weight matrix
+            β -= δ1 * η                                         // update output bias vector
+            c -= convs (xi, δ0) * η                             // update convolutional weight vector
+            α -= δ0.sum * η                                     // update convolutional bias scalar
+
+            yp(i) = ŷ                                           // save i-th prediction
+            sse  += ε.normSq                                    // sum of squared errors
+        end for
+
+        val r2 = -(sse / sst - 1.0)                             // R^2 (recoded to avoid Ops clash)
+
+        println (s"""
+        u  = $u
+        z  = $z
+        v  = $v
+        ŷ  = $ŷ
+        ε  = $ε
+        ƒ1 = $ƒ1
+        δ1 = $δ1
+        g1 = $g1
+        ƒ0 = $ƒ0
+        δ0 = $δ0
+        b  = $b
+        β  = $β
+        c  = $c
+        α  = $α
+        sse= $sse
+        r2 = $r2
+        smape = ${FitM.smapeF (yy.drop(1), yp(?, 0).drop(1))}
+        """)
+    end for
+
+    new Plot (null, yy, yp(?, 0), "IGD for CNN y", lines = true)
+
+    println ("Compare smape scores with Regression")
+    val mod = new Regression (xx, yy)
+    val ypr = mod.trainNtest ()()._1
+    println (s"smape = ${FitM.smapeF (yy.drop(1), ypr.drop(1))}")   // can't forecast first value
+
+end simpleCNN1
+

@@ -54,11 +54,10 @@ class TANBayes (x: MatrixD, y: VectorI, fname_ : Array [String] = null,
 
     private val debug = debugf ("TANBayes", true)                        // debug function
 
-    modelName = "TANBayes"                                               // name of the model
+    _modelName = "TANBayes"                                              // name of the model
 
     if vc == null then
         shift2zero (x); vc = vc_fromData (x)                             // set value counts from data
-    end if
 
     private val me   = hparam("me").toDouble                             // m-estimates (me == 0 => regular MLE estimates)
     private val me_v = NaiveBayes.me_vc (me, vc)                         // for Laplace smoothing: me / vc_j for all j
@@ -113,7 +112,7 @@ class TANBayes (x: MatrixD, y: VectorI, fname_ : Array [String] = null,
         nu_Xy      = RTensorD.freq (x_, vc, y_, k)                      // Joint Frequency Tables (JFTs)
         nu_Xpy_    = RTensor4D.freq (x_, vc, parent, vc_p, y_, k)       // extended Joint Frequency Tables (JFTs)
         val nu_Xpy = freq_Xpy (x_, y_)                                  // extended Joint Frequency Tables (JFTs)
-        p_Xpy      = cProb_Xpy (x_, y_, nu_y, nu_Xy, nu_Xpy)            // extended Conditional Probability Tables (CPTs)
+        p_Xpy      = cProb_Xpy (x_, nu_y, nu_Xy, nu_Xpy)            // extended Conditional Probability Tables (CPTs)
 //      println (s"nu_Xpy  = ${stringOf (nu_Xpy)}")
 //      println (s"nu_Xpy_ = $nu_Xpy_")
     end train
@@ -159,12 +158,11 @@ class TANBayes (x: MatrixD, y: VectorI, fname_ : Array [String] = null,
     /** Compute the conditional probability of X given p and y for all xj in X,
      *  where p is the the unique x-parent of feature xj.
      *  @param x_     the training/full data/input matrix (defaults to full x)
-     *  @param y_     the training/full response/output vector (defaults to full y)
      *  @param nu_y   the class frequency of y
      *  @param nu_Xy  the joint frequency of X and y for all xj in X
      *  @param nu_Xpy the joint frequency of X, p and y for all xj in X
      */
-    def cProb_Xpy (x_ : MatrixD, y_ : VectorI, nu_y: VectorD, nu_Xy: RTensorD,
+    def cProb_Xpy (x_ : MatrixD, nu_y: VectorD, nu_Xy: RTensorD,
                    nu_Xpy: Array [Array [MatrixD]]): Array [Array [MatrixD]] =
         val p_Xpy = Array.ofDim [Array [MatrixD]] (x_.dim2)
         for j <- x_.indices2 do
@@ -211,7 +209,6 @@ class TANBayes (x: MatrixD, y: VectorI, fname_ : Array [String] = null,
                 p_yz *= ecpt (z(j))(z(p))                               // multiply in its v = (z(j), z(p)) row
             else                                                        // xj does not have a parent
                 p_yz *= ecpt (z(j))(0)                                  // multiply in its v = z(j) row
-            end if
         end for
 //      debug ("predictI", s"p_yz = $p_yz")
         p_yz.argmax ()                                                  // return class with highest probability
@@ -237,7 +234,6 @@ class TANBayes (x: MatrixD, y: VectorI, fname_ : Array [String] = null,
                 p_yz += plog (ecpt (z(j))(z(p)))                        // multiply in its v = (z(j), z(p)) row
             else                                                        // xj does not have a parant
                 p_yz += plog (ecpt (z(j))(0))                           // multiply in its v = z(j) row
-            end if
         end for
         debug ("lpredictI", s"p_yz = $p_yz")
         p_yz.argmin ()                                                  // return class with lowest positive log probability

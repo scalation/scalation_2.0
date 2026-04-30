@@ -1,6 +1,6 @@
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** @author  John Miller
+/** @author  John Miller, Yousef Fekri Dabanloo
  *  @version 2.0
  *  @date    Sun Jun 30 13:27:00 EDT 2024
  *  @see     LICENSE (MIT style license file).
@@ -30,22 +30,26 @@ import scalation.mathstat._
  *  @param adjusted  whether in `Correlogram` when calculating auto-covarainces/auto-correlations
  *                   to adjust to account for the number of elements in the sum Σ (or use dim-1)
  *                   @see `VectorD.acov`
+ *  @oaram tForm     the transformation applied
  */
 class AR (y: VectorD, hh: Int, tRng: Range = null,
           hparam: HyperParameter = AR.hp,
-          bakcast: Boolean = false, adjusted: Boolean = true)
+          bakcast: Boolean = false, adjusted: Boolean = true,
+          tForm: Transform = null)
       extends Forecaster (y, hh, tRng, hparam, bakcast)
-         with Correlogram (y, adjusted):
+         with Correlogram (y, adjusted)
+         with NoSubModels:
 
     private   val flaw = flawf ("AR")                                   // flaw function
     protected val p    = hparam("p").toInt                              // use the last p values
     protected var δ    = NO_DOUBLE                                      // drift/intercept/constant term
 
-    modelName = s"AR($p)"
+    _modelName = s"AR_$p"
+    yForm      = tForm                                                  // defined in `Fit` via hierarchy
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Train/fit an `AR` model to the times-series data in vector y_.
-     *  Estimate the coefficient vector b for a p-th order Auto-Regressive AR(p) model.
+     *  Estimate the coefficient vector b (φ) for a p-th order Auto-Regressive AR(p) model.
      *  Uses Durbin-Levinson Algorithm (in `Correlogram`) to determine the coefficients.
      *  The b (φ) vector is p-th row of psi matrix (ignoring the first (0th) column).
      *  @param x_null  the data/input matrix (ignored, pass null)
@@ -152,10 +156,36 @@ object AR:
      *  @param hh      the maximum forecasting horizon (h = 1 to hh)
      *  @param tRng    the time range, if relevant (time index may suffice)
      *  @param hparam  the hyper-parameters
+     *  @param bakcast   whether a backcasted value is prepended to the time series (defaults to false)
+     *  @param adjusted  whether in `Correlogram` when calculating auto-covarainces/auto-correlations
+     *                   to adjust to account for the number of elements in the sum Σ (or use dim-1)
+     *                   @see `VectorD.acov`
      */
-    def apply (y: VectorD, hh: Int, tRng: Range = null, hparam: HyperParameter = hp): AR =
-        new AR (y, hh, tRng, hparam)
+    def apply (y: VectorD, hh: Int, tRng: Range = null, hparam: HyperParameter = hp,
+               bakcast: Boolean = false, adjusted: Boolean = true): AR =
+        new AR (y, hh, tRng, hparam, bakcast, adjusted)
     end apply
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Create an `AR` object by building an input matrix xy and then calling the
+     *  `AR` constructor.  Also rescale the input data.
+     *  @param y        the endogenous/response vector (main time series data)
+     *  @param hh       the maximum forecasting horizon (h = 1 to hh)
+     *  @param tRng     the time range, if relevant (time index may suffice)
+     *  @param hparam   the hyper-parameters
+     *  @param bakcast  whether a backcasted value is prepended to the time series (defaults to false)
+     *  @param tForm    the z-transform (rescale to standard normal)
+     */
+    def rescale (y: VectorD, hh: Int, tRng: Range = null, hparam: HyperParameter = AR.hp,
+                 bakcast: Boolean = false, adjusted: Boolean = true): AR =
+
+        val tr_size = Model.trSize (y.dim)
+        val tForm_y = NormForm (y(0 until tr_size))                     // use (mean, std) of training set for both In-sample and TnT
+//      val tForm_y = tForm(y)                                          // use full dataset
+
+        val y_scl = tForm_y.f(y)
+        new AR (y_scl, hh, tRng, hparam, bakcast, adjusted, tForm_y)
+    end rescale
 
 end AR
 
@@ -199,7 +229,8 @@ end aRTest
     banner (s"TnT Forecasts: ${mod.modelName} on LakeLevels Dataset")
     mod.trainNtest ()()                                                   // train and test on full dataset
 
-    mod.rollValidate ()                                                 // TnT with Rolling Validation
+    mod.setSkip (0)                                                       // can use values from training set to not skip any in test
+    mod.rollValidate ()                                                   // TnT with Rolling Validation
     println (s"Final TnT Forecast Matrix yf = ${mod.getYf}")
 
 end aRTest2

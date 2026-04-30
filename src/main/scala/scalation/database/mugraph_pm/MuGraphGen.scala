@@ -12,6 +12,7 @@ package scalation
 package database
 package mugraph_pm
 
+import scala.annotation.unused
 import scala.collection.mutable.{Map, Queue}
 import scala.collection.mutable.{Set => SET}
 import scala.math.pow
@@ -75,10 +76,10 @@ class MuGraphGen (typeSelector: Char):
      *  @param inverse   whether to create inverse adjacency (parents)
      *  @param name      the name of the graph
      */
-    def genRandomGraph (size: Int, nLabels: Int, eLabels: Int, avDegree: Int, inverse: Boolean = false,
+    def genRandomGraph (size: Int, nLabels: Int, @unused eLabels: Int, avDegree: Int, inverse: Boolean = false,
                         name: String = "g"): MuGraph =
         val ch = Array.ofDim [SET [Int]] (size)
-        for i <- ch.indices do                                    // for each vertex i
+        for i <- ch.indices do                                     // for each vertex i
             val degree = rand.nextInt (avDegree * 2 + 1)           // out degree for vertex i
             val rvec   = RandomVecI (degree, size-1, i)            // random vector of integers
             ch(i)      = rvec.igen.toArray.to (SET)                // children of vertex i
@@ -228,7 +229,7 @@ class MuGraphGen (typeSelector: Char):
                 val newNodeChildren = g.ch (newNode)
                 if ! newNodeChildren.isEmpty then
                     val nncArr = newNodeChildren.toArray
-                    for i <- 0 until rand.nextInt (avDegree * 2 + 1) if nodes.size < size do
+                    for _ <- 0 until rand.nextInt (avDegree * 2 + 1) if nodes.size < size do
                         val newChild = nncArr (rand.nextInt (newNodeChildren.size))
                         if ! (nodes contains newChild) then { nodes += newChild; q.enqueue (newChild) }
                         else cycle = true
@@ -253,7 +254,7 @@ class MuGraphGen (typeSelector: Char):
         vertexMap.foreach { case (oldId, newId) => new2OldIds(newId) = oldId }
 
         // for each mapped vertex, assign its mapped children
-        val ch = Array.ofDim [SET [Int]] (size).map (x => SET [Int] ())
+        val ch = Array.ofDim [SET [Int]] (size).map (_ => SET [Int] ())
         for (v, v_ch) <- chMap do ch(vertexMap (v)) = v_ch.map (vertexMap (_))
 
         // map the vertex, edge labels
@@ -295,7 +296,6 @@ class MuGraphGen (typeSelector: Char):
                 if ! newNodeChildren.isEmpty then
                     for newChild <- newNodeChildren if nodes.size < size do
                         if ! (nodes contains newChild) then { nodes += newChild; q.enqueue (newChild) }
-                    end for
                 end if
             end while
   
@@ -303,7 +303,6 @@ class MuGraphGen (typeSelector: Char):
             if nodes.size < size then
                 nRestarts += 1
                 println ("nodes.size only " + nodes.size)
-            end if
         end while
   
         if nRestarts == maxRestarts then { println ("extractSubgraph: could not find a good query"); return null }
@@ -314,7 +313,7 @@ class MuGraphGen (typeSelector: Char):
         for x <- nodes do { newLabelMap += (x -> c); c += 1 }
         val newToOldLabels = Array.ofDim [Int] (size)
         newLabelMap.foreach { case (oldL, newL) => newToOldLabels (newL) = oldL }
-        val ch = Array.ofDim [SET [Int]] (size).map (x => SET [Int] ())
+        val ch = Array.ofDim [SET [Int]] (size).map (_ => SET [Int] ())
         for (node, children) <- chMap do ch (newLabelMap(node)) = children.map (x => newLabelMap (x))
         val label = newToOldLabels.map (x => g.label(x)).toArray
         val elab = Map [(Int, Int), SET [ValueType]] ()              // FIX to be implemented
@@ -378,7 +377,7 @@ class MuGraphGen (typeSelector: Char):
      *  @param pow      the power/exponent
      */
     private def powDistLabels (size: Int, nLabels: Int, pow: Double): Array [ValueType] =
-        Array.ofDim [ValueType] (size).map (x => powInt (0, nLabels, pow).asInstanceOf [ValueType])
+        Array.ofDim [ValueType] (size).map (_ => powInt (0, nLabels, pow).asInstanceOf [ValueType])
     end powDistLabels
   
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

@@ -22,6 +22,6 @@ package mathstat
 def func2vector (f: FunctionS2S, ab: Interval, n: Int = 100): VectorD =
     val step = (ab._2 - ab._1) / n
     var x    = ab._1 - step
-    VectorD (for i <- 0 to n yield { x += step; f(x) })
+    VectorD (for _ <- 0 to n yield { x += step; f(x) })
 end func2vector
 

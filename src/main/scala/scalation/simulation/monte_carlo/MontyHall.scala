@@ -33,7 +33,7 @@ import scalation.random.{Bernoulli, Randi}
     var winStay   = 0                                    // count wins with stay stategy
     var winSwitch = 0                                    // count wins with switch strategy
 
-    for it <- 1 to limit do
+    cfor (0, limit) { _ =>
         val car  = rg.igen                               // car randomly placed behind this door
         val pick = rg.igen                               // contestant randomly picks a door
         val show = (car, pick) match                     // Monty Hall show other non-car door
@@ -46,7 +46,7 @@ import scalation.random.{Bernoulli, Randi}
        
         if pick == car then winStay += 1                 // stay with initial pick
         else                winSwitch += 1               // switch to the other door 
-    end for
+    } // cfor
 
     println (s"winStay   = $winStay")
     println (s"winSwitch = $winSwitch")

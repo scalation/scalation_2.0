@@ -51,7 +51,7 @@ abstract class Coroutine (label: String = "cor")
         nStarted += 1
         try
             act ()
-        catch case ex: InterruptedException =>
+        catch case _ : InterruptedException =>
             debug ("run", s"INTERRUPTED coroutine $cor_id")
         end try
         nTerminated +=1
@@ -87,7 +87,6 @@ abstract class Coroutine (label: String = "cor")
             else
                 debug ("yyield", s"$cor_id STARTs that new coroutine ${that.cor_id}")
                 that.start ()
-            end if
         end if
 
         if quit then
@@ -96,7 +95,6 @@ abstract class Coroutine (label: String = "cor")
         else
             debug ("yyield", s"$cor_id WAITs on semaphore")
             _sema.acquire ()                                   // wait until resumed
-        end if
     end yyield
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -114,7 +112,6 @@ abstract class Coroutine (label: String = "cor")
             vt.start ()
         else
             pool.submit (this)
-        end if
 
     end start
 
@@ -142,7 +139,7 @@ end Coroutine
  */
 object Coroutine:
 
-    private [simulation]  var useVirtualThread = false         // whether to use regular or virtual threads
+    private [simulation]  var useVirtualThread = true          // whether to use regular or virtual threads
 
     private val debug = debugf ("Coroutine", false)            // debug function
     private val flaw  = flawf ("Coroutine")                    // flaw function
@@ -177,7 +174,6 @@ object Coroutine:
             if nCoreThreads != CORE_THREADS then threadPoolExecutor.setCorePoolSize (nCoreThreads)
         else
             flaw ("startup", "coroutine system is already started")
-        end if
     end startup
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

@@ -58,7 +58,7 @@ import java.util.Date
             if j < COLS-1 then      print ("\t" + seed + ","); if seed < 1000000 then print ("\t")
             else if i < ROWS-1 then println ("\t" + seed + ",")
             else                    println ("\t" + seed + ")")
-            for j <- 0 until streamLen do seed = r.igen              // iterate for the next seed
+            cfor (0, streamLen) { _ => seed = r.igen }                // iterate for the next seed
         end for
 
         println ("\n} // RandomSeeds3 object" +

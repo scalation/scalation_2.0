@@ -12,6 +12,7 @@ package scalation
 package modeling
 package clustering
 
+import scala.annotation.unused
 import scala.math.log
 
 import scalation.mathstat._
@@ -40,19 +41,17 @@ object GapStatistic:
             val mean  = x.mean
             val xzero = x - mean
             val svd   = new Fac_SVD (xzero)
-            val (u, s, vt) = svd.factor123 ()
+            val vt    = svd.factor123 ()._3                   // factors into u, s, vt
             val xp    = xzero * vt.transpose
             val zp    = new MatrixD (x.dim, x.dim2)
             for i <- zp.indices2 do
                 val ci = xp(?, i)
                 zp(?, i) = RandomVecD (zp.dim, ci.max, ci.min, stream = (stream + i) % 1000).gen
-            end for
             ref = (zp * vt) + mean
         else
             for i <- ref.indices2 do
                 val ci = x(?, i)
                 ref(?, i) = RandomVecD (ref.dim, ci.max, ci.min, stream = (stream + i) % 1000).gen
-            end for
         end if
         ref 
     end reference
@@ -65,7 +64,7 @@ object GapStatistic:
      *  @param clustr  the cluster assignments
      *  @param k       the number of clusters
      */
-    def cumDistance (x: MatrixD, cl: Clusterer, clustr: Array [Int], k: Int): VectorD =
+    def cumDistance (x: MatrixD, @unused cl: Clusterer, clustr: Array [Int], k: Int): VectorD =
         val sums = new VectorD (k)
         for i <- 0 until x.dim-1; j <- i+1 until x.dim if clustr(i) == clustr(j) do
             sums(clustr(j)) += dist (x(i), x(j))
@@ -95,7 +94,7 @@ object GapStatistic:
      *  @param useSVD  use SVD to account for the shape of the points (default = true)
      *  @param plot    whether or not to plot the logs of the within-SSEs (default = false)
      */
-    def kMeansPP (x: MatrixD, kMax: Int, algo: Algorithm = HARTIGAN, b: Int = 1, useSVD: Boolean = true,
+    def kMeansPP (x: MatrixD, kMax: Int, algo: Algorithm = HARTIGAN, @unused b: Int = 1, useSVD: Boolean = true,
                   plot: Boolean = false): (KMeansPPClusterer, Array [Int], Int) =
         val awk = new VectorD (kMax)
         val rwk = new VectorD (kMax)
@@ -115,13 +114,11 @@ object GapStatistic:
             if k != 0 && opk == -1 && gap(k-1) >= gap(k) - gap(k)*0.1 then
                 // TODO use stddev instead of 0.01*gap
                 opk = k
-            end if
         end for
 
         if plot then
             new Plot (kv, awk, rwk, "Actual wSSE and Reference wSSE vs. k") // , true)
             new Plot (kv, gap, null, "Gap vs. k") // , true)
-        end if
 
         val cl = KMeansPPClusterer (x, opk, algo)   // TODO used saved instead of reclustering
         (cl, cl.cluster, opk)

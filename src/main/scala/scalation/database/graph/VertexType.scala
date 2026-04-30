@@ -46,15 +46,17 @@ class VertexType (_name: String, val schema: Schema,
     private var primaryKey: String = null                                      // property used as primary key
     private val index     = Map [ValueType, Vertex] ()                         // primary key -> vertex
 
+    def getPK: String = primaryKey
+
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return a new shape object based on the shape template.
      */
     def newShapeObj: Shape =
         shape match
-        case s: Ellipse   => Ellipse ()
-        case s: Octagon   => Octagon ()
-        case s: Rectangle => Rectangle ()
-        case _            => RoundRectangle ()
+        case _ : Ellipse   => Ellipse ()
+        case _ : Octagon   => Octagon ()
+        case _ : Rectangle => Rectangle ()
+        case _             => RoundRectangle ()
         end match
     end newShapeObj
 
@@ -309,7 +311,7 @@ class VertexType (_name: String, val schema: Schema,
             for i <- rng do
                 System.out.print ("| ")
                 val tuple_i = verts(i).prop
-                for (k, v) <- tuple_i do prt (v, wj)
+                for (_, v) <- tuple_i do prt (v, wj)
                 println (" |")
             end for
             println ("|-" + "-" * len + "-|")

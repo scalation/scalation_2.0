@@ -61,7 +61,7 @@ class MarkovChain (a: MatrixD):
      */
     def next (π: VectorD, k: Int): VectorD =
         var p = π.copy
-        for i <- 1 to k do p = p *: a
+        cfor (0, k) { _ =>  p = p *: a }
         p
     end next
 
@@ -151,7 +151,6 @@ class MarkovChain (a: MatrixD):
                 else
                     aniQ.add (AnimateCommand (CreateEdge, eid, shape, label, true, ecolor,
                                               Array (bend), 0.0, i, j))
-                end if
             end for
         end if
     end animate
@@ -168,7 +167,6 @@ class MarkovChain (a: MatrixD):
             if ! (a(i).sum =~ 1.0) then
                 println (s"row $i sums to ${a(i).sum}")
                 go = false
-            end if
         } // cfor
         go
     end isStochastic
@@ -264,7 +262,7 @@ end markovChainTest2
     var lose = 0                                                    // number of games lost
     var win  = 0                                                    // number of games won
 
-    for it <- 1 to 10000 do                                         // iterate playing the game
+    cfor (0, 10000) { _ =>                                          // iterate playing the game
         var j  = 3                                                  // enter game with j dollars
         var go = true                                               // continue with the game
         while go do
@@ -272,7 +270,7 @@ end markovChainTest2
             if j == 0 then { println ("lose"); lose += 1; go = false }
             if j == 5 then { println ("win");  win  += 1; go = false }
         end while
-    end for
+    } // cfor
     println (s"loses = $lose")
     println (s"wins  = $win")
 

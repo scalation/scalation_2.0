@@ -34,6 +34,11 @@ class CoFilter_2D (width: Int = 5):
      */
     def update (mat_ : MatrixD): Unit = mat = mat_
 
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return/get the filter coefficients (needed for forward and gradient computation)
+     */
+    def coef: MatrixD = mat
+
 end CoFilter_2D
 
 
@@ -49,7 +54,7 @@ object CoFilter_2D:
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the 'valid' (no padding) convolution of cofilter matrix c and
      *  input matrix x.
-     *  Caveat: does not include reversal.
+     *  @caveat:  does not include reversal.
      *  @param c  the cofilter matrix of coefficients
      *  @param x  the input/data matrix
      */
@@ -58,7 +63,7 @@ object CoFilter_2D:
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the 'valid' (no padding) convolution of cofilter matrix c and
      *  input tensor x.
-     *  Caveat: does not include reversal.
+     *  @caveat:  does not include reversal.
      *  @param c  the cofilter matrix of coefficients
      *  @param x  the input/data tensor
      */

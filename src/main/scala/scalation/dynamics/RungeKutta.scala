@@ -11,6 +11,7 @@
 package scalation
 package dynamics
 
+import scala.annotation.nowarn
 import scala.math.{abs, E, round}
 
 import scalation.mathstat._
@@ -28,7 +29,7 @@ import scalation.mathstat._
 object RungeKutta
        extends Integrator:
 
-    private val debug = debugf ("RungeKutta", true)                // debug function
+    private val debug = debugf ("RungeKutta", true)                 // debug function
     private val flaw  = flawf ("RungeKutta")                        // flaw function
     private val ovf   = Double.MaxValue / 10.0                      // too big, may overflow
 
@@ -131,25 +132,25 @@ import RungeKutta._
     banner (s"Test ODE Solver Classic Runge-Kutta compute y(2) where y0 = y(0) = 1")
 
     banner ("Test `integrate` on y' = f(t, u) = 2.0 * t")
-    def derv1 (t: Double, y: Double) = 2.0 * t       // solution to differential equation is t^2
-    var y_ = (t: Double) => t~^2 + 1                 // symbolic solution
-    var y  = integrate (derv1, y0, t_)               // numeric solution
+    @nowarn def derv1 (t: Double, y: Double) = 2.0 * t       // solution to differential equation is t^2
+    var y_ = (t: Double) => t~^2 + 1                         // symbolic solution
+    var y  = integrate (derv1, y0, t_)                       // numeric solution
     println (s"\n==> at t = $t_: y = $y")
     println (s"\n==> correct t~^2 + 1 = ${y_(t_)}")
     println (s"\n==> error = ${y_(t_) - y}")
 
     banner ("Test `integrate` on y' = f(t, u) = y")
-    def derv2 (t: Double, y: Double) = y             // f(t, y( for differential equation is e^t
-    y_ = t => E~^t                                   // symbolic solution
-    y  = integrate (derv2, y0, t_)                   // numeric solution
+    @nowarn def derv2 (t: Double, y: Double) = y             // f(t, y) for differential equation is e^t
+    y_ = t => E~^t                                           // symbolic solution
+    y  = integrate (derv2, y0, t_)                           // numeric solution
     println (s"\n==> at t = $t_: y = $y")
     println (s"\n==> correct: E~^t = ${y_(t_)} ")
     println (s"\n==> error = ${y_(t_) - y}")
 
     banner ("Test `integrate` on y' = f(t, u) = t + y")
-    def derv3 (t: Double, y: Double) = t + y          // f(t, y) for ordinary differential equation
-    y_ = t => 2*E~^t - t - 1                          // symbolic solution
-    y  = integrate (derv3, y0, t_)                    // numeric solution
+    def derv3 (t: Double, y: Double) = t + y                  // f(t, y) for ordinary differential equation
+    y_ = t => 2*E~^t - t - 1                                  // symbolic solution
+    y  = integrate (derv3, y0, t_)                            // numeric solution
     println (s"\n==> at t = $t_: y = $y")
     println (s"\n==> correct: 2*E~^t - t - 1 = ${y_(t_)}")
     println (s"\n==> error = ${y_(t_) - y}")
@@ -176,9 +177,9 @@ end rungeKuttaTest
     println (s"\n==> at t = $t_: y = ${integrate (derv1, y0, t_)}")
 
     banner ("Test RungeKutta on System of ODEs with y0 = 1.24 at t_ = 1.0")
-    def dx_dt (t: Double, p: VectorD) =  p(1) * p(2)
-    def dy_dt (t: Double, p: VectorD) = -p(0) * p(2)
-    def dz_dt (t: Double, p: VectorD) = -.51 * p(0) * p(1)
+    @nowarn def dx_dt (t: Double, p: VectorD) =  p(1) * p(2)
+    @nowarn def dy_dt (t: Double, p: VectorD) = -p(0) * p(2)
+    @nowarn def dz_dt (t: Double, p: VectorD) = -.51 * p(0) * p(1)
     val odes = Array [DerivativeV] (dx_dt, dy_dt, dz_dt)
 
     val ti  = 0.2

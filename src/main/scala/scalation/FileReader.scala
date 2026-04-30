@@ -33,9 +33,9 @@ def readFile (fileName: String, fullPath: Boolean = false): Int =
     try
         buffer = Source.fromFile (path)                                // @see BufferedSource
     catch 
-        case ex: IOException => _flaw ("readFile", s"IOException: file $path may not exist.")
+        case _ : IOException => _flaw ("readFile", s"IOException: file $path may not exist.")
 
-    val lines  = buffer.getLines
+    val lines  = buffer.getLines ()
     var i = 0
     for line <- lines do
         println (line)
@@ -63,11 +63,11 @@ def readFileIntoArray (fileName: String, fullPath: Boolean = false, limit: Int =
     try
         buffer = Source.fromFile (path)                                // @see BufferedSource
     catch 
-        case ex: IOException => _flaw ("readFileIntoArray", s"IOException: file $path may not exist.")
+        case _ : IOException => _flaw ("readFileIntoArray", s"IOException: file $path may not exist.")
 
     val lineArr = 
     if limit <= 0 then
-        buffer.getLines.toArray
+        buffer.getLines ().toArray
     else
         val it: Iterator [String] = buffer.getLines ()                 // line iterator
         val ab = ArrayBuffer [String] ()
@@ -104,7 +104,7 @@ def readFileIter (fileName: String, fullPath: Boolean = false): (Iterator [Strin
     try
         buffer = Source.fromFile (path)                                // @see BufferedSource
     catch 
-        case ex: IOException => _flaw ("readFileIter", s"IOException: file $path may not exist.")
+        case _ : IOException => _flaw ("readFileIter", s"IOException: file $path may not exist.")
 
     val it: Iterator [String] = buffer.getLines ()                     // line iterator
     (it, buffer)                                                       // return iterator and buffer

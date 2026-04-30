@@ -19,7 +19,7 @@
  * See the NOTICE file distributed with this work for
  * additional information regarding copyright ownership.
  *
- * @authur John Miller added decreaseKey, increaseKey, printInOrder
+ * @author John Miller added decreaseKey, increaseKey, printInOrder
  */
 
 package scalation
@@ -29,7 +29,7 @@ import scala.collection.{AbstractIterator, IterableOnce, IterableOps,
 import scala.collection.generic.DefaultSerializationProxy
 import scala.collection.immutable
 import scala.collection.mutable.{AbstractIterable, ArrayBuilder, ArrayBuffer,
-                        Builder, Cloneable, Growable, Iterable, Queue}
+                                 Builder, Cloneable, Growable, Iterable, Queue}
 import scala.math.Ordering
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -59,8 +59,8 @@ import scala.math.Ordering
  *  println(pq.clone.dequeueAll) // prints ArraySeq(7, 5, 3, 2, 1)
  *  }}}
  *
- *  @tparam A    type of the elements in this priority queue.
- *  @param ord   implicit ordering used to compare the elements of type `A`.
+ *  @tparam A   type of the elements in this priority queue.
+ *  @param ord  implicit ordering used to compare the elements of type `A`.
  *
  *  @define Coll PriorityQueue
  *  @define coll priority queue
@@ -69,7 +69,8 @@ import scala.math.Ordering
  *  @define mayNotTerminateInf
  *  @define willNotTerminateInf
  */
-class PriorityQueue [A] (implicit val ord: Ordering [A])
+//class PriorityQueue [A] (implicit val ord: Ordering [A])
+class PriorityQueue [A] (using val ord: Ordering [A])
       extends AbstractIterable [A]
          with Iterable [A]
          with IterableOps [A, Iterable, PriorityQueue [A]]
@@ -101,7 +102,7 @@ class PriorityQueue [A] (implicit val ord: Ordering [A])
         end p_swap
     end ResizableArrayAccess
 
-    private val resarr = new ResizableArrayAccess [A]    // internal storage for priorty queue
+    private val resarr = new ResizableArrayAccess [A]    // internal storage for priority queue
 
     resarr.p_size0 += 1                                  // we do not use array(0) TODO: explain -- what is the first element even for?
 
@@ -161,7 +162,7 @@ class PriorityQueue [A] (implicit val ord: Ordering [A])
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Treat an `AnyRef` reference as having type A.
-     *  @param x  the refereence
+     *  @param x  the reference
      */
     private def toA (x: AnyRef): A = x.asInstanceOf [A]
 
@@ -311,8 +312,7 @@ class PriorityQueue [A] (implicit val ord: Ordering [A])
             fixDown (resarr.p_array, 1, resarr.p_size0 - 1)
             toA (result)
         else
-            throw new NoSuchElementException("no element to remove from heap")
-        end if
+            throw new NoSuchElementException ("no element to remove from heap")
     end dequeue
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -336,7 +336,6 @@ class PriorityQueue [A] (implicit val ord: Ordering [A])
             val m = resarr.p_array.indexOf (elem.asInstanceOf [AnyRef])  // find the element in the heap
             resarr.p_array(m) = upElem.asInstanceOf [AnyRef]             // replace it with its updated version
             fixDown (resarr.p_array, m, resarr.p_size0)                  // re-position in heap if needed
-        end if
     end decreaseKey
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -350,7 +349,6 @@ class PriorityQueue [A] (implicit val ord: Ordering [A])
             val m = resarr.p_array.indexOf (elem.asInstanceOf [AnyRef])  // find the element in the heap
             resarr.p_array(m) = upElem.asInstanceOf [AnyRef]             // replace it with its updated version
             fixUp (resarr.p_array, m)                                    // re-position in heap if needed
-        end if
     end increaseKey
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -400,7 +398,8 @@ class PriorityQueue [A] (implicit val ord: Ordering [A])
      *  @return  the reversed priority queue.
      */
     def reverse: PriorityQueue [A] =
-        val revq = new PriorityQueue [A]()(ord.reverse)
+//      val revq = new PriorityQueue [A]()(using ord.reverse)
+        val revq = new PriorityQueue [A](using ord.reverse)
         val n = resarr.p_size0
         revq.resarr.p_ensureSize (n)
         revq.resarr.p_size0 = n
@@ -418,7 +417,7 @@ class PriorityQueue [A] (implicit val ord: Ordering [A])
      *  @return  an iterator over all elements sorted in descending order.
      */
     def reverseIterator: Iterator [A] = new AbstractIterator [A] {
-        private [PriorityQueue] var i = resarr.p_size0 - 1
+        private var i = resarr.p_size0 - 1
         def hasNext: Boolean = i >= 1
         def next (): A =
             val n = resarr.p_array(i)
@@ -460,10 +459,10 @@ class PriorityQueue [A] (implicit val ord: Ordering [A])
     end clone
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Copy the elements in this priority's heap to to an array
+    /** Copy the elements in this priority's heap to an array.
      *  @param xs     the array to copy the elements in this priority's heap to
-     *  @param start  the index to start copu
-     *  @param len    ?
+     *  @param start  the index to start copy
+     *  @param len    the number to copy
      */
     override def copyToArray [B >: A] (xs: Array [B], start: Int, len: Int): Int =
 //      val copied = IterableOnce.elemsToCopyToArray (length, xs.length, start, len)
@@ -492,7 +491,7 @@ end PriorityQueue
 
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `PriorityQueue` object ...
+/** The `PriorityQueue` object provides methods for creating priority queues.
  */
 @SerialVersionUID(3L)
 object PriorityQueue extends SortedIterableFactory [PriorityQueue]:

@@ -97,7 +97,7 @@ end example_GasFurnaceTest
 @main def example_GasFurnaceTest2 (): Unit =
 
     import Example_GasFurnace._
-    import scala.collection.mutable.Set
+    import scala.collection.mutable.{LinkedHashSet => LSET}
 
     val (x, y) = loadData (header, "co2")
 
@@ -109,8 +109,8 @@ end example_GasFurnaceTest
         xj = scaleV (extreme (xj), (0.0, 2.0))(xj)                      // rescale vector xj to [0, 2]
         val xxj = MatrixD.fromVector (xj)
 //      val mod = SymbolicRegression.quadratic (xxj, y)
-//      val mod = SymbolicRegression.rescale (xxj, y, null, Set (1.0, 2.0, 3.0), cross = false)
-        val mod = SymbolicRegression (xxj, y, null, Set (0.5, 1.0, 2.0, 3.0), cross = false)
+//      val mod = SymbolicRegression.rescale (xxj, y, null, LSET (1.0, 2.0, 3.0), cross = false)
+        val mod = SymbolicRegression (xxj, y, null, LSET (0.5, 1.0, 2.0, 3.0), cross = false)
         mod.trainNtest ()()
         val yp = mod.predict (mod.getX)
         println (mod.summary ())

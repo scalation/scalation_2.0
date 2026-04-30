@@ -36,7 +36,7 @@ case class RandomStr (lRange: Range = 4 to 7, cRange: Range = 97 to 122, stream:
      */
     override def sgen: String =
         val sb = new StringBuilder ()
-        for i <- 0 until lrng.igen do sb.append (crng.igen.toChar)
+        cfor (0, lrng.igen) { _ => sb.append (crng.igen.toChar) }
         sb.toString
     end sgen
 
@@ -49,7 +49,7 @@ case class RandomStr (lRange: Range = 4 to 7, cRange: Range = 97 to 122, stream:
     def sgen1 (z: Range): String =
         val lrng = Randi (z.start, z.end, stream)       // random integer generator
         val sb = new StringBuilder ()
-        for i <- 0 until lrng.igen do sb.append (crng.igen.toChar)
+        cfor (0, lrng.igen) { _ => sb.append (crng.igen.toChar) }
         sb.toString
     end sgen1
 
@@ -104,7 +104,7 @@ end RandomWord
      var rs: String = null                             // variate string
 
      println ("Test: RandomStr random string generation ------------------------")
-     for k <- 0 until 30 do { rs = rsg.sgen;  println (rs) }
+     cfor (0, 30) { _ => rs = rsg.sgen; println (rs) }
 
 end randomStrTest
 
@@ -120,7 +120,7 @@ end randomStrTest
      var rs: String = null                             // variate word
 
      println ("Test: RandomWord random string generation ------------------------")
-     for k <- 0 until 30 do { rs = rsg.sgen;  println (rs) }
+     cfor (0, 30) { _ => rs = rsg.sgen; println (rs) }
 
 end randomWordTest
 

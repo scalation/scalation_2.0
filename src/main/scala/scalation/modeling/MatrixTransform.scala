@@ -87,6 +87,15 @@ def denormalizeV (mu_sig: (Double, Double)) (x_n: VectorD): VectorD =
     if sig_x =~ 0.0 then x_n else x_n * sig_x + mu_x
 end denormalizeV
 
+// ADDED FOR COVID TESTING WITH RNNs -- @author Praveen -- FIX merge with mathstat.Transform
+def logTransformV (offset: Double = 1e-8)(x: VectorD): VectorD =
+    x.map (v => math.log (v + offset))
+end logTransformV
+
+def expTransformV (offset: Double = 1e-8)(x_log: VectorD): VectorD =
+    x_log.map (v => math.exp(v) - offset)
+end expTransformV
+
 // Matrix Transformations --------------------------------------------------
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -99,23 +108,25 @@ def extreme (x: MatrixD): (VectorD, VectorD) = (x.min, x.max)
 /** Center matrix x to zero mean, column-wise, by subtracting the mean.
  *  @param x     the matrix to center
  *  @param mu_x  the vector of column means of matrix x
- */
+ *
 def center (x: MatrixD, mu_x: VectorD): MatrixD =
     val x_c = new MatrixD (x.dim, x.dim2)
     for j <- x.indices2 do x_c(?, j) = x(?, j) - mu_x(j)         // subtract column means
     x_c
 end center
+ */
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** Uncenter matrix x_c from zero mean, column-wise, by adding the mean.
  *  @param x_c   the matrix to uncenter
  *  @param mu_x  the vector of column means of matrix x_c
- */
+ *
 def uncenter (x_c: MatrixD, mu_x: VectorD): MatrixD =
     val x = new MatrixD (x_c.dim, x_c.dim2)
     for j <- x.indices2 do x(?, j) = x_c(?, j) + mu_x(j)         // add column means
     x
 end uncenter
+ */
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** Scale matrix x to the range lb to ub, column-wise: x -> x_s.
@@ -136,7 +147,6 @@ def scale (extremes: (VectorD, VectorD), bounds: (Double, Double) = (0, 1)) (x: 
             x_s(?, j) = (x(?, j) - min_x(j)) * scale + lb        // shift and scale
         else
             x_s(?, j) = x(?, j)                                  // no change
-        end if
     end for
     x_s
 end scale
@@ -160,7 +170,6 @@ def unscale (extremes: (VectorD, VectorD), bounds: (Double, Double) = (0, 1)) (x
             x(?, j) = (x_s(?, j) - lb) / scale + min_x(j)        // scale and shift
         else
             x(?, j) = x_s(?, j)                                  // no change
-        end if
     end for
     x
 end unscale
@@ -223,14 +232,14 @@ end denormalize
     println (s"(min_x, max_x) = ($min_x, $max_x)")
     println (s"(mu_x, sig_x) = ($mu_x, $sig_x)")
 
-    val x_c  = center (x, mu_x)
+//  val x_c  = center (x, mu_x)
     val x_s  = scale ((min_x, max_x), (0, 1)) (x)            // e.g., used for sigmoid activation function
     val x_s2 = scale ((min_x, max_x), (-1, 1)) (x)           // e.g., used by tanh activation function
     val x_n  = normalize ((mu_x, sig_x)) (x)                 // e.g., used for unbounded activation function
 
     println ("x    = " + x)
-    banner ("Center at 0")
-    println ("x_c  = " + x_c)
+//  banner ("Center at 0")
+//  println ("x_c  = " + x_c)
     banner ("Scale to (0, 1)")
     println ("x_s  = " + x_s)
     banner ("Scale to (-1, 1)")
@@ -238,7 +247,7 @@ end denormalize
     banner ("Normalize to (mu = 0, sig = 1)")
     println ("x_n  = " + x_n)
 
-    assert (uncenter (x_c, mu_x) == x, "uncenter")
+//  assert (uncenter (x_c, mu_x) == x, "uncenter")
     assert (unscale ((min_x, max_x), (0, 1)) (x_s)   == x, "unscale")
     assert (unscale ((min_x, max_x), (-1, 1)) (x_s2) == x, "unscale")
     assert (denormalize ((mu_x, sig_x)) (x_n) == x, "denormalize")

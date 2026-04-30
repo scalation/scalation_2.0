@@ -38,11 +38,12 @@ import Example_LakeLevels.y
 class TrendModel (y: VectorD, hh: Int, tRng: Range = null,
                   hparam: HyperParameter = null,
                   bakcast: Boolean = false)
-      extends Forecaster (y, hh, tRng, hparam, bakcast):
+      extends Forecaster (y, hh, tRng, hparam, bakcast)
+         with NoSubModels:
 
     private val flaw = flawf ("TrendModel")                             // flaw function
 
-    modelName = s"TrendModel"
+    _modelName = "TrendModel"
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Given a time series y_, train the forecasting function y_ = f(lags (y_)) + e,

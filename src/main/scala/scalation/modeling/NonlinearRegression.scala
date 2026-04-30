@@ -38,22 +38,24 @@ class NonlinearRegression (x: MatrixD, y: VectorD, f: FunctionP2S,
                            b_init: VectorD, fname_ : Array [String] = null,
                            hparam: HyperParameter = null)
       extends Predictor (x, y, fname_, hparam)
-         with Fit (dfm = x.dim2 - 1, df = x.dim - x.dim2)
-         with NoSubModels:
+         with Fit (dfr = x.dim2 - 1, df = x.dim - x.dim2)
+         with NoSubModels:                                               // FIX -- need efficient feature selection
 
     private val debug = debugf ("Nonlinear", true)                       // debug function
     private val flaw  = flawf ("Nonlinear")                              // flaw function
 
     if y != null && x.dim != y.dim then flaw ("init", "dimensions of x and y are incompatible")
 
-    modelName = "NonlinearRegression"
+    _modelName = "NonlinearRegression"
+
+    override def getBest: BestStep = super [NoSubModels].getBest
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Train the predictor by fitting the parameter vector (b-vector) in the
      *  nonlinear regression equation for the response vector y_.
      *      y = f(x, b)
      *  using the least squares method.
-     *  Caveat:  Optimizer may converge to an unsatisfactory local optima.
+     *  @caveat:  Optimizer may converge to an unsatisfactory local optima.
      *           If the regression can be linearized, use linear regression for
      *           starting solution.
      *  @param x_  the training/full data/input matrix
@@ -106,8 +108,6 @@ end NonlinearRegression
  */
 object NonlinearRegression:
 
-    private val debug = debugf ("NonlinearRegression", true)             // debug function
-
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Create a `NonlinearRegression` with automatic rescaling from a combined data matrix.
      *  @param xy      the combined data/input and response/output matrix
@@ -120,45 +120,9 @@ object NonlinearRegression:
     def apply (xy: MatrixD, f: FunctionP2S, b_init: VectorD,
                fname: Array [String] = null, hparam: HyperParameter = null)
               (col: Int = xy.dim2 - 1): NonlinearRegression =
-//      var itran: FunctionV2V = null                                    // inverse transform -> original scale
         val (x, y) = (xy.not(?, col), xy(?, col))                        // assumes the last column is the response
-
-/*                                                                       // FIX - function needs bounds
-        val x_s = if rescale then rescaleX (x, f0)
-                  else x
-        val y_s = if f0.bounds != null then { val y_i = rescaleY (y, f0); itran = y_i._2; y_i._1 }
-                  else y
-
-*/
-        val (x_s, y_s) = (x, y)
-        debug ("apply", s" scaled: x = $x_s \n scaled y = $y_s")
-        new NonlinearRegression (x_s, y_s, f, b_init, fname, hparam)
+        new NonlinearRegression (x, y, f, b_init, fname, hparam)
     end apply
-
-    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Create a `NonlinearRegression` with automatic rescaling from a data matrix and response vector.
-     *  @param x       the data/input matrix
-     *  @param y       the response/output vector
-     *  @param f       the nonlinear function f(x, b) to fit
-     *  @param b_init  the initial guess for the parameter vector b
-     *  @param fname   the feature/variable names (defaults to null)
-     *  @param hparam  the hyper-parameters (currently has none)
-     */
-    def rescale (x: MatrixD, y: VectorD, f: FunctionP2S, b_init: VectorD,
-                 fname: Array [String] = null,
-                 hparam: HyperParameter = null): NonlinearRegression =
-//      var itran: FunctionV2V = null                                    // inverse transform -> original scale
-
-/*                                                                       // FIX - function needs bounds
-        val x_s = if rescale then rescaleX (x, f0)
-                  else x
-        val y_s = if f0.bounds != null then { val y_i = rescaleY (y, f0); itran = y_i._2; y_i._1 }
-                  else y
-*/
-        val (x_s, y_s) = (x, y)
-        debug ("rescale", s" scaled: x = $x_s \n scaled y = $y_s")
-        new NonlinearRegression (x_s, y_s, f, b_init, fname, hparam)
-    end rescale
 
 end NonlinearRegression
 
@@ -188,7 +152,7 @@ end NonlinearRegression
     val b_init = VectorD (4.04, .038)                                   // initial guess for parameter vector b
 
     val mod = new NonlinearRegression (x, y, f, b_init)
-    mod.trainNtest ()()
+    mod.inSample_Test ()                                                // train and test the model
 
     val z  = VectorD (1); z(0) = 50.0                                   // predict y for one point
     val yp = mod.predict (z)

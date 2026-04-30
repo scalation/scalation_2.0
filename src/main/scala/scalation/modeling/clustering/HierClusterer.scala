@@ -13,7 +13,7 @@ package modeling
 package clustering
 
 import scala.runtime.ScalaRunTime.stringOf
-import scala.collection.mutable.{Set, ArrayBuffer}
+import scala.collection.mutable.{ArrayBuffer => VEC, Set}
 
 import scalation.mathstat._
 
@@ -33,7 +33,7 @@ class HierClusterer (x: MatrixD, k: Int = 2)
 
     private val cent  = new MatrixD (k, x.dim2)           // the k centroids of clusters
     private val to_c  = Array.ofDim [Int] (x.dim)         // assignment of vectors to clusters
-    private val clust = ArrayBuffer [Set [Int]] ()        // the list of clusters as sets
+    private val clust = VEC [Set [Int]] ()                // the list of clusters as sets
     private val sz    = new VectorI (k)
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -68,7 +68,6 @@ class HierClusterer (x: MatrixD, k: Int = 2)
             if d_ij < minDist then
                 minDist = d_ij                            // update minimum distance
                 si = clust(i); sj = clust(j)              // remember point sets i and j
-            end if
         end for
         (si, sj)
     end bestMerge

@@ -14,8 +14,6 @@
 package scalation
 package database
 
-import scala.reflect.ClassTag
-
 //  H a s h   B a s e d   I n d e x
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -28,8 +26,8 @@ import scala.reflect.ClassTag
  *  @param  initialCap  the initial hash table size (number of slots)
  *  @param  loadFactor  the load factor (number of keys over number of slots)
  */
-class JHashMap [K: ClassTag, V: ClassTag] (initialCap: Int   = 16,
-                                           loadFactor: Float = 0.75)
+class JHashMap [K, V] (initialCap: Int   = 16,
+                       loadFactor: Float = 0.75)
       extends Serializable:
 
     private   val flaw = flawf ("JHashMap")
@@ -73,7 +71,7 @@ end JHashMap
  *  @tparam V    the base-type of the values assigned to keys in this tree map
  *  @param  ord  the implicit ordering used to compare objects of type K
  */
-class JTreeMap [K: ClassTag, V: ClassTag] (implicit val ord: Ordering [K])
+class JTreeMap [K, V] (implicit val ord: Ordering [K])
       extends Serializable:
 
     private   val flaw = flawf ("JTreeMap")
@@ -127,7 +125,6 @@ end JTreeMap
         for i <- 1 to totalKeys by 2 do index.put (rng.igen, i~^2)
     else
         for i <- 1 to totalKeys by 2 do index.put (i, i~^2)
-    end if
     index.show ()
 
     banner ("Find Keys")

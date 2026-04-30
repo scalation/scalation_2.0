@@ -13,6 +13,7 @@ package modeling
 package forecasting
 package neuralforecasting
 
+import scala.collection.mutable.{LinkedHashSet => LSET}
 import scala.math.max
 
 import scalation.mathstat._
@@ -20,7 +21,7 @@ import scalation.mathstat._
 import ActivationFun._
 import neuralnet.{NeuralNet_3L, Optimizer}
 
-import Example_Covid.{loadData, response}
+import Example_Covid._
 import MakeMatrix4TS._
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -50,7 +51,7 @@ class NeuralNet_3L4TS (x: MatrixD, y: MatrixD, hh: Int, n_exo: Int, fname: Array
                        hparam: HyperParameter = hp ++ Optimizer.hp,
                        f: AFF = f_tanh, f1: AFF = f_id, val itran: FunctionV2V = null,
                        bakcast: Boolean = false)
-      extends Forecaster_D (x, y, hh, tRng, hparam, bakcast):           // no automatic backcasting, @see `NeuralNet_3L4TS.apply`
+      extends Forecaster_D (x, y, hh, fname, tRng, hparam, bakcast):    // no automatic backcasting, @see `NeuralNet_3L4TS.apply`
 
     private val debug = debugf ("NeuralNet_3L4TS", true)                // debug function
 //  private val flaw  = flawf ("NeuralNet_3L4TS")                       // flaw function
@@ -62,10 +63,10 @@ class NeuralNet_3L4TS (x: MatrixD, y: MatrixD, hh: Int, n_exo: Int, fname: Array
     private val nnet  = NeuralNet_3L.rescale (x, y, fname, nz, hparam, f, f1)
                                                                         // delegate training to neural network
 
-    modelName = s"NeuralNet_3L4TS_${p}_${q}_${f.name}_${f1.name}"
+    _modelName = s"NeuralNet_3L4TS_${p}_${q}_${f.name}_${f1.name}"
 
     debug ("init", s"$modelName with $n_exo exogenous variables and additional term spec = $spec with nneg = $nneg")
-//  debug ("init", s"[ x | y ] = ${x ++^ y}")
+    debug ("init", s"[ x | y ] = ${x ++^ y}")
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Train/fit an `NeuralNet_3L4TS` model to the times-series data in matrix x and vector y_.
@@ -114,9 +115,9 @@ class NeuralNet_3L4TS (x: MatrixD, y: MatrixD, hh: Int, n_exo: Int, fname: Array
      *  @param size  the size of dataset (full, train, or test)
      */
     override def mod_resetDF (size: Int): Unit =
-        val dfm = max (1, nnet.parameter.dim - 1)                      // degrees of freedom for model
-        debug ("mod_resetDF", s"dfm = $dfm, df = ${size-dfm}")
-        resetDF (dfm, size - dfm)
+        val dfr = max (1, nnet.parameter.dim - 1)                       // degrees of freedom for regression/model
+        debug ("mod_resetDF", s"dfr = $dfr, df = ${size-dfr}")
+        resetDF (dfr, size - dfr)
     end mod_resetDF
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -133,6 +134,33 @@ class NeuralNet_3L4TS (x: MatrixD, y: MatrixD, hh: Int, n_exo: Int, fname: Array
 //      debug ("predict", s"@t = $t, x(t) = ${x(t)}, yp = $yp vs. y_ = ${y_(t)}")
         yp
     end predict
+
+   //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Build an `NeuralNet_3L4TS` model using the cols with the selected features.
+     *  @param cols  the cols of the input matrix with selected features
+     *  @param h     the number of the horizon
+     */
+    def getModel (cols: LSET [Int] = LSET.range (0, x.dim2)): NeuralNet_3L4TS =
+        new NeuralNet_3L4TS (x(?, cols), y, hh, n_exo, cols.toArray.map (fname (_)), tRng, nz, hparam, f, f1, itran, bakcast)
+    end getModel
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Build a single-horizon `Forecaster_Reg` model using the cols with the selected features.
+     *  @param cols  the cols of the input matrix with selected features
+     *  @param h     the number of the horizon
+     */
+    def getModel_h (cols: LSET [Int] = LSET.range (0, x.dim2), h: Int = 1): Forecaster_Reg =
+        throw new UnsupportedOperationException ("getModel_h is not supported by NeuralNet_3L4TS")
+    end getModel_h
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Convert the underlying Regression Model to an `NeuralNet_3L4TS` Forecasting Model.
+     *  @param mod  the regression model to convert, e.g., the best model after feature selection
+     */
+    def convertReg2Forc (mod: Model_FS = getBest.mod): NeuralNet_3L4TS =
+        new NeuralNet_3L4TS (mod.getX, MatrixD.fromVector (mod.getY), 1, n_exo, fname,
+                             tRng, nz, hparam, f, f1, itran, bakcast)    //, tForms)
+    end convertReg2Forc
 
 end NeuralNet_3L4TS
 
@@ -167,6 +195,9 @@ object NeuralNet_3L4TS extends Scaling:
         val xy    = ARX.buildMatrix (xe, y, hparam, bakcast)
         val yy    = makeMatrix4Y (y, hh, bakcast)
         val n_exo = if xe == null then 0 else xe.dim2
+
+        println (s"apply: xy = $xy")
+        println (s"apply: yy = $yy")      // FIX -- handle NO_DOUBLE (-Infinity)
 
         new NeuralNet_3L4TS (xy, yy, hh, n_exo, fname, tRng, nz, hparam, f, f1, itran, bakcast)
     end apply
@@ -264,7 +295,8 @@ end neuralNet_3L4TSTest2
 @main def neuralNet_3L4TSTest3 (): Unit =
 
 //  val exo_vars  = NO_EXO
-    val exo_vars  = Array ("icu_patients", "hosp_patients")
+    val exo_vars  = Array ("icu_patients")
+//  val exo_vars  = Array ("icu_patients", "hosp_patients")
 //  val exo_vars  = Array ("icu_patients", "hosp_patients", "new_tests", "people_vaccinated")
     val (xxe, yy) = loadData (exo_vars, response)
     println (s"xxe.dims = ${xxe.dims}, yy.dim = ${yy.dim}")
@@ -280,34 +312,34 @@ end neuralNet_3L4TSTest2
     for j <- exo_vars.indices do
         new Plot (null, xe(?, j), null, s"x_$j (${exo_vars(j)}) vs. t", lines = true)
 
-    val p    = 5                                                         // number of lags for endogenous variable
+    val p    = 5                                                          // number of lags for endogenous variable
     val q    = 2                                                          // number of lags for exogenous variables
     val spec = 1                                                          // number of trend terms
 
     hp("p")    = p
     hp("q")    = q
     hp("spec") = spec
-    Optimizer.hp("eta") = 0.5
+    Optimizer.hp("eta") = 0.01
 
     val f_ : Array [AFF] = Array (f_sigmoid, f_id)
 
-    val mod = NeuralNet_3L4TS.rescale (xe, y, hh, f = f_(0), f1 = f_(1))    // create model for time series data
+    val mod = NeuralNet_3L4TS (xe, y, hh, f = f_(0), f1 = f_(1))            // create model for time series data
+//  val mod = NeuralNet_3L4TS.rescale (xe, y, hh, f = f_(0), f1 = f_(1))    // create model for time series data
     banner (s"In-ST Forecasts: ${mod.modelName} on COVID-19 Dataset")
 
 //  val (x_, y_, xx, yy) = NeuralNet_3L4TS.split_TnT (mod.getX, mod.getYY)
 //  val (yp, qof) = mod.trainNtest_xx (x_, y_)(xx, yy)                    // train on (x_, y_) and test on (xx, yy)
 
-    val (yp, qof) = mod.trainNtest_xx ()()                                // train on full and test on full
+    mod.trainNtest_xx ()()                                                // train on full and test on full
 
     mod.forecastAll (mod.getYy)                                           // forecast h-steps ahead (h = 1 to hh) for all y
     mod.diagnoseAll (y, mod.getYf)                                        // diagnose for all horizons
 /*
     banner (s"Feature Selection Technique: Stepwise")
-    val (cols, rSq) = mod.stepwiseSelAll (cross = false)                        // R^2, R^2 bar, sMAPE, NA
+    val (cols, rSq) = mod.stepwiseSelAll (cross = false)                  // R^2, R^2 bar, sMAPE, NA
     val k = cols.size
     println (s"k = $k, n = ${mod.getX.dim2}")
-    new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "sMAPE", "NA"),
-               s"R^2 vs n for NeuralNet_3L4TS with tech", lines = true)
+    new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for NeuralNet_3L4TS with tech", lines = true)
 //  println (mod.summary ())
 
     banner ("Feature Importance")

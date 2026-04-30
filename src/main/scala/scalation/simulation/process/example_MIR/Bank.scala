@@ -30,7 +30,7 @@ import scalation.random.RandomSeeds.N_STREAMS
  *  (1) using the transport's 'jump' method rather than its 'move' method and
  *  (2) reducing the time through the transport from minutes to seconds
  *  It also has animation turned off, by default.
- *  Caveat: must add 'from' and 'to' components before transport!!
+ *  @caveat:  must add 'from' and 'to' components before transport!!
  *  @param name       the name of the simulation model
  *  @param reps       the number of independent replications to run
  *  @param animating  whether to animate the model

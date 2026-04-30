@@ -281,7 +281,6 @@ class Model (name: String, val reps: Int = 1, animating: Boolean = true, aniRati
             reportF ()                                              // report in new window/frame
             if rep == 1 then dgAni.animate (0, 100000)              // only animate first rep
 //          dgAni.saveImage (DATA_DIR + name + ".png")
-        end if
     end fini
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

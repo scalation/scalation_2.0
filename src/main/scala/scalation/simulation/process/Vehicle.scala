@@ -16,23 +16,27 @@ import scala.collection.immutable.Map
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `Vehicle` object contains driver/vehicle characteristics/properties.
+ *  @see https://hypertextbook.com/facts/2001/MeredithBarricella.shtml
  */
 object Vehicle:
 
     /** defaults values for driver/vehicle characteristics/properties (PUBLIC access required)
+     *  units are meters and seconds
      *  @see https://en.wikipedia.org/wiki/Intelligent_driver_model
      */
     val def_prop = Map ("rt"   -> 1.0,                       // driver reaction time
-                        "amax" -> 2.0,                       // max acceleration
-                        "bmax" -> -1.5,                      // max deceleration
-                        "v0"   -> 0.0,                       // starting velocity
+                        "amax" -> 3.0,                       // max acceleration
+                        "bmax" -> -3.5,                      // max deceleration (typically higher than acceleration)
+//                      "v0"   -> 0.0,                       // starting velocity, from a stopped position
+                        "v0"   -> 33.528,                    // starting velocity, sim segment of interstate
                         "vmax" -> 33.528,                    // max velocity
                         "T"    -> 3.0,                       // safe min time headway
                         "s"    -> 5.0,                       // safe min distance headway
                         "len"  -> 4.0,                       // length of the vehicles
                         "del"  -> 4.0)                       // acceleration exponent (delta)
 
-    /** current values for driver/vehicle characteristics/properties
+    /** Current values for driver/vehicle characteristics/properties
+     *  To change a property: Vehicle.prop("amax") = 4.0
      */
     private [process] var prop = def_prop
 
@@ -50,7 +54,7 @@ object Vehicle:
     inline def del: Double  = prop("del")                    // acceleration exponent (delta)
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Set the driver/vehicle characteristics/properties to the new property values.
+    /** Set all the driver/vehicle characteristics/properties to the new property values.
      *  @param new_prop  the new property values
      */
     def setProps (new_prop: Map [String, Double]): Unit = prop = new_prop
@@ -85,6 +89,10 @@ end Vehicle
 abstract class Vehicle (name_ : String, director: Model)
          extends SimActor (name_, director)
             with Dynamics:
+
+    // Each car needs to located itself in terms of what `Pathway` it is on and what node in that `Pathway`
+//  protected var myPathway: Pathway = null
+    private [process] var myPathNode: DoublyLinkedList [Vehicle]#Node = null
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** The abstract method, 'act', is defined in each subclass to provide specific

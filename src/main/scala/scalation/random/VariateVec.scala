@@ -312,7 +312,7 @@ end PermutedVecI
 
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `RandomVecSample` class generates random sample from a population.
+/** The `RandomVecSample` class generates random samples from a population.
  *  @param pop     the size of the population (0, 1, ... pop-1)
  *  @param samp    the size of the random samples
  *  @param stream  the random number stream
@@ -324,8 +324,7 @@ case class RandomVecSample (pop: Int, samp: Int, stream: Int = 0)
 
     if samp >= pop then
         flaw ("int", "requires samp < pop")
-        throw new IllegalArgumentException ("RandomVecSample: samp too large")
-    end if
+        throw new IllegalArgumentException (s"RandomVecSample: samp = $samp is too large")
 
     private val mu  = pop / 2.0                         // mean
     private val rng = Randi0 (pop-1, stream)            // random integer generator
@@ -336,14 +335,23 @@ case class RandomVecSample (pop: Int, samp: Int, stream: Int = 0)
 
     def gen: VectorD = igen.toDouble
 
-    def igen: VectorI =
+    def igen: VectorI =                                 // randomly generate indices of size samp from a vector of size pop
         val y = VectorI.range (0, pop)                  // generate vector containing 0, 1, ... pop-1
         for i <- 0 until samp do
             val j = rng.igen                            // random integer 0 to pop-1
             val t = y(i); y(i) = y(j); y(j) = t         // swap y(i) and y(j)
         end for
-        y(0 until samp)                                 // take the first sampSize elements
+        y(0 until samp)                                 // take the first samp elements
     end igen
+
+    def isplit: (VectorI, VectorI) =                    // randomly split the indices of a vector of size pop
+        val y = VectorI.range (0, pop)                  // generate vector containing 0, 1, ... pop-1
+        for i <- 0 until samp do
+            val j = rng.igen                            // random integer 0 to pop-1
+            val t = y(i); y(i) = y(j); y(j) = t         // swap y(i) and y(j)
+        end for
+        (y(0 until samp), y(samp+1 until pop))          // take the first samp elements and the remaining elements
+    end isplit
 
 end RandomVecSample
 
@@ -352,10 +360,10 @@ end RandomVecSample
 /** The `RandomVecD` class generates a random vector of doubles.
  *  Ex: (3.0, 2.0, 0.0, 4.0, 1.0) has dim = 5 and max = 4.
  *  @param dim        the dimension/size of the vector (number of elements)
- *  @param max        generate doubles in the range min to max
+ *  @param max        generate doubles in the range min to max (@note:  max arg first)
  *  @param min        generate doubles in the range min to max
  *  @param density    sparsity basis = 1 - density
- *  @param runLength  the maximum run length
+ *  @param runLength  the maximum run length (for `repgen`)
  *  @param stream     the random number stream
  */
 case class RandomVecD (dim: Int = 10, max: Double = 20.0, min: Double = 0.0,
@@ -374,16 +382,16 @@ case class RandomVecD (dim: Int = 10, max: Double = 20.0, min: Double = 0.0,
     def igen: VectorI = gen.toInt
 
     def gen: VectorD =
-        VectorD (for i <- 0 until dim yield if rn.gen < density then rng.gen else 0.0)
+        VectorD (for _ <- 0 until dim yield if rn.gen < density then rng.gen else 0.0)
     end gen
 
     def repgen: VectorD =
         val v   = new VectorD (dim)
         var cnt = 0
         while cnt < dim do
-            val x   = rng.gen                    // value
-            val rep = ri.igen                    // repetition 
-            for j <- 0 until rep if cnt < dim do { v(cnt) = x; cnt += 1}
+            val x   = rng.gen                           // value
+            val rep = ri.igen                           // repetition 
+            cfor (0, rep) { _ => if cnt < dim then { v(cnt) = x; cnt += 1 } }
         end while
         v
     end repgen
@@ -396,7 +404,7 @@ end RandomVecD
  *  Ex: (3.0, 2.0, 0.0, 4.0, 1.0) has dim = 5.
  *  This version does not consider density or runLength.
  *  @param dim     the dimension/size of the vector (number of elements)
- *  @param max     generate doubles in the range min to max
+ *  @param max     generate doubles in the range min to max (@note:  max arg first)
  *  @param min     generate doubles in the range min to max
  *  @param stream  the random number stream
  */
@@ -425,7 +433,7 @@ end RandomVecD_
 /** The `RandomVecI` class generates a random vector of integers.
  *  Ex: (3, 2, 0, 4, 1) has dim = 5 and max = 4.
  *  @param dim     the dimension/size of the vector (number of elements)
- *  @param max     generate integers in the range min (inclusive) to max (inclusive)
+ *  @param max     generate integers in the range min (inclusive) to max (inclusive) (@note:  max arg first)
  *  @param min     generate integers in the range min (inclusive) to max (inclusive)
  *  @param skip    skip this number, i.e, do not use it
  *  @param unique  whether the integers must be unique
@@ -440,7 +448,6 @@ case class RandomVecI (dim: Int = 10, max: Int = 20, min: Int = 10, skip: Int = 
     if unique && (max-min) < dim-1 then
         flaw ("init", "requires range max-min = ${max-min) >= dim-1 = ${dim-1}")
         throw new IllegalArgumentException ("RandomVecI: range max-min is too small for unique")
-    end if
 
     private val mu  = (max - min) / 2.0                 // mean
     private val rng = Randi (min, max, stream)          // random integer generator
@@ -465,6 +472,38 @@ case class RandomVecI (dim: Int = 10, max: Int = 20, min: Int = 10, skip: Int = 
     end igen
 
 end RandomVecI
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `RandomVecIR` class generates a random vector of integers with REPLACEMENT.
+ *  @see `mathstat.StatBootstrap`
+ *  Ex: (3, 2, 0, 4, 3) has dim = 5 and max = 4.
+ *  @param dim     the dimension/size of the vector (number of elements)
+ *  @param max     generate integers in the range min (inclusive) to max (inclusive) (@note:  max arg first)
+ *  @param min     generate integers in the range min (inclusive) to max (inclusive)
+ *  @param stream  the random number stream
+ */
+case class RandomVecIR (dim: Int = 10, max: Int = 20, min: Int = 0, stream: Int = 0)
+     extends VariateVec (stream):
+
+    _discrete = true
+
+    private val mu  = (max - min) / 2.0                 // mean
+    private val rng = Randi (min, max, stream)          // random integer generator
+
+    def mean: VectorD = VectorD.fill (dim)(mu)
+
+    def pf (z: VectorD): Double = 1.0 / (max - min) ~^ dim
+
+    def gen: VectorD = igen.toDouble
+
+    def igen: VectorI =
+        val y = new VectorI (dim)
+        for i <- 0 until dim do y(i) = rng.igen
+        y
+    end igen
+
+end RandomVecIR
 
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -540,7 +579,7 @@ case class Multinomial (p: Array [Double] = Array (.4, .7, 1.0), n: Int = 5, str
 
     def gen: VectorD = igen.toDouble
 
-    def igen: VectorI = VectorI (for i <- p.indices yield dice.igen)
+    def igen: VectorI = VectorI (for _ <- p.indices yield dice.igen)
 
 end Multinomial
 
@@ -581,7 +620,7 @@ end RandomVecTrend
      banner ("Test: ProbabilityVec random vector generation ----------------")
      rvv = ProbabilityVec (10)
      println ("mean = " + rvv.mean)             // probability vector generator
-     for k <- 0 until 30 do println (rvv.gen)
+     cfor (0, 30) { _ => println (rvv.gen) }
 
      banner ("Test: NormalVec random vector generation ---------------------")
      val mu  = VectorD (5.0, 5.0)
@@ -589,60 +628,60 @@ end RandomVecTrend
                                 1.0, 2.0)
      rvv = NormalVec (mu, cov)                 // multivariate normal generator
      println ("mean = " + rvv.mean)
-     for k <- 0 until 30 do println (rvv.gen)
+     cfor (0, 30) { _ => println (rvv.gen) }
 
      banner ("Test: NormalVec_ random vector generation --------------------")
      val sig = VectorD (2.0, 1.0)
      rvv = NormalVec_ (mu, sig)           // ind. multivariate normal generator
      println ("mean = " + rvv.mean)
-     for k <- 0 until 30 do println (rvv.gen)
+     cfor (0, 30) { _ => println (rvv.gen) }
 
      banner ("Test: PermutedVecD random vector generation ------------------")
      val x = VectorD (1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0)
      rvv = PermutedVecD (x)                     // random permutation generator
      println ("mean = " + rvv.mean)
-     for k <- 0 until 30 do println (rvv.gen)
+     cfor (0, 30) { _ => println (rvv.gen) }
 
      banner ("Test: PermutedVecI random vector generation ------------------")
      val y = VectorI (1, 2, 3, 4, 5, 6, 7, 8, 9)
      rvv = PermutedVecI (y)                     // random permutation generator
      println ("mean = " + rvv.mean)
-     for k <- 0 until 30 do println (rvv.igen)
+     cfor (0, 30) { _ => println (rvv.igen) }
 
      banner ("Test: RandomVecSample random vector generation ---------------")
      rvv = RandomVecSample (10, 5)             // random permutation generator
      println ("mean = " + rvv.mean)
-     for k <- 0 until 30 do println (rvv.igen)
+     cfor (0, 30) { _ => println (rvv.igen) }
 
      banner ("Test: RandomVecD random vector generation --------------------")
      rvv = RandomVecD ()                     // random vector generator doubles
      println ("mean = " + rvv.mean)
-     for k <- 0 until 30 do println (rvv.gen)
+     cfor (0, 30) { _ => println (rvv.gen) }
 
      banner ("Test: RandomVecD_ random vector generation -------------------")
      rvv = RandomVecD_ (2, VectorD (10, 8), VectorD (0, 0))  // random vector generator doubles
      println ("mean = " + rvv.mean)
-     for k <- 0 until 30 do println (rvv.gen)
+     cfor (0, 30) { _ => println (rvv.gen) }
 
      banner ("Test: RandomVecI random vector generation --------------------")
      rvv = RandomVecI ()                        // random vector generator ints
      println ("mean = " + rvv.mean)
-     for k <- 0 until 30 do println (rvv.igen)
+     cfor (0, 30) { _ => println (rvv.igen) }
 
      banner ("Test: RandomVecS random vector generation --------------------")
      rvv = RandomVecS ()                     // random vector generator strings
      println ("mean = " + rvv.mean)
-     for k <- 0 until 30 do println (rvv.asInstanceOf [RandomVecS].sgen)
+     cfor (0, 30) { _ => println (rvv.asInstanceOf [RandomVecS].sgen) }
 
      banner ("Test: Multinomial random vector generation --------------------")
      rvv = Multinomial ()                        // random multinomial generator
      println ("mean = " + rvv.mean)
-     for k <- 0 until 30 do println (rvv.igen)
+     cfor (0, 30) { _ => println (rvv.igen) }
 
      banner ("Test: RandomVecTrend random vector generation -----------------")
      rvv = RandomVecTrend ()                     // time-series vector generator
      println ("mean = " + rvv.mean)
-     for k <- 0 until 30 do println (rvv.gen)
+     cfor (0, 30) { _ => println (rvv.gen) }
 
 end variateVecTest
 

@@ -123,7 +123,6 @@ class LSTM (x: MatrixD, y: MatrixD, fname: Array [String] = null, n_mem: Int = 8
             else
                 yp(t) = V * h(t) + b_V                                 // activation: id for forecasting
                 L(t)  = (y(t) - yp(t)).normSq	                       // sse loss function
-            end if
         end for
     end forward
 
@@ -152,16 +151,16 @@ class LSTM (x: MatrixD, y: MatrixD, fname: Array [String] = null, n_mem: Int = 8
 
             dIn = dh * (_1 - z(t)) * tanhD (c(t))                      // input to tanh for candidate mixin c
             c  += (dIn, x(t), h(t-1) * r(t))                           // update partials for c mixin
-            dhr = Wc.𝐓 * dIn                                           // 𝐓 => matrix transpose
+            dhr = Wc.ᵀ * dIn                                           // ᵀ => matrix transpose
             dh  = dhr * r(t)
 
             dIn = dhr * h(t-1) * sigmoidD (r(t))                       // input to sigmoid reset gate r
             r  += (dIn, x(t), h(t-1))                                  // update partials for r gate
-            dh += Wr.𝐓 * dIn + dh_bk * z(t)
+            dh += Wr.ᵀ * dIn + dh_bk * z(t)
 
             dIn = dh_bk * (c(t) - h(t-1)) * sigmoidD (z(t))            // input to sigmoid update gate z
             z  += (dIn, x(t), h(t-1))                                  // update partials for z gate
-            dh += Wz.𝐓 * dIn
+            dh += Wz.ᵀ * dIn
         end for
 
         // end case @ time t = 0 -> use h_m1 for hidden state
@@ -170,16 +169,16 @@ class LSTM (x: MatrixD, y: MatrixD, fname: Array [String] = null, n_mem: Int = 8
 
         dIn = dh * (_1 - z(0)) * tanhD (c(0))
         c  += (dIn, x(0), h_m1 * r(0))                                 // update partials for c mixin @ t = 0
-        dhr = Wc.𝐓 * dIn
+        dhr = Wc.ᵀ * dIn
         dh_m1 += dhr * r(0)
 
         dIn = dhr * h_m1 * sigmoidD (r(0))
         r  += (dIn, x(0), h_m1)                                        // update partials for r gate @ t = 0
-        dh_m1 += Wr.𝐓 * dIn + dh * z(0)
+        dh_m1 += Wr.ᵀ * dIn + dh * z(0)
 
         dIn = dh * (c(0) - h_m1) * sigmoidD (z(0))
         z  += (dIn, x(0), h_m1)                                        // update partials for z gate @ t = 0
-        dh_m1 += Wz.𝐓 * dIn
+        dh_m1 += Wz.ᵀ * dIn
     end backward
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

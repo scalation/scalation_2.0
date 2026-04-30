@@ -6,10 +6,19 @@
  *  @see     LICENSE (MIT style license file).
  *
  *  @note    Collection of Simple Imputation Techniques for Missing Values or Outliers
+ *
+ *  Common Imputation Techniques:  Multiple Imputation of Chained Equations (MICE),
+ *  Regression Imputation (RI), kNN, Decision Trees, Random Forests (missForest), SoftImpute
+ *
+ *  FIX -- implement Multiple Imputation of Chained Equations (MICE)
+ *  @see https://pmc.ncbi.nlm.nih.gov/articles/PMC3074241/
+ *  @see https://www.machinelearningplus.com/machine-learning/mice-imputation
  */
 
 package scalation
 package modeling
+
+import scala.annotation.unused
 
 import scalation.mathstat._
 import scalation.random.Normal
@@ -17,10 +26,13 @@ import scalation.random.Normal
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `Imputation` trait specifies an imputation operation called impute to be defined
  *  by the objects implementing it, i.e.,
- *      `ImputeRegression`  - impute missing values using `SimpleRegression`
+ *      `ImputeMICE`        - impute missing values using MICE
+ *      `ImputeMRegression` - impute missing values using `Regression` (RI)
+ *      `ImputeSRegression` - impute missing values using `SimpleRegression`
  *      `ImputeForward`     - impute missing values using previous values and slopes
  *      `ImputeBackward`    - impute missing values using subsequent values and slopes
- *      `ImputeMean`        - impute missing values usind the filtered mean
+ *      `ImputeMean`        - impute missing values using the filtered mean
+ *      `ImputeMedian`      - impute missing values using the filtered median
  *      `ImputeNormal`      - impute missing values using the median of Normal random variates
  *      `ImputeMovingAvg`   - impute missing values using the moving average
  *      `ImputeNormalWin`   - impute missing values using the median of Normal random variates for a window
@@ -119,14 +131,9 @@ trait Imputation:
      */
     protected def nextVal (x: VectorD, i: Int): Double =
         val j = x.indexWhere (_ != missVal, i)                         // find first non-missing from i
+        debug ("nextVal", s"unable to find any non-missing values from $i to ${x.dim -1}")
         if j >= 0 then x(j) else missVal
     end nextVal
-
-/*
-        for j <- i until x.dim if x(j) != missVal do return x(j)       // find first non-missing from i
-        println (s"nextVal: unable to find any non-missing values from $i to ${x.dim -1}")
-        missVal
-*/
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the previous non-missing value in vector x from index i.  If none, return missVal.
@@ -134,15 +141,10 @@ trait Imputation:
      *  @param i  the starting index to look for non-missing value
      */
     protected def prevVal (x: VectorD, i: Int): Double =
-        val j = x.lastIndexWhere (_ != missVal, i)                      // find first non-missing from i backward
+        val j = x.lastIndexWhere (_ != missVal, i)                     // find first non-missing from i backward
+        debug ("prevVal", s"unable to find any non-missing values from $i downto 0")
         if j >= 0 then x(j) else missVal
     end prevVal
-
-/*
-        for j <- i to 0 by -1 if x(j) != missVal do return x(j)        // find first non-missing from i
-        println (s"prevVal: unable to find any non-missing values from $i downto 0")
-        missVal
-*/
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the index of first missing value in vector x from index i and the
@@ -151,18 +153,10 @@ trait Imputation:
      *  @param i  the starting index to look for missing value
      */
     def findMissing (x: VectorD, i: Int = 0): (Int, Double) =
-        val j = x.indexOf (missVal, i)                                // find first missing from i
-        if j >= 0 then (j,  imputeAt (x, j))                          // return (index, imputed value)
-        else           (-1, nextVal (x, i))                           // return (not found, first value)
+        val j = x.indexOf (missVal, i)                                 // find first missing from i
+        if j >= 0 then (j,  imputeAt (x, j))                           // return (index, imputed value)
+        else           (-1, nextVal (x, i))                            // return (not found, first value)
     end findMissing
-
-/*
-        var value = nextVal (x, i)
-        for j <- i until x.dim if x(j) == missVal do                  // find first missing from i
-            value = imputeAt (x, j)
-            return (j, value)                                         // return (index, imputed value)
-        end for
-*/
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the index of last missing value in vector x from index i and the
@@ -172,27 +166,113 @@ trait Imputation:
      */
     def findLastMissing (x: VectorD, i_ : Int = -1): (Int, Double) =
         val i = if i_ < 0 then x.dim-1 else i_
-        val j = x.lastIndexOf (missVal, i)                            // find last missing from i
-        if j >= 0 then (j,  imputeAt (x, j))                          // return (index, imputed value)
-        else           (-1, prevVal (x, i))                           // return (not found, last value)
+        val j = x.lastIndexOf (missVal, i)                             // find last missing from i
+        if j >= 0 then (j,  imputeAt (x, j))                           // return (index, imputed value)
+        else           (-1, prevVal (x, i))                            // return (not found, last value)
     end findLastMissing
-
-/*
-        var value = prevVal (x, i)
-        for j <- i to 0 by -1 if x(j) == missVal do                   // find last missing from ii
-            val value = imputeAt (x, j)
-            return (j, value)                                         // return (index, imputed value)
-        end for
-        (-1, value)                                                   // return (not found, last value)
-*/
 
 end Imputation
 
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `ImputeRegression` object imputes missing values using `SimpleRegression`.
+/** The `ImputeMICE` object imputes missing values using MICE.
+ *  Use the columns in matrix z to impute values for target vector x.
  */
-object ImputeRegression extends Imputation:
+object ImputeMICE extends Imputation:
+
+    private val max_iter   = 5                                         // maximum number of impute steps
+    private var z: MatrixD = null                                      // matrix holding the dataset
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Set the value for the z matrix containing the dataset (consisting of multiple
+     *  columns/variables) where missing values are to be imputed.
+     *  @param z_  the matrix to be assigned
+     */
+    def setZ (z_ : MatrixD): Unit = z = z_
+
+    def imputeAt (x: VectorD, i: Int): Double =
+         throw new UnsupportedOperationException ("ImputeImputeMICE: 'imputeAt' not supported, use 'imputeAll'")
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Make initial imputation by replacing missing values with the column means.
+     *  Return the positions imputed and the new imputed matrix.
+     */
+    def initialImpute (): (Array [IndexedSeq [Int]], MatrixD) =
+        val idx = Array.fill (z.dim2) (IndexedSeq [Int] ())            // hold the indices of missing values
+        val zz  = z.copy                                               // put imputed values in a copy of the z matrix
+        for j <- z.indices2 do
+            idx(j) = for i <- z.indices if z(i, j) != missVal yield i  // find indices where z has missing values
+            ImputeMean.imputeAll (zz(?, j))                            // replace missing values with column mean
+        (idx, zz)
+    end initialImpute
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Perform a MICE imputation step by fixing each column that has missing values.
+     */
+    def imputeStep (): Unit =
+        val (idx, zz) = initialImpute ()
+        for j <- z.indices2 if idx(j).size < z.dim2 do                 // look for columns with missing values
+            val y  = zz(?, j)                                          // column to impute values
+            val x  = zz.not(?, j)                                      // other columns used to predict the impute column
+            val rg = new Regression (x, y, null)                       // create a multiple regression model
+            rg.train (x(idx(j)), y(idx(j)))                            // train using rows with no missing values in y
+            val pidx = IndexedSeq.range (0, x.dim) diff idx(j)         // indices where values are to be predicted
+            for i <- pidx do zz(i, j) = rg.predict (zz(i))                // call predict to get values where y had missing values
+                                                                       // FIX - may add noise to prediction
+        end for
+    end imputeStep
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Replace all missing values in vector x with imputed values.  Will change
+     *  the values in vector x.  Make a copy to preserve values x.copy.
+     *  @param x  the vector with missing values (target column)
+     */
+    override def imputeAll (@unused x: VectorD): VectorD =
+        for _ <- 1 to max_iter do imputeStep ()
+        null
+    end imputeAll
+
+end ImputeMICE
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `ImputeMRegression` object imputes missing values using multiple `Regression`.
+ *  Use the columns in matrix z to impute values for target vector x.
+ */
+object ImputeMRegression extends Imputation:
+
+    private var z: MatrixD = null                                      // matrix holding the dataset
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Set the value for the z matrix containing the other columns used to predict
+     *  values for target column x.
+     *  @param z_  the matrix to be assigned
+     */
+    def setZ (z_ : MatrixD): Unit = z = z_
+
+    def imputeAt (x: VectorD, i: Int): Double =
+         throw new UnsupportedOperationException ("ImputeImputeMRegression: 'imputeAt' not supported, use 'imputeAll'")
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Replace all missing values in vector x with imputed values.  Will change
+     *  the values in vector x.  Make a copy to preserve values x.copy.
+     *  @param x  the vector with missing values (target column)
+     */
+    override def imputeAll (x: VectorD): VectorD =
+        val idx = for i <- x.indices if x(i) != missVal yield i        // find indices where x does not have missing values
+        val rg  = new Regression (z, x, null)                          // create a multiple regression model
+        rg.train (z(idx), x(idx))                                      // train using rows with no missing values in x
+        val pidx = IndexedSeq.range (0, x.dim) diff idx                // indices where values are to be predicted
+        for i <- pidx do x(i) = rg.predict (z(i))                      // call predict to get values where x had missing values
+        x(pidx)                                                        // return the new predicted values for x
+    end imputeAll
+
+end ImputeMRegression
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `ImputeSRegression` object imputes missing values using `SimpleRegression`.
+ */
+object ImputeSRegression extends Imputation:
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Impute a value for the first missing value in vector x from index i
@@ -201,14 +281,14 @@ object ImputeRegression extends Imputation:
      *  @param i  the starting index to look for missing values
      */
     def imputeAt (x: VectorD, i: Int): Double =
-        val xf = x.filter (_ != missVal)
-        val t  = VectorD.range (0, xf.dim)
-        val rg = SimpleRegression (t, xf, null)
-        rg.train (rg.getX, xf)
-        rg.predict (VectorD (1, t(i)))
+        val xf = x.filter (_ != missVal)                               // x-vector with missing values removed
+        val t  = VectorD.range (0, xf.dim)                             // vector = 0, 1, ..., xf.dim-1
+        val rg = SimpleRegression (t, xf, null)                        // Simple Regression model of xf onto t
+        rg.train (rg.getX, xf)                                         // train the model: X = [1, t], y = xf
+        rg.predict (VectorD (1, t(i)))                                 // return the predicted value for the i-th element
     end imputeAt
 
-end ImputeRegression
+end ImputeSRegression
 
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -297,6 +377,25 @@ end ImputeMean
 
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `ImputeMean` object imputes missing values using the filtered median.
+ */
+object ImputeMedian extends Imputation:
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Impute a value for the first missing value in vector x from index i
+     *  using the filtered mean.
+     *  @param x  the vector with missing values
+     *  @param i  the starting index to look for missing values (ignored)
+     */
+    def imputeAt (x: VectorD, i: Int):  Double =
+        val xf = x.filter (_ != missVal)
+        xf.median ()
+    end imputeAt
+
+end ImputeMedian
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `ImputeNormal` object imputes missing values using the median Normal variates.
  */
 object ImputeNormal extends Imputation:
@@ -329,7 +428,7 @@ object ImputeMovingAvg extends Imputation:
     def imputeAt (x: VectorD, i: Int): Double =
         var (sum, cnt) = (0.0, 0)
         for k <- i - dist to i + dist do
-             if k >= 0 && k < x.dim && k != i && x(k) != missVal then { sum += x(k); cnt += 1 }
+            if k >= 0 && k < x.dim && k != i && x(k) != missVal then { sum += x(k); cnt += 1 }
         end for
         sum / cnt
     end imputeAt
@@ -344,8 +443,7 @@ end ImputeMovingAvg
 object ImputeNormalWin extends Imputation:
 
     def imputeAt (x: VectorD, i: Int): Double =
-         throw new UnsupportedOperationException ("ImputeNormalWin: 'impute' not supported, use 'imputeAll'")
-    end imputeAt
+        throw new UnsupportedOperationException ("ImputeNormalWin: 'imputeAt' not supported, use 'imputeAll'")
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Impute all the missing values in vector x using Normal Distribution for
@@ -353,9 +451,9 @@ object ImputeNormalWin extends Imputation:
      *  @param q  size of the sliding window
      */
     override def imputeAll (x: VectorD): VectorD =
-        val z     = new VectorD (x.dim)
-        val sumq  = new SumSqQueue (q)
-        sumq     += nextVal (x, 0)                                     // prime with first non-missing value
+        val z    = new VectorD (x.dim)
+        val sumq = new SumSqQueue (q)
+        sumq    += nextVal (x, 0)                                      // prime with first non-missing value
 
         for i <- x.indices do
             debug ("imputeAll", s"mu = ${sumq.mean}, sig2 = ${sumq.variance}")
@@ -377,67 +475,67 @@ end ImputeNormalWin
  */
 @main def imputationTest (): Unit =
 
-     val x = VectorD (1, 2, 3, 4, NO_DOUBLE, 6, 7, 8, 9)
-     val x2 = x.copy
-     val x3 = x.copy
-     var iv = (-1, NO_DOUBLE)
+    val x  = VectorD (1, 2, 3, 4, NO_DOUBLE, 6, 7, 8, 9)
+    val x2 = x.copy
+    val x3 = x.copy
+    var iv = (-1, NO_DOUBLE)
 
-     banner ("ImputeRegression.impute")
-     iv = ImputeRegression.impute (x)
-     x2(iv._1) = iv._2
-     println (s"x  = $x")
-     println (s"x2 = $x2")
+    banner ("ImputeSRegression.impute")
+    iv = ImputeSRegression.impute (x)
+    x2(iv._1) = iv._2
+    println (s"x  = $x")
+    println (s"x2 = $x2")
 
-     banner ("ImputeForward.impute")
-     iv = ImputeForward.impute (x)
-     x2(iv._1) = iv._2
-     println (s"x  = $x")
-     println (s"x2 = $x2")
+    banner ("ImputeForward.impute")
+    iv = ImputeForward.impute (x)
+    x2(iv._1) = iv._2
+    println (s"x  = $x")
+    println (s"x2 = $x2")
 
-     banner ("ImputeBackward.impute")
-     iv = ImputeBackward.impute (x)
-     x2(iv._1) = iv._2
-     println (s"x  = $x")
-     println (s"x2 = $x2")
+    banner ("ImputeBackward.impute")
+    iv = ImputeBackward.impute (x)
+    x2(iv._1) = iv._2
+    println (s"x  = $x")
+    println (s"x2 = $x2")
 
-     banner ("ImputeMean.impute")
-     iv = ImputeMean.impute (x)
-     x2(iv._1) = iv._2
-     println (s"x  = $x")
-     println (s"x2 = $x2")
+    banner ("ImputeMean.impute")
+    iv = ImputeMean.impute (x)
+    x2(iv._1) = iv._2
+    println (s"x  = $x")
+    println (s"x2 = $x2")
 
-     banner ("ImputeNormal.impute")
-     iv = ImputeNormal.impute (x)
-     x2(iv._1) = iv._2
-     println (s"x  = $x")
-     println (s"x2 = $x2")
+    banner ("ImputeNormal.impute")
+    iv = ImputeNormal.impute (x)
+    x2(iv._1) = iv._2
+    println (s"x  = $x")
+    println (s"x2 = $x2")
 
-     banner ("ImputeMovingAvg.impute")
-     iv = ImputeMovingAvg.impute (x)
-     x2(iv._1) = iv._2
-     println (s"x  = $x")
-     println (s"x2 = $x2")
+    banner ("ImputeMovingAvg.impute")
+    iv = ImputeMovingAvg.impute (x)
+    x2(iv._1) = iv._2
+    println (s"x  = $x")
+    println (s"x2 = $x2")
 
-     banner ("ImputeRegression.imputeAll")
-     println ("x3 = " + ImputeRegression.imputeAll (x3.copy))
+    banner ("ImputeSRegression.imputeAll")
+    println ("x3 = " + ImputeSRegression.imputeAll (x3.copy))
 
-     banner ("ImputeForward.imputeAll")
-     println ("x3 = " + ImputeForward.imputeAll (x3.copy))
+    banner ("ImputeForward.imputeAll")
+    println ("x3 = " + ImputeForward.imputeAll (x3.copy))
 
-     banner ("ImputeBackward.imputeAll")
-     println ("x3 = " + ImputeBackward.imputeAll (x3.copy))
+    banner ("ImputeBackward.imputeAll")
+    println ("x3 = " + ImputeBackward.imputeAll (x3.copy))
 
-     banner ("ImputeMean.imputeAll")
-     println ("x3 = " + ImputeMean.imputeAll (x3.copy))
+    banner ("ImputeMean.imputeAll")
+    println ("x3 = " + ImputeMean.imputeAll (x3.copy))
 
-     banner ("ImputeNormal.imputeAll")
-     println ("x3 = " + ImputeNormal.imputeAll (x3.copy))
+    banner ("ImputeNormal.imputeAll")
+    println ("x3 = " + ImputeNormal.imputeAll (x3.copy))
 
-     banner ("ImputeMovingAvg.imputeAll")
-     println ("x3 = " + ImputeMovingAvg.imputeAll (x3.copy))
+    banner ("ImputeMovingAvg.imputeAll")
+    println ("x3 = " + ImputeMovingAvg.imputeAll (x3.copy))
 
-     banner ("ImputeNormalWin.imputeAll")
-     println ("x3 = " + ImputeNormalWin.imputeAll (x3.copy))
+    banner ("ImputeNormalWin.imputeAll")
+    println ("x3 = " + ImputeNormalWin.imputeAll (x3.copy))
 
 end imputationTest
 
@@ -449,73 +547,124 @@ end imputationTest
  */
 @main def imputationTest2 (): Unit =
 
-     val x  = VectorD (NO_DOUBLE, NO_DOUBLE, 1, 2, 3, 4, 5, 6, 7, 8, 9)
-     var x2 = null.asInstanceOf [VectorD]
-     val x3 = x.copy
-     var iv = (-1, NO_DOUBLE)
+    val x  = VectorD (NO_DOUBLE, NO_DOUBLE, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+    var x2 = null.asInstanceOf [VectorD]
+    val x3 = x.copy
+    var iv = (-1, NO_DOUBLE)
 
-     banner ("ImputeRegression.impute")
-     iv = ImputeRegression.impute (x)
-     x2 = x.copy
-     x2(iv._1) = iv._2
-     println (s"x  = $x")
-     println (s"x2 = $x2")
+    banner ("ImputeSRegression.impute")
+    iv = ImputeSRegression.impute (x)
+    x2 = x.copy
+    x2(iv._1) = iv._2
+    println (s"x  = $x")
+    println (s"x2 = $x2")
 
-     banner ("ImputeForward.impute")
-     iv = ImputeForward.impute (x)
-     x2 = x.copy
-     x2(iv._1) = iv._2
-     println (s"x  = $x")
-     println (s"x2 = $x2")
+    banner ("ImputeForward.impute")
+    iv = ImputeForward.impute (x)
+    x2 = x.copy
+    x2(iv._1) = iv._2
+    println (s"x  = $x")
+    println (s"x2 = $x2")
 
-     banner ("ImputeBackward.impute")
-     iv = ImputeBackward.impute (x)
-     x2 = x.copy
-     x2(iv._1) = iv._2
-     println (s"x  = $x")
-     println (s"x2 = $x2")
+    banner ("ImputeBackward.impute")
+    iv = ImputeBackward.impute (x)
+    x2 = x.copy
+    x2(iv._1) = iv._2
+    println (s"x  = $x")
+    println (s"x2 = $x2")
 
-     banner ("ImputeMean.impute")
-     iv = ImputeMean.impute (x)
-     x2 = x.copy
-     x2(iv._1) = iv._2
-     println (s"x  = $x")
-     println (s"x2 = $x2")
+    banner ("ImputeMean.impute")
+    iv = ImputeMean.impute (x)
+    x2 = x.copy
+    x2(iv._1) = iv._2
+    println (s"x  = $x")
+    println (s"x2 = $x2")
 
-     banner ("ImputeNormal.impute")
-     iv = ImputeNormal.impute (x)
-     x2 = x.copy
-     x2(iv._1) = iv._2
-     println (s"x  = $x")
-     println (s"x2 = $x2")
+    banner ("ImputeNormal.impute")
+    iv = ImputeNormal.impute (x)
+    x2 = x.copy
+    x2(iv._1) = iv._2
+    println (s"x  = $x")
+    println (s"x2 = $x2")
 
-     banner ("ImputeMovingAvg.impute")
-     iv = ImputeMovingAvg.impute (x)
-     x2 = x.copy
-     x2(iv._1) = iv._2
-     println (s"x  = $x")
-     println (s"x2 = $x2")
+    banner ("ImputeMovingAvg.impute")
+    iv = ImputeMovingAvg.impute (x)
+    x2 = x.copy
+    x2(iv._1) = iv._2
+    println (s"x  = $x")
+    println (s"x2 = $x2")
 
-     banner ("ImputeRegression.imputeAll")
-     println ("x3 = " + ImputeRegression.imputeAll (x3.copy))
+    banner ("ImputeSRegression.imputeAll")
+    println ("x3 = " + ImputeSRegression.imputeAll (x3.copy))
 
-     banner ("ImputeForward.imputeAll")
-     println ("x3 = " + ImputeForward.imputeAll (x3.copy))
+    banner ("ImputeForward.imputeAll")
+    println ("x3 = " + ImputeForward.imputeAll (x3.copy))
 
-     banner ("ImputeBackward.imputeAll")
-     println ("x3 = " + ImputeBackward.imputeAll (x3.copy))
+    banner ("ImputeBackward.imputeAll")
+    println ("x3 = " + ImputeBackward.imputeAll (x3.copy))
 
-     banner ("ImputeMean.imputeAll")
-     println ("x3 = " + ImputeMean.imputeAll (x3.copy))
+    banner ("ImputeMean.imputeAll")
+    println ("x3 = " + ImputeMean.imputeAll (x3.copy))
 
-     banner ("ImputeNormal.imputeAll")
-     println ("x3 = " + ImputeNormal.imputeAll (x3.copy))
+    banner ("ImputeNormal.imputeAll")
+    println ("x3 = " + ImputeNormal.imputeAll (x3.copy))
 
-     banner ("ImputeMovingAvg.imputeAll")
-     println ("x3 = " + ImputeMovingAvg.imputeAll (x3.copy))
+    banner ("ImputeMovingAvg.imputeAll")
+    println ("x3 = " + ImputeMovingAvg.imputeAll (x3.copy))
 
-     banner ("ImputeNormalWin.imputeAll")
-     println ("x3 = " + ImputeNormalWin.imputeAll (x3.copy))
+    banner ("ImputeNormalWin.imputeAll")
+    println ("x3 = " + ImputeNormalWin.imputeAll (x3.copy))
 
 end imputationTest2
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `imputationTest3` main function imputes a missing value for the Texas Temperatures
+ *  dataset that contains temperatures from counties in Texas where the variables/factors
+ *  to consider are Latitude (x1), Elevation (x2) and Longitude (x3).  The model equation
+ *  is the following:
+ *      y  =  b dot x  =  b0 + b1*x1 + b2*x2 + b3*x3
+ *  > runMain scalation.modeling.imputationTest3
+ */
+@main def imputationTest3 (): Unit =
+
+    // 16 data points:         one      x1      x2       x3     y
+    //                                 Lat    Elev     Long  Temp        County
+    val xy = MatrixD ((16, 5), 1.0, 29.767,   41.0,  95.367, 56.0,       // Harris
+                               1.0, 32.850,  440.0,  96.850, 48.0,       // Dallas
+                               1.0, 26.933,   25.0,  97.800, 60.0,       // Kennedy
+                               1.0, 31.950, 2851.0, 102.183, 46.0,       // Midland
+                               1.0, 34.800, 3840.0, 102.467, 38.0,       // Deaf Smith
+                               1.0, 33.450, 1461.0,  99.633, 46.0,       // Knox
+                               1.0, 28.700,  815.0, 100.483, 53.0,       // Maverick
+                               1.0, 32.450, 2380.0, 100.533, NO_DOUBLE,  // Nolan (46.0)
+                               1.0, 31.800, 3918.0, 106.400, 44.0,       // El Paso
+                               1.0, 34.850, 2040.0, 100.217, 41.0,       // Collington
+                               1.0, 30.867, 3000.0, 102.900, 47.0,       // Pecos
+                               1.0, 36.350, 3693.0, 102.083, 36.0,       // Sherman
+                               1.0, 30.300,  597.0,  97.700, 52.0,       // Travis
+                               1.0, 26.900,  315.0,  99.283, 60.0,       // Zapata
+                               1.0, 28.450,  459.0,  99.217, 56.0,       // Lasalle
+                               1.0, 25.900,   19.0,  97.433, 62.0)       // Cameron
+
+    println (s"xy = $xy")
+
+    banner ("Texas Temperatures Regression before Imputation")
+    var mod = Regression (xy)()                               // create model with intercept (else pass x)
+    mod.inSample_Test ()                                      // train and test the model
+    println (mod.summary ())                                  // parameter/coefficient statistics
+
+    val x = xy.not (?, 4)
+    val y = xy(?, 4)
+
+    banner ("ImputeMRegression.imputeAll")
+    ImputeMRegression.setZ (x)
+    println ("y = " + ImputeMRegression.imputeAll (y))
+
+    banner ("Texas Temperatures Regression after Imputation")
+    mod = new Regression (x, y)                               // create model with intercept (else pass x)
+    mod.inSample_Test ()                                      // train and test the model
+    println (mod.summary ())                                  // parameter/coefficient statistics
+
+end imputationTest3
 
