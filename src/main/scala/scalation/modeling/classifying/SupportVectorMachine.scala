@@ -68,7 +68,7 @@ class SupportVectorMachine (x: MatrixD, y: VectorI, fname_ : Array [String] = nu
     private var al2     = 0.0                                    // old Lagrange multiplier 2
     private var a2      = 0.0                                    // new Lagrange multiplier 2
 
-    modelName = "SupportVectorMachine"                           // the name of the model
+    _modelName = "SupportVectorMachine"                          // the name of the model
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the vector of model parameter values [ w | b ]
@@ -98,7 +98,6 @@ class SupportVectorMachine (x: MatrixD, y: VectorI, fname_ : Array [String] = nu
                 I_1 += i; i_Up = i
             else
                 I_4 += i; i_Low = i
-            end if
         end for
         
         fCache(i_Low) =  1
@@ -225,14 +224,12 @@ class SupportVectorMachine (x: MatrixD, y: VectorI, fname_ : Array [String] = nu
         if abs (a2 - al2) < EPSILON * (a2 + al2 + EPSILON) then
             debug ("takeStep", s"skip if a2 = $a2 ~=  al2 = $al2")      // almost no change
             return false
-        end if
         
         a1 = al1 + s * (al2 - a2)
         if a1 < 0.0 then
             a2 += s * a1; a1 = 0
         else if a1 > C then
             val t = a1 - C; a2 += s * t; a1 = C
-        end if
         
         update (i1, i2, y1, y2)                // weights and fCache
         alp(i1) = a1; alp(i2) = a2             // store a1, a2 in alp array
@@ -262,11 +259,9 @@ class SupportVectorMachine (x: MatrixD, y: VectorI, fname_ : Array [String] = nu
             if fCache (i) < b_Up then
                 b_Up = fCache (i)
                 i_Up = i
-            end if
             if fCache (i) > b_Low then
                 b_Low = fCache (i)
                 i_Low = i
-            end if
         end for
         true
     end takeStep
@@ -283,7 +278,6 @@ class SupportVectorMachine (x: MatrixD, y: VectorI, fname_ : Array [String] = nu
         else
             val gamma = al1 - al2
             return if gamma > 0.0 then (0.0, C - gamma) else (-gamma, C)
-        end if
     end computeLH
     
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -356,7 +350,6 @@ class SupportVectorMachine (x: MatrixD, y: VectorI, fname_ : Array [String] = nu
         if I_0 contains i2 then
             if b_Low - F2 > F2 - b_Up then i1 = i_Low
             else i1 = i_Up
-        end if
         
         takeStep (i1, i2)
     end checkExample

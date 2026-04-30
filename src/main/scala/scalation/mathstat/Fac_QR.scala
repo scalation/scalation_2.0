@@ -27,7 +27,7 @@ import MatrixD.eye
  *-------------------------------------------------------------------------------
  *  This implementation improves performance by working with the transpose the
  *  original matrix and reorders operations to facilitate parallelism (see par directory).
- *  Caveat: for m < n use `Fac_LQ`, @see `Fac_QR.apply`
+ *  @caveat:  for m < n use `Fac_LQ`, @see `Fac_QR.apply`
  *-------------------------------------------------------------------------------
  *  @param aa     the matrix to be factored into q and r
  *  @param needQ  flag indicating whether a full q matrix is needed
@@ -83,7 +83,6 @@ class Fac_QR (aa: MatrixD, needQ: Boolean = false)
             if at_k(k) < 0.0 then _norm = -_norm               // make k-th Householder vector
             cfor (k, m) { i => at_k(i) /= _norm }
             at_k(k) += 1.0
-        end if
         r(k, k) = -_norm                                       // set the diagonal of r matrix
 
         cfor (k+1, p) { j =>                                   // transform all the rest of aa matrix
@@ -158,7 +157,7 @@ class Fac_QR (aa: MatrixD, needQ: Boolean = false)
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute the nullspace of matrix a: { x | a*x = 0 } using QR Factorization
      *  q*r*x = 0.  Gives a basis of dimension n - rank for the nullspace
-     *  Caveat: requires dim >= dim2
+     *  @caveat:  requires dim >= dim2
      *  @param rank  the rank of the matrix (number of linearly independent column vectors)
      */
     def nullspace (rank: Int): MatrixD = 

@@ -58,7 +58,6 @@ class Fac_Cholesky (a: MatrixD)
                 end for
             else
                 l(j, j) = sqrt (EPS)
-            end if
         end for
         factored = true
         this
@@ -91,7 +90,6 @@ class Fac_Cholesky (a: MatrixD)
             else
                 flaw ("factor", s"sqrt of negative diff = $diff, setting l(j, j) to zero")
                 l(j, j) = 0.0
-            end if
         end for
         factored = true
         this
@@ -118,7 +116,6 @@ class Fac_Cholesky (a: MatrixD)
                 val l_jj = l(j, j)
                 if l_jj == 0.0 then flaw ("factor", s"divide by zero l($j, $j) = $l_jj")
                 l(i, j) = diff / l_jj
-            end if
         end for
         factored = true
         this

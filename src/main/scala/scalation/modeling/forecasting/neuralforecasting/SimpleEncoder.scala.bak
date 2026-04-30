@@ -1,0 +1,267 @@
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** @author  John A. Miller
+ *  @version 2.0
+ *  @date    Sun Nov  9 23:27:14 EST 2025
+ *  @see     LICENSE (MIT style license file).
+ *
+ *  @note    Simple Implementation for an Encoder-Only Transformer, e.g., used for
+ *           (1) Natural Language Processing (NLP) or
+ *           (2) Time Series Forecasting (TSF) 
+ *
+ *  Limitations: one attention head, no dropout layer, single encoder block,
+ *               no back-propagation
+ *
+ *  @see sebastianraschka.com/blog/2023/self-attention-from-scratch.html
+ *  @see arxiv.org/pdf/1706.03762.pdf (main paper)
+ */
+
+package scalation
+package modeling
+package forecasting
+package neuralforecasting
+
+import scala.math.{cos, sin, sqrt}
+
+import scalation.mathstat._
+import scalation.modeling.ActivationFun.{f_reLU, f_softmax}
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `SimpleEncoder` object implements the attention method based on the
+ *  scaled dot product.
+ */
+object SimpleEncoder:
+
+    private val debug = debugf ("SimpleEncoder", true)       // debug function
+            val eps   = 1E-5                                 // very small value
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Patchify the univariate time series y by breaking it into non-overlapping
+     *  patches of length pl.  This simple implementation assumes stride s = pl,
+     *  but PatchTST uses pl = 16 and s = 8 as defaults.
+     *  @param y   the given univariate time series
+     *  @param pl  the patch length
+     */
+    def patchify (y: VectorD, pl: Int): MatrixD =
+        val m  = y.dim
+        val np = m / pl
+        val x  = new MatrixD (np, pl)
+        for i <- x.indices do x(i) = y(i*pl until (i+1)*pl)
+        x
+    end patchify
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Use a matrix transformation containing learnable weights to embed each patch
+     *  vector into a higher dimensional space (providing enhanced vector similarity).
+     *  The dimensionality of the embedding space is d_model.  For this simple
+     *  implementation d_model = d_k as there is only one attention head.
+     *  @param xx  the matrix containing each patch as a row
+     *  @param wE  the dimensionality of the embedding space
+     */
+    def embed (xx: MatrixD, wE: MatrixD): MatrixD = xx * wE
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Encode all the positions in the time series as vectors of length d_model.
+     *  @param y_len  the length of the time series (sequence length)
+     *  @param d_k    the dimensionality of the model (d_model = d_k here)
+     */
+    def encodePositions (y_len: Int, d_k: Int): MatrixD =
+        val pe = new MatrixD (y_len, d_k)
+        for k <- pe.indices do
+            for i <- 0 until d_k/2 do
+                val den = 10000~^(2*i/d_k)
+                pe(k, 2*i)   = sin (k / den)      
+                pe(k, 2*i+1) = cos (k / den)      
+        pe
+    end encodePositions
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Based on the Query (Q), Key (K), and Value (V) matrices, compute the attention.
+     *
+     *      att = softmax (QK^T/√d_k) V
+     *
+     *  @param q    the Query: the input of interest
+     *  @param k    the Key: other locations to compare it with (for similarity)
+     *  @param v    the Value: the input value at the key locations
+     *  @param d_k  the dimensionality of Query, Key, and Value (if different use d_v) 
+     */
+    def attention (q: MatrixD, k: MatrixD, v: MatrixD, d_k: Int): MatrixD =
+        val qkt = q * k.𝐓                                    // repeated dot product
+        val sdp = qkt / sqrt (d_k)                           // scaled dot product (sdp)
+        val scr = f_softmax.fM (sdp)                         // attention scores
+        debug ("attention", s" qkt = $qkt, sdp = $sdp, scr = $scr)")
+        scr * v                                              // attention (Q, K, V)
+    end attention
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Perform layer normalization on matrix x.  The more general affine transformation
+     *  is not supported in this simple implementation
+     *  @param x  the matrix to normalize
+     */
+    def layerNorm (x: MatrixD): MatrixD = (x - x.mean) / (x.stdev + eps)
+
+end SimpleEncoder
+
+import SimpleEncoder._
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `simpleEncoder1` main function illustrates the calculation of attention (Q, K, V)
+ *  for a Single Head as used in a Transformer.
+ *  @see pub.aimind.so/transformer-model-and-variants-of-transformer-chatgpt-3d423676e29c (URL)
+ *  > runMain scalation.modeling.forecasting.neuralforecasting.simpleEncoder1
+ */
+@main def simpleEncoder1 (): Unit =
+ 
+    val d_k = 3                                              // dimensionality for Q, K, and V (if different need d_v)
+//  val heads = 1                                            // number of attention heads (d_model = d_k * heads)
+
+    // input token can be (sub) words (for NLP) or patches (for TSF)
+    // three inputs after embedding, each embedding vector has size/dimensionality 4
+    // these three embedding vectors are made up, but could use word2vec, etc.
+    val x = MatrixD ((3, 4), 1, 0, 1, 0,                     // input x0 for token 0
+                             0, 2, 0, 2,                     // input x1 for token 1
+                             1, 1, 1, 1)                     // input x2 for token 2
+
+    println (s"input (after embedding) x = $x")
+
+    val wQ = MatrixD ((4, 3), 1, 0, 1,                       // Query weight matrix
+                              1, 0, 0,
+                              0, 0, 1,
+                              0, 1, 1) 
+    val wK = MatrixD ((4, 3), 0, 0, 1,                       // Key weight matrix
+                              1, 1, 0,
+                              0, 1, 0,
+                              1, 1, 0) 
+    val wV = MatrixD ((4, 3), 0, 2, 0,                       // Value weight matrix
+                              0, 3, 0,
+                              1, 0, 3,
+                              1, 1, 0)
+
+    val q = x * wQ                                           // Query: size of input x d_k
+    val k = x * wK                                           // Key:   size of input x d_k
+    val v = x * wV                                           // Value: size of input x d_k (or d_v if different)
+
+//  val att = attention (q, k, v, d_k)                       // compute attention based on correct size
+    val att = attention (q, k, v, 1)                         // approximation used by URL for checking purposes
+
+    println (s"""
+    d_k = $d_k
+    wQ  = $wQ
+    wK  = $wK
+    wV  = $wV
+    q   = $q
+    k   = $k
+    v   = $v
+    att = $att
+    """)
+
+end simpleEncoder1
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `simpleEncoder2` main function illustrates the steps in an Encoder-Only Transformer
+ *  consisting of a single encoder block.
+ *  > runMain scalation.modeling.forecasting.neuralforecasting.simpleEncoder2
+ */
+@main def simpleEncoder2 (): Unit =
+
+    import neuralnet.SimpleCNN.yy                            // example univariate time series of length 20
+
+    val pl  = 4                                              // patch length
+    val d_k = 6                                              // dimensionality for Q, K, and V (if different need d_v)
+//  val heads = 1                                            // number of attention heads (d_model = d_k * heads)
+
+    // input tokens in this case are patches (for TSF)
+    // five inputs with each patch vector having size/dimensionality 4
+    val (μ, σ) = (yy.mean, yy.stdev)
+    val y  = (yy - μ) / (σ + eps)                            // normalize the whole time series via z-transformation 
+    val xx = patchify (y, pl)                                // patchify to form a 5 by 4 matrix
+
+    //-----------------------------------------
+    // Input Embedding + Positional Encodings |
+    //-----------------------------------------
+
+    val wE = MatrixD.fill (xx.dim2, d_k, 0.1)                // transformation matrix used for embedding
+//  var x  = embed (xx, wE)                                  // embed xx in a higher dimensional space (skip pe)
+    var x  = embed (xx, wE) + encodePositions (y.dim, d_k)   // embed xx in a higher dimensional space
+                                                             // + positional encodings (pe)
+
+    println (s"input (after normalize, patchify, embed, encode) x = $x")
+
+    //------------------
+    // Attention Layer |
+    //------------------
+
+    val wQ = MatrixD.fill (d_k, d_k, 0.1)                    // Query weight matrix
+    val wK = MatrixD.fill (d_k, d_k, 0.1)                    // Key weight matrix
+    val wV = MatrixD.fill (d_k, d_k, 0.1)                    // Value weight matrix
+
+    val q = x * wQ                                           // Query: size of input x d_k
+    val k = x * wK                                           // Key:   size of input x d_k
+    val v = x * wV                                           // Value: size of input x d_k (or d_v if different)
+
+    val att = attention (q, k, v, d_k)                       // compute attention
+
+    println (s"""
+    wQ  = $wQ
+    wK  = $wK
+    wV  = $wV
+    q   = $q
+    k   = $k
+    v   = $v
+    att = $att
+    """)
+
+    //-----------------------------
+    // Add & Norm After Attention |
+    //-----------------------------
+
+    x += att                                                  // add attention to x (residual connection)
+    x  = layerNorm (x)                                        // apply layer normalization
+    println (s"after layer normalization x = $x")
+
+    //---------------------------------------
+    // Two-Layer Feed Forward Network (FFN) |
+    //---------------------------------------
+
+    val d_ff = 4 * d_k                                        // dimensionality of FFN hidden layer (common four-fold expansion)
+    val w1 = MatrixD.fill (d_k, d_ff, 0.1)                    // weight matrix preceding the FFN hidden layer
+    val b1 = VectorD.fill (d_ff)(0.1)                         // bias vector for the FFN hidden layer
+    val w2 = MatrixD.fill (d_ff, d_k, 0.1)                    // weight matrix preceding the FFN output layer
+    val b2 = VectorD.fill (d_k)(0.1)                          // bias vector for the FFN output layer
+
+    // FFN forward prop: 'refined input' -> hidden            // input with embedding, position encoding, attention, layer norm 
+    val u  = x * w1 + b1                                      // hidden pre-activation matrix
+    val z  = f_reLU.fM (u)                                    // hidden matrix from f0 = reLU activation
+//  val z  = f_geLU.fM (u)                                    // hidden matrix from f0 = geLU activation
+
+    // FFN forward prop: hidden -> output
+    val vv = z * w2 + b2                                       // output pre-activation matrix
+    val ŷ  = vv                                                // output/prediction matrix: typically no activation
+
+    println (s"""
+    u  = $u
+    z  = $z
+    vv = $vv
+    ŷ  = $ŷ
+    """)
+
+    //-----------------------
+    // Add & Norm After FNN |
+    //-----------------------
+
+    x += ŷ                                                     // add output from FNN to x (residual connection)
+    x  = layerNorm (x)                                         // apply layer normalization a second time
+    println (s"at end of encoder block x = $x")
+
+    //--------------------------------------------------------
+    // Use Simple MLP instead of Decoder to Make Predictions |
+    //--------------------------------------------------------
+
+//  reverse the embeddings ?
+//  val ε  = y - ŷ                                             // error matrix
+
+    // No backward prop -- should use AutoDiff due to complexity
+
+end simpleEncoder2
+

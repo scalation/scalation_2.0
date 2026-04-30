@@ -30,15 +30,17 @@ import scalation.mathstat._
  */
 class SimpleRegression (x: MatrixD, y: VectorD, fname_ : Array [String] = null)
       extends Predictor (x, y, if fname_ == null then null else fname_.slice (0, 2), null)
-         with Fit (dfm = 1, df = x.dim - 2)
+         with Fit (dfr = 1, df = x.dim - 2)
          with NoSubModels:
 
     private val debug = debugf ("SimpleRegression", true)          // debug function
     private val flaw  = flawf ("SimpleRegression")                 // flaw function
 
-    modelName = "SimpleRegression"
+    _modelName = s"SimpleRegression_${fname(1)}"
 
     if x.dim2 < 2 then flaw ("init", s"data matrix must have at least 2 columns: ${x.dim2}")
+
+    override def getBest: BestStep = super [NoSubModels].getBest
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Train the predictor by fitting the parameter vector (b-vector) in the
@@ -93,9 +95,9 @@ class SimpleRegression (x: MatrixD, y: VectorD, fname_ : Array [String] = null)
     /** Compute the confidence intervals for the parameters b_0 and b_1, returning
      *  their interval half widths.
      *  @param x_  the training/full data/input matrix
-     *  @param p   the confidence level
+     *  @param p_  the confidence level (1 - alpha)
      */
-    def confInterval (x_ : MatrixD = getX, p: Double = .95): VectorD =
+    def confInterval (x_ : MatrixD = getX, p_ : Double = .95): VectorD =
         val x1   = x_(?, 1)                                        // second column (column 1)
         val m    = x1.dim                                          // number of instances
         val df   = m - 2                                           // DoF for error e
@@ -106,8 +108,8 @@ class SimpleRegression (x: MatrixD, y: VectorD, fname_ : Array [String] = null)
         val se_0 = s * sqrt (1.0 / m + x1.mean~^2 / s_xx)          // standard error for b_0
         val se_1 = s / sqrt (s_xx)                                 // standard error for b_1
 
-        val pp = 1.0 - (1.0 - p) / 2.0                             // e.g., .95 --> .975 (two tails)
-        val t  = random.Quantile.studentTInv (pp, df)              // critical value from Student's t distribution
+        val p = 1.0 - (1.0 - p_) / 2.0                             // e.g., .95 --> .975 (two tails)
+        val t = random.Quantile.studentTInv (p, df)                // critical value from Student's t distribution
 
         debug ("confInterval", s"s = $s, s_xx = $s_xx, se_0 = $se_0, se_1 = $se_1, t = $t")
 
@@ -163,7 +165,7 @@ object SimpleRegression:
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Create the Best Simple Linear Regression model using the first column of all
      *  ones and the column/variable that is the best predictor xj (matrix [1 xj]).
-     *  Caveat:  assumes matrix x has a first column of all one.
+     *  @caveat:  assumes matrix x has a first column of all one.
      *  @param x      the m-by-n data/input matrix
      *  @param y      the response/output m-vector
      *  @param fname  the feature/variable names (defaults to null)
@@ -172,7 +174,7 @@ object SimpleRegression:
         val j = x.corr (y, 1).argmag () + 1                          // use best column
         val fname_ = Array (fname(0), fname(j))
         println (s"best: column j = $j, fname(j) = ${fname(j)}")
-        new SimpleRegression (MatrixD (x(?, 0), x(?, j)).transpose, y, fname_)
+        new SimpleRegression (MatrixD (x(?, 0), x(?, j)).ᵀ, y, fname_)
     end best
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -183,7 +185,6 @@ object SimpleRegression:
     def coeff (x: VectorD, y: VectorD): VectorD =
         if x.dim != y.dim then
             flaw ("coeff", s"dimensions do not agree: x.dim = ${x.dim} != y.dim = ${y.dim}")
-        end if
         val b1 = (x cov y) / x.variance
         val b0 = y.mean - b1 * x.mean
         VectorD (b0, b1)
@@ -211,7 +212,7 @@ end SimpleRegression
     println (s"y = $y")
 
     val mod = new SimpleRegression (x, y)                          // create a simple regression model
-    mod.trainNtest ()()                                            // train and test the model
+    mod.inSample_Test ()                                           // train and test the model
 
     val yp = mod.predict (x)
     new Plot (x(?, 1), y, yp, "plot y and yp vs. x", lines = true)
@@ -235,7 +236,7 @@ end simpleRegressionTest
     println (s"y = $y")
 
     val mod = SimpleRegression (x, y, null)                        // automatically prepends a column of ones
-    mod.trainNtest ()()                                            // train and test the model
+    mod.inSample_Test ()                                           // train and test the model
 
 end simpleRegressionTest2
 
@@ -273,7 +274,7 @@ end simpleRegressionTest2
     println (s"y  = $y")
 
     val mod = new SimpleRegression (ox, y)                         // create a simple regression model
-    mod.trainNtest ()()                                            // train and test the model
+    mod.inSample_Test ()                                           // train and test the model
 
     banner ("Low Level Calculation Check")
     val n   = y.dim
@@ -292,11 +293,11 @@ end simpleRegressionTest2
     new Plot (x, y, yp, "plot y and yp vs. x", lines = true)
 
     val qrg = SymbolicRegression.quadratic (MatrixD.fromVector (x), y)
-    val yq = qrg.trainNtest ()()._1
+    val yq = qrg.inSample_Test ()._1                               // train and test the model
     new Plot (x, y, yq, "plot y and yq vs. x", lines = true)
 
-    val trg = new TranRegression (ox, y, tran = sqrt, itran = sq)
-    val yt = trg.trainNtest ()()._1
+    val trg = new TranRegression (ox, y, yℱ = RootForm ())
+    val yt = trg.inSample_Test ()._1                               // train and test the model
     new Plot (x, y, yt, "plot y and yt vs. x", lines = true)
 
 end simpleRegressionTest3
@@ -323,7 +324,7 @@ end simpleRegressionTest3
     println (s"y = $y")
 
     val mod = new SimpleRegression (x, y)                          // create a simple regression model
-    mod.trainNtest ()()                                            // train and test the model
+    mod.inSample_Test ()                                           // train and test the model
 
     val z  = VectorD (1.0, 15.0)                                   // predict y for new point z
     println (s"predict ($z) = ${mod.predict (z)}")
@@ -383,7 +384,7 @@ end simpleRegressionTest5
 
     banner ("Null Model")
     val nm = new NullModel (y)
-    nm.trainNtest ()()                                             // train and test the model
+    nm.inSample_Test ()                                            // train and test the model
     val yp = nm.predict (x)
     new Plot (null, y, yp, "Null EDA: y and yp (red) vs. t", lines = true)
 
@@ -396,14 +397,14 @@ end simpleRegressionTest5
         banner (s"Plot response y vs. predictor variable ${x_fname(j)}")
         val xj = x(?, j)
         val mod = SimpleRegression (xj, y, Array ("one", x_fname(j)))
-        mod.trainNtest ()()                                        // train and test the model
+        mod.inSample_Test ()                                       // train and test the model
         val yp = mod.predict (mod.getX)
         new Plot (xj, y, yp, s"EDA: y and yp (red) vs. ${x_fname(j)}", lines = true)
     end for
 
     banner ("AutoMPG Best Simple Regression Model")
     val mod2 = SimpleRegression.best (ox, y, ox_fname)
-    mod2.trainNtest ()()                                           // train and test the model
+    mod2.inSample_Test ()                                          // train and test the model
 
 end simpleRegressionTest6
 
@@ -421,7 +422,7 @@ end simpleRegressionTest6
 
     banner ("Null Model")
     val nm = new NullModel (y)
-    nm.trainNtest ()()                                             // train and test the model
+    nm.inSample_Test ()                                            // train and test the model
     val yp = nm.predict (x)
     new Plot (null, y, yp, "Null Model EDA: y and yp (red) vs. t", lines = true)
 
@@ -434,7 +435,7 @@ end simpleRegressionTest6
         banner (s"Plot response y vs. predictor variable ${x_fname(j)}^2")
         val xj = x(?, j)
         val mod = SimpleRegression.quadratic (xj, y, Array ("one", x_fname(j) + "^2"))
-        mod.trainNtest ()()                                        // train and test the model
+        mod.inSample_Test ()                                       // train and test the model
         val yp = mod.predict (mod.getX)
         new Plot (xj, y, yp, s"EDA: y and yp (red) vs. ${x_fname(j)}^2", lines = false)
     end for
@@ -450,49 +451,50 @@ end simpleRegressionTest7
 @main def simpleRegressionTest8 (): Unit =
 
     val x  = VectorD (1, 2, 3, 4, 5, 6)
-    val y  = VectorD (1, 3, 3, 5, 4, 4)
+//  val y  = VectorD (1, 3, 3, 5, 4, 4)
+    val y  = VectorD (1, 3, 5, 6, 4, 2)
     val ox = MatrixD.one (x.dim) :^+ x
 
     val x_fname  = Array ("x")
     val ox_fname = Array ("one", "x")
 
     banner ("NullModel")
-    val nmod = new NullModel (y)
-    nmod.trainNtest ()()
-    println (s"mse = ${nmod.mse_}")
-    println (nmod.summary ())
-    new Plot (null, y, nmod.predict (nmod.getX), s"${nmod.modelName} y vs yp", lines = true)
+    val nm = new NullModel (y)
+    nm.inSample_Test ()                                            // train and test the model
+    println (s"mse = ${nm.mse_}")
+    println (nm.summary ())
+    new Plot (null, y, nm.predict (nm.getX), s"${nm.modelName} y vs yp", lines = true)
 
     banner ("SimplerRegression")
-    val reg = new SimplerRegression (MatrixD (x).transpose, y, x_fname)
-    reg.trainNtest ()()
+    val reg = new SimplerRegression (MatrixD (x).ᵀ, y, x_fname)
+    reg.inSample_Test ()                                           // train and test the model
     println (s"mse = ${reg.mse_}")
     println (reg.summary ())
     new Plot (null, y, reg.predict (reg.getX), s"${reg.modelName} y vs yp", lines = true)
 
     banner ("SimpleRegression")
     val mod = new SimpleRegression (ox, y, ox_fname)
-    mod.trainNtest ()()
+    mod.inSample_Test ()                                           // train and test the model
     println (s"mse   = ${mod.mse_}")
     println (s"confI = ${mod.confInterval ()}")
     println (mod.summary ())
     new Plot (null, y, mod.predict (mod.getX), s"${mod.modelName} y vs yp", lines = true)
 
     banner ("SymbolicRegression.quadratic")
-    val qrg = SymbolicRegression.quadratic (MatrixD (x).transpose, y, x_fname)
-    qrg.trainNtest ()()
+    val qrg = SymbolicRegression.quadratic (MatrixD (x).ᵀ, y, x_fname)
+    qrg.inSample_Test ()                                           // train and test the model
     println (s"mse   = ${qrg.mse_}")
 //  println (s"confI = ${qrg.confInterval ()}")
     println (qrg.summary ())
     new Plot (null, y, qrg.predict (qrg.getX), s"${qrg.modelName} y vs yp", lines = true)
 
     banner ("TranRegression")
-    val trd = new TranRegression (ox, y, ox_fname, tran = sqrt, itran = sq)
-    trd.trainNtest ()()
-    println (s"mse   = ${trd.mse_}")
-//  println (s"confI = ${trd.confInterval ()}")
-    println (trd.summary ())
-    new Plot (null, y, trd.predict (trd.getX), s"${trd.modelName} y vs yp", lines = true)
+    val trg = new TranRegression (ox, y, ox_fname, yℱ = RootForm ())
+    trg.inSample_Test ()                                           // train and test the model
+    println (s"mse   = ${trg.mse_}")
+//  println (s"confI = ${trg.confInterval ()}")
+    println (trg.summary ())
+    new Plot (null, y, trg.predict (trg.getX), s"${trg.modelName} y vs yp", lines = true)
 
 end simpleRegressionTest8
 

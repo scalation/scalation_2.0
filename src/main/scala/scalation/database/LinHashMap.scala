@@ -94,7 +94,6 @@ class LinHashMap [K: ClassTag, V: ClassTag] (name: String, order: Int = 4,
                 if j != nKeys then
                     key(j)   = key(nKeys)                     // overwrite with last pair
                     value(j) = value(nKeys)
-                end if
                 true
             else false
         end move
@@ -119,7 +118,7 @@ class LinHashMap [K: ClassTag, V: ClassTag] (name: String, order: Int = 4,
     /** The list of buckets making up this hash table.
      */
     private val hTable = new ArrayBuffer [Bucket] ()
-    for i <- 0 until mod1 do hTable += new Bucket ()
+    cfor (0, mod1) { _ => hTable += new Bucket () }
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** The `HTIterator` inner class supports iterating over all the elements
@@ -129,7 +128,7 @@ class LinHashMap [K: ClassTag, V: ClassTag] (name: String, order: Int = 4,
      *  @param js  the starting within node index (defaults to 0)
      */
     class HTIterator (is: Int = 0, bs: Bucket = hTable(0), js: Int = 0) extends Iterator [(K, V)]:
-        var (i, b, j) = (is, bs, js)
+        private var (i, b, j) = (is, bs, js)
         def hasNext: Boolean = j < b.nKeys - 1 || b.next != null || is < size0 - 1
         def next (): (K, V) =
             if j < b.nKeys - 1 then j += 1                     // next position in bucket
@@ -196,7 +195,6 @@ class LinHashMap [K: ClassTag, V: ClassTag] (name: String, order: Int = 4,
                 b.move (j, null)                              // move element j to null bucket
                 if b != bh && b.nKeys == 0 then
                     bp.next = b.next                          // remove empty overflow bucket
-                end if
                 removed = true                                // element successfully removed, end loop
             end if
         } // cfor
@@ -248,7 +246,6 @@ class LinHashMap [K: ClassTag, V: ClassTag] (name: String, order: Int = 4,
             isplit = 0                                        // if so, reset to zero
             mod1   = mod2                                     // double first hash function's modulus
             mod2  *= 2                                        // double second hash function's modulus
-        end if
         rehash (isp, b, bnew)                                 // rehash some keys in chain b to bnew
         show ()
     end split
@@ -268,7 +265,6 @@ class LinHashMap [K: ClassTag, V: ClassTag] (name: String, order: Int = 4,
            mod2   = mod1
            mod1  /= 2
            isplit = mod1 - 1
-        end if
 
         val bh = hTable(isplit)                               // home bucket for merge chain
         var b  = bh
@@ -303,10 +299,9 @@ class LinHashMap [K: ClassTag, V: ClassTag] (name: String, order: Int = 4,
                     else
                         if b != b1 && b.nKeys == 0 then
                             bp.next = b.next                  // remove empty overflow bucket
-                        end if
                     end if
-                else j += 1
-                end if
+                else
+                    j += 1
             end while
         } // cfor
     end rehash
@@ -374,7 +369,6 @@ end LinHashMap
         for i <- 1 to totalKeys by 2 do ht.put (rng.igen, i * i)
     else 
         for i <- 1 to totalKeys by 2 do ht.put (i, i * i)
-    end if
     ht.show ()
 
     banner ("Find Keys")

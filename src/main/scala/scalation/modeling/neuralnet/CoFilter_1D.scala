@@ -25,7 +25,7 @@ import scalation.random.RandomVecD
  */
 class CoFilter_1D (width: Int = 5):
 
-    private val rvg = RandomVecD (width, 2.0)                                 // random vector genertor
+    private val rvg = RandomVecD (width, 2.0)                                 // random vector generator
     private var vec = rvg.gen                                                 // the filter's vector
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -33,6 +33,11 @@ class CoFilter_1D (width: Int = 5):
      *  @param vec_  the new vector parameters
      */
     def update (vec_ : VectorD): Unit = vec = vec_
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return/get the filter coefficients (needed for forward and gradient computation)
+     */
+    def coef: VectorD = vec
 
 end CoFilter_1D
 
@@ -46,10 +51,12 @@ end CoFilter_1D
  */
 object CoFilter_1D:
 
+// valid convolutions
+
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the 'valid' (no padding) convolution of cofilter vector c and
      *  input vector x.
-     *  Caveat: does not include reversal.
+     *  @caveat:  does not include reversal.
      *  @param c  the cofilter vector of coefficients
      *  @param x  the input/data vector
      */
@@ -58,11 +65,13 @@ object CoFilter_1D:
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the 'valid' (no padding) convolution of cofilter vector c and
      *  input matrix x.
-     *  Caveat: does not include reversal.
+     *  @caveat:  does not include reversal.
      *  @param c  the cofilter vector of coefficients
      *  @param x  the input/data matrix
      */
     def conv (c: VectorD, x: MatrixD): MatrixD = x.mmap (c *+ _)
+
+// same convolutions
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the 'same' (with padding) convolution of cofilter vector c and
@@ -82,6 +91,54 @@ object CoFilter_1D:
     def convs (c: VectorD, x: MatrixD): MatrixD = x.mmap (c *~+ _)
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the centered backward convolution for computing the cofilter gradient.
+     *  @param x  the relevant data matrix
+     *  @param d  the delta correction matrix
+     *  @param k  the filter size
+     */
+    def convs_back (x: MatrixD, d: MatrixD, k: Int): VectorD =
+        val gc   = new VectorD (k)                             // gradient vector
+        val n    = x.dim2                                      // input length (# columns)
+        val half = k / 2
+
+        for j <- 0 until k do
+            var sum = 0.0
+            val shift = j - half                               // center the filter gradient calculation
+        
+            for i <- x.indices; t <- x.indices2 do
+                val idx = t + shift
+                if idx >= 0 && idx < n then sum += x(i, idx) * d(i, t)
+            gc(j) = sum
+        end for
+        gc
+    end convs_back
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the causal backward convolution for computing the cofilter gradient.
+     *  @param x  the relevant data matrix
+     *  @param d  the delta correction matrix
+     *  @param k  the filter size
+     *
+    def convs_back_ (x: MatrixD, d: MatrixD, k: Int): VectorD =
+        val gc = new VectorD (k)                                // gradient vector for filter weights
+        val m  = x.dim                                          // length of the time series
+
+        for j <- 0 until k do
+            var sum = 0.0
+            val lag = (k - 1) - j                               // lag increases as j decreases
+
+            for t <- x.indices do
+                val idx = t - lag                               // look only at the past/present
+                if idx >= 0 then sum += x(idx) * d(t)
+            gc(j) = sum
+        end for
+        gc
+    end convs_back_
+     */
+
+// full convolutions
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the 'full' convolution of cofilter vector c and input vector x.
      *  Same means that the size of the result is the same as the input.
      *  @param c  the cofilter vector of coefficients
@@ -96,10 +153,12 @@ object CoFilter_1D:
      */
     def convf (c: VectorD, x: MatrixD): MatrixD = x.mmap (c *++ _)
 
+// max-pooling
+
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the max-pooling results over all pooling windows.
      *  @param x  the input/data vector
-     *  @param s  the size of the pooling window
+     *  @param s  the size of the pooling window (also the stride)
      */
     def pool (x: VectorD, s: Int = 2): VectorD =
         val p = new VectorD (x.dim / s)
@@ -115,6 +174,8 @@ object CoFilter_1D:
      *  @param s  the the size of the pooling window
      */
     def pool (x: MatrixD, s: Int): MatrixD = x.mmap (pool (_, s))
+
+// avg-pooling
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the avg-pooling results over all pooling windows.

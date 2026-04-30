@@ -6,6 +6,8 @@
  *  @see     LICENSE (MIT style license file).
  *
  *  @note    Singular Value Decomposition (SVD) Matrix Factorization
+ *           produces Compact SVD; for Full SVD see `fullSVD` method 
+ *  @see eecs16b.org/notes/sp24/note15.pdf
  *
  *  @see Matrix Computations:  Algorithm 8.6.1 Golub-Kahan SVD Step Algorithm
  *  @see Matrix Computations:  Algorithm 8.6.2 SVD Algorithm
@@ -47,23 +49,23 @@ type FactorTypeFull = (MatrixD, MatrixD, MatrixD)
 class Fac_SVD (a: MatrixD)
     extends Factorization:
 
-    private val flaw  = flawf ("Fac_SVD")                 // flaw function
-    private val debug = debugf ("Fac_SVD", false)         // debug function
+    private val flaw  = flawf ("Fac_SVD")                         // flaw function
+    private val debug = debugf ("Fac_SVD", false)                 // debug function
 
-    private val MAX_ITER       = 100                      // maximum number of iterations
-    private val m              = a.dim                    // number of rows
-    private val n              = a.dim2                   // number of columns
+    private val MAX_ITER       = 100                              // maximum number of iterations
+    private val m              = a.dim                            // number of rows
+    private val n              = a.dim2                           // number of columns
 
     if n > m then flaw ("init", s"Fac_SVD implementation requires m = $m >= n = $n")
 
-    private var l              = 0                        // lower index vs. k for zeroing out super-diagonal elements
-    private var f, g           = 0.0                      // typcally [ f g ]
-    private var h              = 0.0                      //          [ 0 h ]
-    private var bmx            = 0.0                      // maximum column magnitude in the bidiagonal matrix
-    private var test_fconverge = true                     // whether singular values have reached converging magnitude
-    private var eps            = EPSILON                  // adjustable small value
+    private var l              = 0                                // lower index vs. k for zeroing out super-diagonal elements
+    private var f, g           = 0.0                              // typically [ f g ]
+    private var h              = 0.0                              //           [ 0 h ]
+    private var bmx            = 0.0                              // maximum column magnitude in the bidiagonal matrix
+    private var test_fconverge = true                             // whether singular values have reached converging magnitude
+    private var eps            = EPSILON                          // adjustable small value
 
-    private var mat3: FactorType = null                   // result of factorization: 3 matrices 
+    private var mat3: FactorType = null                           // result of factorization: 3 matrices 
 
 // FIX: make naming of matrices consistent
 
@@ -86,18 +88,18 @@ class Fac_SVD (a: MatrixD)
      *  such that a = u *~ q * v.t.
      */
     def factor123 (): FactorType =
-        if mat3 != null then return mat3                  // matrix a has already been factored
+        if mat3 != null then return mat3                          // matrix a has already been factored
 
-        val bid       = new Bidiagonal (a)                // class for making bidiagonal matrices 
-        val (u, b, v) = bid.bidiagonalize ()              // factor a into a bidiagonal matrix b 
-        val (e, q)    = bid.e_q                           // get b's super-diagonal e and main diagonal q
-        bmx           = bid.bmax                          // largest column magnitude in b
-        eps          *= bmx                               // adjust eps based on bmx
-        var c, s      = 0.0                               // cosine, sine for rotations
-        var y         = 0.0                               // holds values from q and u
-        var z         = 0.0                               // holds values from q, v and normalization of (f, h)
+        val bid       = new Bidiagonal (a)                        // class for making bidiagonal matrices 
+        val (u, _, v) = bid.bidiagonalize ()                      // factor a into a bidiagonal matrix b in (u, b, v)
+        val (e, q)    = bid.e_q                                   // get b's super-diagonal e and main diagonal q
+        bmx           = bid.bmax                                  // largest column magnitude in b
+        eps          *= bmx                                       // adjust eps based on bmx
+        var c, s      = 0.0                                       // cosine, sine for rotations
+        var y         = 0.0                                       // holds values from q and u
+        var z         = 0.0                                       // holds values from q, v and normalization of (f, h)
 
-        for k <- n-1 to 0 by -1 do iterate (k)            // diagonalization of the bidiagonal form
+        for k <- n-1 to 0 by -1 do iterate (k)                    // diagonalization of the bidiagonal form
 
         //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
         /*  Iterate until the super-diagonal element e(k) is (near) zero.
@@ -119,7 +121,6 @@ class Fac_SVD (a: MatrixD)
                 else
                     shiftFromBottom (k, e, q)
                     qrTransform (l, k)
-                end if
             } // cfor
         end iterate
 
@@ -132,11 +133,10 @@ class Fac_SVD (a: MatrixD)
             debug ("testFConvergence", s"(l, k) = ($l, $k)")
 
             z = q(k)
-            if l == k then                                  // convergence indicated by l equaling k
-                if z < 0.0 then                             // make sure singular value is non-negative
+            if l == k then                                        // convergence indicated by l equaling k
+                if z < 0.0 then                                   // make sure singular value is non-negative
                     q(k) = -z
                     for j <- 0 until n do v(j, k) = -v(j, k)
-                end if
                 true
             else false
         end testFConvergence
@@ -148,20 +148,20 @@ class Fac_SVD (a: MatrixD)
          *  @param k  the upper index
          */
         def cancellation (l : Int, k : Int): Unit =
-            c = 0.0; s = 1.0                                // set cosine, sine
+            c = 0.0; s = 1.0                                      // set cosine, sine
             var converged = false
             var j = l
-            cfor (! converged && j <= k, j += 1) {          // each column l to k
-                f     = s * e(j)                            // sine * e(j)
-                e(j) *= c                                   // cosine * e(j)
+            cfor (! converged && j <= k, j += 1) {                // each column l to k
+                f     = s * e(j)                                  // sine * e(j)
+                e(j) *= c                                         // cosine * e(j)
 
-                if abs (f) <= eps then                      // f near zero => return & test f convergence
+                if abs (f) <= eps then                            // f near zero => return & test f convergence
                     converged = true
                 else
-                    g = q(j); h = hypot (f, g)              // hypotenuse/norm
+                    g = q(j); h = hypot (f, g)                    // hypotenuse/norm
                     q(j) = h
-                    c = g / h; s = -f / h                   // reset cosine, sine
-                    rotateU (l-1, j)                        // rotation for columns l-1 and j of u
+                    c = g / h; s = -f / h                         // reset cosine, sine
+                    rotateU (l-1, j)                              // rotation for columns l-1 and j of u
                 end if
             } // cfor
         end cancellation
@@ -172,25 +172,25 @@ class Fac_SVD (a: MatrixD)
          *  @param k  the upper index
          */
         def qrTransform (l : Int, k : Int): Unit =
-            c = 1.0; s = 1.0                              // set cosine, sine
-            for j <- l+1 to k do                          // each column l+1 to k
-                g = e(j); h = s * g; g *= c               // compute g, h
-                y = q(j); z = hypot (f, h)                // hypotenuse/norm
-                e(j-1) = z                                // update e
+            c = 1.0; s = 1.0                                      // set cosine, sine
+            for j <- l+1 to k do                                  // each column l+1 to k
+                g = e(j); h = s * g; g *= c                       // compute g, h
+                y = q(j); z = hypot (f, h)                        // hypotenuse/norm
+                e(j-1) = z                                        // update e
 
-                c = f / z; s = h / z                      // reset cosine, sine
-                f =  bmx * c + g * s                      // compute f
-                g = -bmx * s + g * c; h = y * s           // compute g, h
+                c = f / z; s = h / z                              // reset cosine, sine
+                f =  bmx * c + g * s                              // compute f
+                g = -bmx * s + g * c; h = y * s                   // compute g, h
                 y *= c
-                rotateV (j-1, j)                          // update v
+                rotateV (j-1, j)                                  // update v
 
-                z = hypot (f, h)                          // hypotenuse/norm
-                q(j-1) = z                                // update q
+                z = hypot (f, h)                                  // hypotenuse/norm
+                q(j-1) = z                                        // update q
 
-                c   = f / z; s = h / z                    // reset cosine, sine
-                f   =  c * g + s * y                      // compute f
+                c   = f / z; s = h / z                            // reset cosine, sine
+                f   =  c * g + s * y                              // compute f
                 bmx = -s * g + c * y
-                rotateU (j-1, j)                          // update u
+                rotateU (j-1, j)                                  // update u
             end for
             e(l) = 0.0
             e(k) = f
@@ -203,8 +203,8 @@ class Fac_SVD (a: MatrixD)
          *  @param j2  the second column involved 
          */
         def rotateU (j1: Int, j2: Int): Unit =
-            for i <- 0 until m do                         // each row of u
-                y = u(i, j1)                              // changes to y and z affect outer scope
+            for i <- 0 until m do                                 // each row of u
+                y = u(i, j1)                                      // changes to y and z affect outer scope
                 z = u(i, j2)
                 u(i, j1) =  y * c + z * s
                 u(i, j2) = -y * s + z * c
@@ -217,8 +217,8 @@ class Fac_SVD (a: MatrixD)
          *  @param j2  the second column involved 
          */
         def rotateV (j1: Int, j2: Int): Unit =
-            for i <- 0 until n do                          // each row of v
-                bmx = v(i, j1)                             // changes to y and z affect outer scope
+            for i <- 0 until n do                                 // each row of v
+                bmx = v(i, j1)                                    // changes to y and z affect outer scope
                 z   = v(i, j2)
                 v(i, j1) =  bmx * c + z * s
                 v(i, j2) = -bmx * s + z * c
@@ -244,15 +244,15 @@ class Fac_SVD (a: MatrixD)
         end shiftFromBottom
 
         // final part for factor method
-        flip (u, q)                                        // convert singluar values to positive, if any, adjusting u accordingly
-        reorder ((u, q, v))                                // reorder so largest singular values come first
-        (u, q, v)                                          // return left matrix, singular vector and right matrix
+        flip (u, q)                                               // convert singular values to positive, if any, adjusting u accordingly
+        reorder ((u, q, v))                                       // reorder so largest singular values come first
+        (u, q, v)                                                 // return left matrix, singular vector and right matrix
     end factor123
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Flip negative singular values to positive and set singular values close
      *  to zero to zero.
-     *  @param u  the left orthongonal matrix
+     *  @param u  the left orthogonal matrix
      *  @param s  the vector of singular values
      */
     def flip (u: MatrixD, s: VectorD): Unit =
@@ -264,8 +264,8 @@ class Fac_SVD (a: MatrixD)
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Flip negative main diagonal elements in the singular vectors to positive.
-     *  @param u  the left orthongonal matrix
-     *  @param v  the right orthongonal matrix
+     *  @param u  the left orthogonal matrix
+     *  @param v  the right orthogonal matrix
      */
     def flip (u: MatrixD, v: MatrixD): Unit =
         for j <- u.indices2 if u(j, j) < 0.0 do u(?, j) = u(?, j) * -1.0
@@ -281,12 +281,11 @@ class Fac_SVD (a: MatrixD)
     def reorder (ft: FactorType): Unit =
         val n = ft._2.dim
         for i <- 0 until n do
-            val j = ft._2.argmax (i, n)             // index of largest element in s(i:n)
+            val j = ft._2.argmax (i , n)                          // index of largest element in s(i:n)
             if i != j then
-                ft._1.swapCol (i, j)                // u left orthogonal matrix
-                ft._2.swap (i, j)                   // s diagonal matrix
-                ft._3.swapCol (i, j)                // v right orthogonal matrix
-            end if
+                ft._1.swapCol (i, j)                              // u left orthogonal matrix
+                ft._2.swap (i, j)                                 // s diagonal matrix
+                ft._3.swapCol (i, j)                              // v right orthogonal matrix
         end for
     end reorder
 
@@ -300,13 +299,12 @@ class Fac_SVD (a: MatrixD)
     def testFSplitting (k : Int, e: VectorD, q: VectorD): Unit =
         breakable {
             for ll <- k to 0 by -1 do
-                l = ll                                         // make global index l track loop variable ll
+                l = ll                                            // make global index l track loop variable ll
                 test_fconverge = false
                 if abs (e(ll)) <= eps then
                     debug ("Fac_SVD", s"e(ll) = ${e(ll)}")
                     test_fconverge = true
                     break ()
-                end if
                 if abs (q(ll-1)) <= eps then break ()
             end for
         } // breakable
@@ -317,10 +315,10 @@ class Fac_SVD (a: MatrixD)
      *  @param b  the constant vector
      */
     def solve (b: VectorD): VectorD =
-        val (u, d, vt) = factor123 ()                          // factor using SVD
-        val alpha = u.transpose * b                            // principle component regression
-//      vt *~ d.recip * alpha                                  // estimate coefficients
-        vt *~ recip (d) * alpha                                // estimate coefficients - handles 0's
+        val (u, d, vt) = factor123 ()                             // factor using SVD
+        val alpha = u.transpose * b                               // principle component regression
+//      vt *~ d.recip * alpha                                     // estimate coefficients
+        vt *~ recip (d) * alpha                                   // estimate coefficients - handles 0's
     end solve
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -328,7 +326,7 @@ class Fac_SVD (a: MatrixD)
      *      a * a^-1 = I
      */
     def inverse: MatrixD =
-        val (u, d, vt) = factor123 ()                          // factor using SVD
+        val (u, d, vt) = factor123 ()                             // factor using SVD
         vt *~ d.recip * u.transpose
     end inverse
 
@@ -363,51 +361,90 @@ end Fac_SVD
  */
 object Fac_SVD:
 
-    val a1 = MatrixD ((2, 2), 1.00,  2.00,                           // original matrix
-                              0.00,  2.00)                           // 2 by 2, bidiagonal
+    val a1 = MatrixD ((2, 2), 1.00,  2.00,                        // original matrix
+                              0.00,  2.00)                        // 2 by 2, bidiagonal
 
-    val a2 = MatrixD ((3, 2), 3.0, -1.0,                             // original matrix
-                              1.0,  3.0,                             // 3 by 2
+    val a2 = MatrixD ((3, 2), 3.0, -1.0,                          // original matrix
+                              1.0,  3.0,                          // 3 by 2
                               1.0,  1.0)
 
-    val a3 = MatrixD ((3, 3), 1.0, 1.0, 0.0,                         // original matrix
-                              0.0, 2.0, 2.0,                         // 3 by 3, bidiagonal
+    val a3 = MatrixD ((3, 3), 1.0, 1.0, 0.0,                      // original matrix
+                              0.0, 2.0, 2.0,                      // 3 by 3, bidiagonal
                               0.0, 0.0, 3.0)
 
-    val a4 = MatrixD ((3, 3), 0.0,     1.0, 1.0,                     // original matrix
-                              sqrt(2), 2.0, 0.0,                     // 3 by 3
+    val a4 = MatrixD ((3, 3), 0.0,     1.0, 1.0,                  // original matrix
+                              sqrt(2), 2.0, 0.0,                  // 3 by 3
                               0.0,     1.0, 1.0)
 
-    val a5 = MatrixD ((4, 4), 0.9501, 0.8913, 0.8214, 0.9218,        // original matrix
-                              0.2311, 0.7621, 0.4447, 0.7382,        // 4 by 4
+    val a5 = MatrixD ((4, 4), 0.9501, 0.8913, 0.8214, 0.9218,     // original matrix
+                              0.2311, 0.7621, 0.4447, 0.7382,     // 4 by 4
                               0.6068, 0.4565, 0.6154, 0.1763,
                               0.4860, 0.0185, 0.7919, 0.4057)
 
-    val a6 = MatrixD ((3, 2), 4, 5,                                  // original matrix
-                              6, 7,                                  // 3 by 2
+    val a6 = MatrixD ((3, 2), 4, 5,                               // original matrix
+                              6, 7,                               // 3 by 2
                               9, 8)
 
-    val a7 = MatrixD ((4, 4), 1.0, 2.0, 3.0, 4.0,                    // original matrix
-                              4.0, 3.0, 2.0, 1.0,                    // 4 by 4
+    val a7 = MatrixD ((4, 4), 1.0, 2.0, 3.0, 4.0,                 // original matrix
+                              4.0, 3.0, 2.0, 1.0,                 // 4 by 4
                               5.0, 6.0, 7.0, 8.0,
                               8.0, 7.0, 6.0, 5.0)
 
-    val a8 = MatrixD ((5, 3), 0.44444444,  0.3333333, -1.3333333,    // original matrix
-                              0.41111111, -0.3166667, -0.3333333,    // 5 by 3
+    val a8 = MatrixD ((5, 3), 0.44444444,  0.3333333, -1.3333333,   // original matrix
+                              0.41111111, -0.3166667, -0.3333333,   // 5 by 3
                              -0.18888889,  0.4833333, -0.3333333,
                              -0.03333333, -0.6500000,  1.0000000,
                              -0.63333333,  0.1500000,  1.0000000)
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Convert an SVD factoring to its full representation, returning the result as
-     *  three matrices.
+    /** Convert an SVD factoring to a full matrix representation, returning the result as
+     *  three matrices having the following dimensions: U (m-by-n), S (n-by-n) and V (n-by-n).
+     *  This is the compact SVD representation, see the next methods of a full SVD representation.
      *  @param u_s_v  the 3-way factorization
      */
     def factorFull (u_s_v: FactorType): FactorTypeFull =
-        val s  = u_s_v._2.dim
-        val ss = new MatrixD (s, s); ss(?, ?) = s                    // turn vector into diagonal matrix
+        val s  = u_s_v._2                                          // vector of singular values
+        val ss = new MatrixD (s.dim, s.dim); ss(?, ?) = s          // turn vector into diagonal matrix
         (u_s_v._1, ss, u_s_v._3)
     end factorFull
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Create a full SVD factorization (rather than a compact one) where the three
+     *  matrices have the following dimensions: U (m-by-m), S (m-by-n) and V (n-by-n).
+     *  @see https://eecs16b.org/notes/sp24/note15.pdf
+     *  @param a  the m-by-n matrix to factor/decompose (requires m >= n)
+     */
+    def fullSVD (a: MatrixD): FactorTypeFull =
+        val (m, n) = a.dims
+        val svd = new Fac_SVD (a)
+        val (u, s, v) = factorFull (svd.factor123 ())             // factor matrix a
+        if m - n > 0 then
+            var uu = u
+            cfor (0, m - n) { _ => uu = uu :^+ gsOrtho (uu) }     // append an orthogonal column
+            (uu,
+             s ++ (new MatrixD (m - n, n)),                       // append rows of zeroes
+             v)                                                   // use original v
+        else 
+            (u, s, v)
+    end fullSVD
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return a new normalized m-dimensional vector that is orthogonal to all
+     *  columns in an orthonormal matrix u of dimension m-by-n (m > n),
+     *  Use the Gram-Schmidt (SG) Orthogonalization Algorithm.
+     *      v = a - Σ (a ⋅ uᵢ) * uᵢ
+     *  @see https://www.cis.upenn.edu/~cis6100/Gram-Schmidt-Bjorck.pdf
+     *  @param u  the given m-by-n orthonormal matrix
+     */
+    def gsOrtho (u: MatrixD): VectorD =
+        val m  = u.dim
+        val ut = u.transpose
+        val a  = VectorD.one (m)
+        val vs = VectorD (m)
+        cfor (0, m) { i => vs += ut(i) * (a dot ut(i)) }
+        val v = a - vs 
+        v / v.norm
+    end gsOrtho
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Reduce the dimensionality of the u, s and v matrices from n to k.
@@ -418,9 +455,9 @@ object Fac_SVD:
      *  @param k      the desired dimensionality
      */
     def reduce (u_s_v: FactorType, k: Int): FactorType =
-        (u_s_v._1(?, 0 until k),                                 // slice columns from matrtix u
-         u_s_v._2(0 until k),                                    // slice elements from vector s
-         u_s_v._3(?, 0 until k))                                 // slice columns from matrtix v
+        (u_s_v._1(?, 0 until k),                                  // slice columns from matrix u
+         u_s_v._2(0 until k),                                     // slice elements from vector s
+         u_s_v._3(?, 0 until k))                                  // slice columns from matrix v
     end reduce
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -438,18 +475,18 @@ object Fac_SVD:
     /** Test the SVD Factorization algorithm on matrix a by factoring the matrix
      *  into a left matrix u, a vector s, and a right matrix v.  Then multiply back
      *  to recover the original matrix u *~ s * v.t.
-     *  @param a      the orginal matrix
+     *  @param a      the original matrix
      *  @param u_s_v  the given matrix a factored into three components
      *  @param name   the name of the test case
      */
     def test (a: MatrixD, svd: Fac_SVD, name: String): Unit =
         banner (name)
         println (s"factor matrix a = $a")
-        val (u, s, v) = svd.factor123 ()                         // factor matrix a
+        val (u, s, v) = svd.factor123 ()                          // factor matrix a
         println (sline () + s"into (u, s, v) = ${(u, s, v)}")
-        val prod = u *~ s * v.transpose                          // compute the product
-        println (sline () + s"check: u *~ s * v.t = $prod")      // should equal the original a matrix
-        println (s"prod - a = ${prod - a}")                      // difference should be close to 0
+        val prod = u *~ s * v.transpose                           // compute the product
+        println (sline () + s"check: u *~ s * v.t = $prod")       // should equal the original a matrix
+        println (s"prod - a = ${prod - a}")                       // difference should be close to 0
         println (sline ())
         assert (prod == a)
         println (sline ())

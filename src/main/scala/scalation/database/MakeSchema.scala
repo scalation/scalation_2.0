@@ -54,7 +54,7 @@ object MakeSchema:
         try
             TimeNum (str)
         catch
-            case ex: DateTimeException => correct = false
+            case _ : DateTimeException => correct = false
         correct
     end isDateTime
 

@@ -106,7 +106,6 @@ class Simplex2P (a: MatrixD, b: VectorD, c: VectorD)
                 jr    += 1
                 x_B(i) = MpN + jr                            // put artificial variable in basis
                 t(M)  += t(i)                                // row op to make t(M, MpN + j) zero
-            end if
         end for
     end initBasis
 
@@ -206,7 +205,6 @@ class Simplex2P (a: MatrixD, b: VectorD, c: VectorD)
             true
         else
             false
-        end if
     end infeasible
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -238,7 +236,6 @@ class Simplex2P (a: MatrixD, b: VectorD, c: VectorD)
             t(M)(MpN until jj) = -1.0                        // set cost row (M) in the tableau to remove artificials
         else
             t(M)(0 until N) = -c                             // set cost row (M) in the tableau to given cost vector
-        end if
         initBasis ()                                         // initialize the basis to the slack and artificial vars
 
         if R > 0 then                                        // there are artificial variables => phase I required

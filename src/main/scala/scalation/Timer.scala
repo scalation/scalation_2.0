@@ -78,7 +78,7 @@ def time [R] (amplify: Int, skip: Boolean = true) (block: => R): R =
     var result: R = null.asInstanceOf [R]
     if skip then result = block                            // skip measuring first time due to JIT-Compiler
     val t0 = nanoTime ()                                   // start time
-    cfor (0, amplify) { i => result = block }              // exercise code amplify times
+    cfor (0, amplify) { _ => result = block }              // exercise code amplify times
     val t1 = nanoTime ()                                   // end time
     println ("Elapsed time: " + (t1 - t0) * NS_PER_MS / amplify + " ms")
     result
@@ -112,10 +112,34 @@ def timed [R] (amplify: Int, skip: Boolean = true) (block: => R): (R, Double) =
     var result: R = null.asInstanceOf [R]
     if skip then result = block                            // skip measuring first time due to JIT-Compiler
     val t0 = nanoTime ()                                   // start time
-    cfor (0, amplify) { i => result = block }              // exercise code amplify times
+    cfor (0, amplify) { _ => result = block }              // exercise code amplify times
     val t1 = nanoTime ()                                   // end time
     (result, (t1 - t0) * NS_PER_MS / amplify)
 end timed
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** Calculate the elapsed time in milliseconds (ms) for the execution of an
+ *  arbitrary block of code:  'timedX { block }'.  Return any result produced
+ *  by the block of code and the average elapsed time.
+ *  @see http://stackoverflow.com/questions/9160001/how-to-profile-methods-in-scala
+ *  Executes the block of code multiple times for better resolution and accuracy,
+ *  throwing the slowest execution to improve consistency (e.g., may be slow due to GC).
+ *  @param amplify  the number of times to execute the block of code
+ *  @param skip     whether to skip the first execution due to slowness of the JIT-Compiler
+ *  @param block    the block of code to be executed
+ */
+def timedX [R] (amplify: Int, skip: Boolean = true) (block: => R): (R, Double) =
+    var result: R = null.asInstanceOf [R]
+    if skip then result = block                            // skip measuring first time due to JIT-Compiler
+    val dt = Array.ofDim [Long] (amplify+1)
+    var t0 = 0L
+    cfor (0, amplify+1) { i =>
+        t0 = nanoTime ()                                   // start time
+        result = block
+        dt(i)  = nanoTime () - t0                          // time difference
+    } // cfor
+    (result, (dt.sum - dt.max) * NS_PER_MS / amplify)
+end timedX
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** Calculate the elapsed time in milliseconds (ms) for the execution of an
@@ -143,7 +167,7 @@ end gauge
 def gauge [R] (amplify: Int, skip: Boolean = true) (block: => R): Double =
     if skip then block                                     // skip measuring first time due to JIT-Compiler
     val t0 = nanoTime ()                                   // start time
-    cfor (0, amplify) { i => block }                       // exercise code amplify times
+    cfor (0, amplify) { _ => block }                       // exercise code amplify times
     val t1 = nanoTime ()                                   // end time
     (t1 - t0) * NS_PER_MS / amplify
 end gauge
@@ -187,9 +211,17 @@ end memoryUsed
     end quadraticEq
 
     val (a, b, c) = (1, -5, 6)
-    banner (s"Quadratic Equation ax^2 + bx + c = 0 where a = $a, b = $b, c = $c") 
-    val roots = time (1000) { quadraticEq (1, -5, 6) }
+    banner (s"time: Quadratic Equation ax^2 + bx + c = 0 where a = $a, b = $b, c = $c") 
+    val roots = time (10000) { quadraticEq (1, -5, 6) }
     println (s"roots = $roots")
+
+    banner (s"timed: Quadratic Equation ax^2 + bx + c = 0 where a = $a, b = $b, c = $c") 
+    var result = timed (10000) { quadraticEq (1, -5, 6) }
+    println (s"result = $result")
+
+    banner (s"timedX: Quadratic Equation ax^2 + bx + c = 0 where a = $a, b = $b, c = $c") 
+    result = timedX (10000) { quadraticEq (1, -5, 6) }
+    println (s"result = $result")
 
 end timerTest
 

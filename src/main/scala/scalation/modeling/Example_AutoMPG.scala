@@ -26,6 +26,9 @@ object Example_AutoMPG:
     val xr_fname = Array ("cylinders", "displacement", "horsepower", "weight",
                           "acceleration", "modelyear", "origin")
 
+    val xyr_fname = Array ("cylinders", "displacement", "horsepower", "weight",
+                           "acceleration", "modelyear", "origin", "mpg")
+
     /** the raw combined data matrix 'xyr'
      */
     val xyr = MatrixD ((392,  8), 8, 307, 130, 3504, 12, 70, 1, 18, 
@@ -421,9 +424,10 @@ object Example_AutoMPG:
                                   4, 120, 79, 2625, 18.6, 82, 1, 28, 
                                   4, 119, 82, 2720, 19.4, 82, 1, 31)
 
-    /** the origin column (6) is categorical
+    /** the origin column (7) in oxr will be categorical
      */
-    val oxr = xyr.not(?, 7)
+    val _1     = VectorD.one (xyr.dim)                                  // vector of all ones
+    val oxr = _1 +^: xyr.not(?, 7)
     val oxr_fname: Array [String] = Array ("intercept") ++ xr_fname
 
     /** the combined data matrix xy with the origin column (6) removed
@@ -435,7 +439,6 @@ object Example_AutoMPG:
 
     val (x, y) = (xy.not(?, n), xy(?, n))                              // (data/input matrix, response column)
     val yy     = MatrixD.fromVector (y)                                // turn the m-vector y into an m-by-1 matrix 
-    val _1     = VectorD.one (xy.dim)                                  // vector of all ones
     val oxy    = _1 +^: xy                                             // prepend a column of all ones to xy
     val ox     = _1 +^: x                                              // prepend a column of all ones to x
 
@@ -488,7 +491,7 @@ end example_AutoMPG_Correlation
 
     banner ("NullModel model: y = b₀")
     val mod = NullModel (xy)                                           // create a null model
-    mod.trainNtest ()()                                                // train and test the model
+    mod.inSample_Test ()                                               // train and test the model
 
     val x  = xy(?, 0 to 1)                                             // predictors variables/columns
     val yp = mod.predict (x)                                           // predict y for all x rows
@@ -511,7 +514,7 @@ end example_AutoMPG_NullModel
 
     banner ("SimplerRegression model: y = b₁*x₁")
     val mod = SimplerRegression (xy)                                   // create a SimplerRegression model
-    mod.trainNtest ()()                                                // train and test the model
+    mod.inSample_Test ()                                               // train and test the model
 
 end example_AutoMPG_SimplerRegression
 
@@ -526,7 +529,7 @@ end example_AutoMPG_SimplerRegression
 
     banner ("SimpleRegression model: y = b₀ + b₁*x₁")
     val mod = SimpleRegression (oxy)                                   // create a SimpleRegression model
-    mod.trainNtest ()()                                                // train and test the model
+    mod.inSample_Test ()                                               // train and test the model
     println (mod.summary ())                                           // produce summary statistics
 
 end example_AutoMPG_SimpleRegression
@@ -545,12 +548,12 @@ end example_AutoMPG_SimpleRegression
 
     banner ("Regression model: y = b₀ + b₁*x₁ + b₂*x₂ + b₃*x₃ + b₄*x₄ + b₅*x₅ + b₆*x₆")
     var mod = Regression (oxy, ox_fname)()                             // create a Regression Model (with intercept)
-    mod.trainNtest ()()                                                // train and test the model
+    mod.inSample_Test ()                                               // train and test the model
     println (mod.summary ())                                           // produce summary statistics
 
     banner ("Regression model: y = b₀ + b₄*x₄ + b₆*x₆")
     mod = new Regression (x046, y, x046_fname)                         // create a Regression Model from columns 0, 4, 6
-    mod.trainNtest ()()                                                // train and test the model
+    mod.inSample_Test ()                                               // train and test the model
     println (mod.summary ())                                           // produce summary statistics
 
 end example_AutoMPG_Regression
@@ -566,8 +569,21 @@ end example_AutoMPG_Regression
 
     banner ("Quad Regression model: y = b₀ + b₄*x₄ + b₆*x₆ + b7*x4^2 + b8*x6^2")
     val mod = SymbolicRegression.quadratic (x46, y, x46_fname)         // create a Quad Regression Model from columns 4, 6
-    mod.trainNtest ()()                                                // train and test the model
+    mod.inSample_Test ()                                               // train and test the model
     println (mod.summary ())                                           // produce summary statistics
 
 end example_AutoMPG_QuadRegression
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `example_AutoMPG_write_csv` main function writes the AutoMPG dataset into
+ *  a CSV file in the DATA director (.../scalation_2.0/data).
+ *  @see archive.ics.uci.edu/ml/datasets/Auto+MPG
+ *  > runMain scalation.modeling.example_AutoMPG_write_csv
+ */
+@main def example_AutoMPG_write_csv (): Unit =
+
+    xyr.write ("auto_mpg.csv", xyr_fname) 
+
+end example_AutoMPG_write_csv
 

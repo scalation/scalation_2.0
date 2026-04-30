@@ -57,16 +57,15 @@ class MergeSortIndirect (a: Array [ValueType]) (perm: Array [Int] = Array.range 
                 perm(k) = aux(j); j += 1
             else
                 perm(k) = aux(i); i += 1
-            end if
         end for
     end mergeIndirect
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Recursive helper method that sorts 'perm(lo to hi).
      *  @param lo  the lower bound
-     *  @param hi  the upper bound
+     *  @param hi  the upper bound (e.g., a.length at beginning)
      */
-    private def indirectSort (lo: Int, hi: Int = a.length): Unit =
+    private def indirectSort (lo: Int, hi: Int): Unit =
         if hi <= lo then return
         val mid = lo + (hi - lo) / 2
 

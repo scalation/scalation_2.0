@@ -341,7 +341,6 @@ object ActivationFun:
         else                                                    // normalize: Normal (0, 1)
             val (mu_x, sig_x) = (x.mean, x.stdev)
             normalize ((mu_x, sig_x)) (x)
-        end if
     end rescaleX
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -359,7 +358,6 @@ object ActivationFun:
         else                                                    // normalize: Normal (0, 1)
             val (mu_x, sig_x) = (x.mean, x.stdev)
             normalize ((mu_x, sig_x)) (x)
-        end if
 */
         null
     end rescaleX
@@ -381,7 +379,6 @@ object ActivationFun:
             val (mu_y, sig_y) = (y.mean, y.stdev)
             (normalizeV ((mu_y, sig_y)) (y),
              denormalizeV ((mu_y, sig_y)))                      // rescaling inverse
-        end if
     end rescaleY
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -401,7 +398,6 @@ object ActivationFun:
             val (mu_y, sig_y) = (y.mean, y.stdev)
             (normalize ((mu_y, sig_y)) (y),
              denormalize ((mu_y, sig_y)))                       // rescaling inverse
-        end if
     end rescaleY
 
 end ActivationFun
@@ -504,6 +500,17 @@ end activationFunTest2
     val gaussianDf = gaussianD (gaussianf, t)
     val geLUDf     = geLUD (t)
     val softmaxDf  = softmaxD (softmaxf)
+
+    // print out all the derivatives
+    println (s"idD       = $idDf")
+    println (s"reLUD     = $reLUDf")
+    println (s"lreLUD    = $lreLUDf")
+    println (s"eLUD      = $eLUDf")
+    println (s"tanhD     = $tanhDf")
+    println (s"sigmoidD  = $sigmoidDf")
+    println (s"gaussianD = $gaussianDf")
+    println (s"geLUD     = $geLUDf")
+    println (s"softmaxD  = $softmaxDf")
 
     new Plot (t, idDf,       null, "t vs. idD") 
     new Plot (t, reLUDf,     null, "t vs. reLUD") 

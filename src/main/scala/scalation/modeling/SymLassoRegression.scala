@@ -11,23 +11,41 @@
 package scalation
 package modeling
 
-import scala.collection.mutable.Set
+import scala.collection.mutable.{LinkedHashSet => LSET}
 
 import scalation.mathstat._
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `SymLassoRegression` object supports symbolic ridge regression that allows
+/** The `SymLassoRegression` class supports symbolic ridge regression that allows
  *  variables/columns to be raised to various powers, e.g., x^2, x^3, x^.5.
  *  Note, x~^p is a column-wise power function (each column raised to p-th power).
  *  IMPORTANT:  must not include INTERCEPT (column of ones) in initial data matrix),
  *  i.e., DO NOT include a column of ones in x (will cause singularity in expanded matrix).
  *  Method signatures are the as same as for `SymbolicRegression`, except there is
  *  NO intercept ARGUMENT.
+ *  @param x       the initial data/input m-by-n matrix (before expansion)
+ *                     must not include an intercept column of all ones
+ *  @param y       the response/output m-vector
+ *  @param fname   the feature/variable names
+ *  @param powers  the set of powers to raise matrix x to
+ *  @param hparam  the hyper-parameters (use Regression.hp for default)
+ */
+class SymLassoRegression (x: MatrixD, y: VectorD, fname: Array [String],
+                          powers: LSET [Double], hparam: HyperParameter = LassoRegression.hp)
+      extends LassoRegression (x, y, fname, hparam):
+
+    _modelName = s"SymLassoRegression_$powers"
+
+end SymLassoRegression
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `SymLassoRegression` object provides factory methods.
  */
 object SymLassoRegression:
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Create a `LassoRegression` object from a data matrix and a response vector.
+    /** Create a `SymLassoRegression` object from a data matrix and a response vector.
      *  Partial support for "Symbolic Lasso Regression" as matrix x can be raised
      *  to several powers (e.g., x^1 and x^2).  Note, x^1 is automatically included.
      *  @see `SymbolicRegression.buildMatrix`
@@ -44,19 +62,16 @@ object SymLassoRegression:
      *                        adds x0 x1^(-2)
      */
     def apply (x: MatrixD, y: VectorD, fname: Array [String] = null,
-               powers: Set [Double] = null, intercept: Boolean = true,
+               powers: LSET [Double] = null, intercept: Boolean = true,
                cross: Boolean = true, cross3: Boolean = false,
                hparam: HyperParameter = LassoRegression.hp,
-               terms: Array [Xj2p]*): LassoRegression =
+               terms: Array [Xj2p]*): SymLassoRegression =
         val fname_ = if fname != null then fname
                      else x.indices2.map ("x" + _).toArray                // default feature/variable names
 
-        val (xx, f_name) = SymbolicRegression.buildMatrix (x, fname_, powers, intercept,
+        val (xx, f_name) = SymbolicRegression.buildMatrix (x, fname_, powers, null, intercept,
                                                            cross, cross3, terms*)
-        val mod       = new LassoRegression (xx, y, f_name, hparam)
-        mod.modelName = "SymLassoRegression" + (if cross then "X" else "") +
-                                               (if cross3 then "XX" else "")
-        mod
+        new SymLassoRegression (xx, y, f_name, powers, hparam)
     end apply
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -75,16 +90,16 @@ object SymLassoRegression:
      *                        adds x0 x1^(-2)
      */
     def rescale (x: MatrixD, y: VectorD, fname: Array [String] = null,
-                 powers: Set [Double] = null, intercept: Boolean = true,
+                 powers: LSET [Double] = null, intercept: Boolean = true,
                  cross: Boolean = true, cross3: Boolean = false,
                  hparam: HyperParameter = Regression.hp,
-                 terms: Array [Xj2p]*): LassoRegression =
+                 terms: Array [Xj2p]*): SymLassoRegression =
         val xn = normalize ((x.mean, x.stdev)) (x)
         apply (xn, y, fname, powers, intercept, cross, cross3, hparam, terms*)
     end rescale
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Create a `LassoRegression` object that uses multiple regression to fit a quadratic
+    /** Create a `SymLassoRegression` object that uses multiple regression to fit a quadratic
      *  surface to the data.  For example in 2D, the quadratic regression equation is
      *      y  =  b dot x + e  =  [b_0, ... b_k] dot [x_0, x_0^2, x_1, x_1^2] + e
      *  @param x       the initial data/input m-by-n matrix (before quadratic term expansion)
@@ -97,14 +112,12 @@ object SymLassoRegression:
      */
     def quadratic (x: MatrixD, y: VectorD, fname: Array [String] = null,
                    intercept: Boolean = true, cross: Boolean = false,
-                   hparam: HyperParameter = LassoRegression.hp): LassoRegression =
-        val mod       = apply (x, y, fname, Set (1, 2), intercept, cross, false, hparam)
-        mod.modelName = "SymLassoRegression.quadratic" + (if cross then "X" else "")
-        mod
+                   hparam: HyperParameter = LassoRegression.hp): SymLassoRegression =
+        apply (x, y, fname, LSET (1, 2), intercept, cross, false, hparam)
     end quadratic
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Create a `LassoRegression` object that uses multiple regression to fit a cubic
+    /** Create a `SymLassoRegression` object that uses multiple regression to fit a cubic
      *  surface to the data.  For example in 2D, the cubic regression equation is
      *      y  =  b dot x + e  =  [b_0, ... b_k] dot [x_0, x_0^2, x_0^3,
      *                                                x_1, x_1^2, x_1^3,
@@ -120,11 +133,8 @@ object SymLassoRegression:
      */
     def cubic (x: MatrixD, y: VectorD, fname: Array [String] = null,
                intercept: Boolean = true, cross: Boolean = false, cross3: Boolean = false,
-               hparam: HyperParameter = LassoRegression.hp): LassoRegression =
-        val mod       = apply (x, y, fname, Set (1, 2, 3), intercept, cross, cross3, hparam)
-        mod.modelName = "SymLassoRegression.cubic" + (if cross then "X" else "") +
-                                                     (if cross3 then "X" else "")
-        mod
+               hparam: HyperParameter = LassoRegression.hp): SymLassoRegression =
+        apply (x, y, fname, LSET (1, 2, 3), intercept, cross, cross3, hparam)
     end cubic
 
 end SymLassoRegression
@@ -134,7 +144,7 @@ import Example_AutoMPG._
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `symLassoRegressionTest` main function tests the `SymLassoRegression`
  *  object using the AutoMPG dataset.  Assumes no missing values.
- *  It tests custom "Symbolic Lasso Regression", with powers specified in "Set (...)" and
+ *  It tests custom "Symbolic Lasso Regression", with powers specified in "LSET (...)" and
  *  applies forward selection, backward elimination, or stepwise regression.
  *  > runMain scalation.modeling.symLassoRegressionTest
  */
@@ -144,8 +154,8 @@ import Example_AutoMPG._
 //  println (s"y = $y")
 
     banner ("AutoMPG Symbolic Lasso Regression")
-    val mod = SymLassoRegression (x, y, x_fname, Set (-2, -1, 0.5, 2))    // add cross-terms and given powers
-    mod.trainNtest ()()                                                   // train and test the model
+    val mod = SymLassoRegression (x, y, x_fname, LSET (-2, -1, 0.5, 2))   // add cross-terms and given powers
+    mod.inSample_Test ()                                                  // train and test the model
     println (mod.summary ())                                              // parameter/coefficient statistics
 
     for tech <- SelectionTech.values do 
@@ -153,8 +163,7 @@ import Example_AutoMPG._
         val (cols, rSq) = mod.selectFeatures (tech)                       // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for Symbolic Lasso Regression with $tech", lines = true)
+        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Symbolic Lasso Regression with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 
@@ -175,18 +184,24 @@ end symLassoRegressionTest
 
     banner ("AutoMPG Quadratic Lasso Regression")
     val mod = SymLassoRegression.quadratic (x, y, x_fname)                // add x^2 terms
-    mod.trainNtest ()()                                                   // train and test the model
+    mod.inSample_Test ()                                                  // train and test the model
     println (mod.summary ())                                              // parameter/coefficient statistics
+    Predictor.makePredictionInt (mod, mod.getX, y, mod.predict (mod.getX))   // make and show PREDICTION INTERVALs
+
+    banner ("AutoMPG Validation Test")
+    mod.validate ()()
+/*
+    println (s"x_fname = ${stringOf (x_fname)}")
 
     for tech <- SelectionTech.values do
         banner (s"Feature Selection Technique: $tech")
         val (cols, rSq) = mod.selectFeatures (tech)                       // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for Quadratic Lasso Regression with $tech", lines = true)
+        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Quadratic Lasso Regression with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
+*/
 
 end symLassoRegressionTest2
 
@@ -205,7 +220,7 @@ end symLassoRegressionTest2
 
     banner ("AutoMPG Quadratic X Lasso Regression")
     val mod = SymLassoRegression.quadratic (x, y, x_fname, true)          // add cross-terms and x^2 terms
-    mod.trainNtest ()()                                                   // train and test the model
+    mod.inSample_Test ()                                                  // train and test the model
     println (mod.summary ())                                              // parameter/coefficient statistics
 
     for tech <- SelectionTech.values do 
@@ -213,8 +228,7 @@ end symLassoRegressionTest2
         val (cols, rSq) = mod.selectFeatures (tech)                       // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for Quadratic X Lasso Regression with $tech", lines = true)
+        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Quadratic X Lasso Regression with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 
@@ -235,7 +249,7 @@ end symLassoRegressionTest3
 
     banner ("AutoMPG Cubic Lasso Regression")
     val mod = SymLassoRegression.cubic (x, y, x_fname)                    // add x^2 and x^3 terms
-    mod.trainNtest ()()                                                   // train and test the model
+    mod.inSample_Test ()                                                  // train and test the model
     println (mod.summary ())                                              // parameter/coefficient statistics
 
     for tech <- SelectionTech.values do 
@@ -243,8 +257,7 @@ end symLassoRegressionTest3
         val (cols, rSq) = mod.selectFeatures (tech)                       // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for Cubic Lasso Regression with $tech", lines = true)
+        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Cubic Lasso Regression with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 
@@ -265,7 +278,7 @@ end symLassoRegressionTest4
 
     banner ("AutoMPG Cubic X Lasso Regression")
     val mod = SymLassoRegression.cubic (x, y, x_fname, true)              // add cross-terms, x^2 and x^3 terms
-    mod.trainNtest ()()                                                   // train and test the model
+    mod.inSample_Test ()                                                  // train and test the model
     println (mod.summary ())                                              // parameter/coefficient statistics
 
     for tech <- SelectionTech.values do 
@@ -273,8 +286,7 @@ end symLassoRegressionTest4
         val (cols, rSq) = mod.selectFeatures (tech)                       // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for Cubic X Lasso Regression with $tech", lines = true)
+        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Cubic X Lasso Regression with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 
@@ -295,18 +307,17 @@ end symLassoRegressionTest5
 //  println (s"y = $y")
 
     banner ("AutoMPG Cubic XX Lasso Regression")
-    val mod = SymLassoRegression.cubic (x, y, x_fname,                  // add x^2 and x^3 terms
-                                        true, true)                     // add cross and cross3 terms
-    mod.trainNtest ()()                                                 // train and test the model
-    println (mod.summary ())                                            // parameter/coefficient statistics
+    val mod = SymLassoRegression.cubic (x, y, x_fname,                    // add x^2 and x^3 terms
+                                        true, true)                       // add cross and cross3 terms
+    mod.inSample_Test ()                                                  // train and test the model
+    println (mod.summary ())                                              // parameter/coefficient statistics
 
     for tech <- SelectionTech.values do
         banner (s"Feature Selection Technique: $tech")
-        val (cols, rSq) = mod.selectFeatures (tech)                     // R^2, R^2 bar, R^2 cv
+        val (cols, rSq) = mod.selectFeatures (tech)                       // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for Cubic XX Lasso Regression with $tech", lines = true)
+        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Cubic XX Lasso Regression with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 
@@ -316,7 +327,7 @@ end symLassoRegressionTest6
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `symLassoRegressionTest7` main function tests the `SymLassoRegression`
  *  object using the AutoMPG dataset.  Assumes no missing values.
- *  It tests custom "Symbolic Lasso Regression", with powers specified in "Set (...)" and
+ *  It tests custom "Symbolic Lasso Regression", with powers specified in "LSET (...)" and
  *  applies forward selection, backward elimination, or stepwise regression.
  *  This test case performs data rescaling.
  *  > runMain scalation.modeling.symLassoRegressionTest7
@@ -328,17 +339,16 @@ end symLassoRegressionTest6
 
     banner ("AutoMPG Symbolic Lasso Regression")
     val mod = SymLassoRegression.rescale (x, y, x_fname,
-                                          Set (-2, -1, 0.5, 2))          // add cross-terms and given powers
-    mod.trainNtest ()()                                                  // train and test the model
-    println (mod.summary ())                                             // parameter/coefficient statistics
+                                          LSET (-2, -1, 0.5, 2))          // add cross-terms and given powers
+    mod.inSample_Test ()                                                  // train and test the model
+    println (mod.summary ())                                              // parameter/coefficient statistics
 
     for tech <- SelectionTech.values do
         banner (s"Feature Selection Technique: $tech")
-        val (cols, rSq) = mod.selectFeatures (tech)                      // R^2, R^2 bar, R^2 cv
+        val (cols, rSq) = mod.selectFeatures (tech)                       // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for Symbolic Lasso Regression with $tech", lines = true)
+        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Symbolic Lasso Regression with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 
@@ -356,20 +366,20 @@ end symLassoRegressionTest7
 
     import random.{Uniform, Normal}
 
-    val noise = Normal (0, 10)                                           // random noise
-    val rad   = Uniform (6370, 7000)                                     // distance from the center of the Earth in km
-    val mas   = Uniform (50, 150)                                        // mass of person
+    val noise = Normal (0, 10)                                            // random noise
+    val rad   = Uniform (6370, 7000)                                      // distance from the center of the Earth in km
+    val mas   = Uniform (50, 150)                                         // mass of person
 
-    val m1 = 5.97219E24                                                  // mass of Earth in kg
-    val G  = 6.67408E-11                                                 // gravitational constant in m^3 kg^-1 s^-2
+    val m1 = 5.97219E24                                                   // mass of Earth in kg
+    val G  = 6.67408E-11                                                  // gravitational constant in m^3 kg^-1 s^-2
 
-    val xy = new MatrixD (100, 3)                                        // simulated gravity data
+    val xy = new MatrixD (100, 3)                                         // simulated gravity data
     for i <- xy.indices do
-        val m2 = mas.gen                                                 // unit of kilogram (kg)
-        val r  = 1000 * rad.gen                                          // unit of meter (m)
-        xy(i, 0) = m2                                                    // mass of person
-        xy(i, 1) = r                                                     // radius/distance
-        xy(i, 2) = G * m1 * m2 / r~^2 + noise.gen                        // force of gravity
+        val m2 = mas.gen                                                  // unit of kilogram (kg)
+        val r  = 1000 * rad.gen                                           // unit of meter (m)
+        xy(i, 0) = m2                                                     // mass of person
+        xy(i, 1) = r                                                      // radius/distance
+        xy(i, 2) = G * m1 * m2 / r~^2 + noise.gen                         // force of gravity
     end for
 
     val fname = Array ("mass2", "radius")
@@ -379,11 +389,11 @@ end symLassoRegressionTest7
 
     banner ("Newton's Universal Gravity Symbolic Lasso Regression")
     val mod = SymLassoRegression (x, y, fname, null, false, false,
-              terms = Array ((0, 1.0), (1, -2.0)))                       // add one custom term
+              terms = Array ((0, 1.0), (1, -2.0)))                        // add one custom term
 
-    mod.trainNtest ()()                                                  // train and test the model
-    println (mod.summary ())                                             // parameter/coefficient statistics
-    println (s"b =~ GM = ${G * m1}")                                     // Gravitational Constant * Mass of the Earth
+    mod.inSample_Test ()                                                  // train and test the model
+    println (mod.summary ())                                              // parameter/coefficient statistics
+    println (s"b =~ GM = ${G * m1}")                                      // Gravitational Constant * Mass of the Earth
 
 end symLassoRegressionTest8
 
@@ -404,11 +414,11 @@ end symLassoRegressionTest8
     val x_c  = x - mu_x
     val y_c  = y - mu_y
 
-    val xx = MatrixD (x_c).transpose
+    val xx = MatrixD (x_c).ᵀ
 
     banner ("Lasso Regression")
     var mod = new LassoRegression (xx, y_c)
-    mod.trainNtest ()()
+    mod.inSample_Test ()                                                  // train and test the model
     println (mod.summary ())
     var yp  = mod.predict (mod.getX)
     var yp2 = yp + mu_y
@@ -418,7 +428,7 @@ end symLassoRegressionTest8
     banner ("Quadratic Lasso Regression")
     val fname = Array ("x")
     mod = SymLassoRegression.quadratic (xx, y_c, fname)
-    mod.trainNtest ()()
+    mod.inSample_Test ()                                                  // train and test the model
     println (mod.summary ())
     yp  = mod.predict (mod.getX)
     yp2 = yp + mu_y
@@ -427,7 +437,7 @@ end symLassoRegressionTest8
 
     banner ("Cubic Lasso Regression")
     mod = SymLassoRegression.cubic (xx, y_c, fname)
-    mod.trainNtest ()()
+    mod.inSample_Test ()                                                  // train and test the model
     println (mod.summary ())
     yp  = mod.predict (mod.getX)
     yp2 = yp + mu_y

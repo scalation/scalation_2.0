@@ -92,7 +92,6 @@ object LassoAdmm:
         else
             z = new VectorD (n)
             l = new VectorD (n)
-        end if
 
         var z_old: VectorD = null
 

@@ -12,7 +12,7 @@ package scalation
 package modeling
 package classifying
 
-import scala.collection.mutable.{ArrayBuffer, Set, SortedMap}
+import scala.collection.mutable.{ArrayBuffer => VEC, Set, SortedMap}
 
 import scalation.mathstat.{VectorD, VectorI}
 import scalation.mathstat.Probability.entropy
@@ -53,7 +53,7 @@ trait DecisionTree:
 
     private val debug      = debugf ("DecisionTree", true)           // debug function
     private var root: Node = null                                    // the root node
-    private [classifying] val leaves = ArrayBuffer [Node] ()         // array buffer of leaf nodes
+    private [classifying] val leaves = VEC [Node] ()                 // array buffer of leaf nodes
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Add the root node to the tree.
@@ -94,7 +94,6 @@ trait DecisionTree:
             leaves += n                                          // add n to leaves
         else
             println (s"makeLeaf: node $n already is a leaf")
-        end if
     end makeLeaf
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -133,7 +132,7 @@ trait DecisionTree:
      *  of nodes (defaults to leaves).
      *  @param nodes  the nodes to compute the weighted entropy over
      */
-    def calcEntropy (nodes: ArrayBuffer [Node] = leaves): Double =
+    def calcEntropy (nodes: VEC [Node] = leaves): Double =
         var sum, ent = 0.0
         for n <- nodes do
             sum += n.nu_sum                                      // add number of counts for node n
@@ -154,7 +153,7 @@ trait DecisionTree:
             val zj = z(n.j)
             try predictIrec (z, n.branch(zj))
             catch
-                case ex: NoSuchElementException => n.nu.argmax ()    // take consensus of node n
+                case _ : NoSuchElementException => n.nu.argmax ()    // take consensus of node n
         end if
     end predictIrec
 
@@ -172,7 +171,7 @@ trait DecisionTree:
                 if cont then predictIrecD (z, if zj <= n.thres then n.branch(0) else n.branch(1))
                 else predictIrecD (z, n.branch(zj.toInt))
             catch
-                case ex: NoSuchElementException => n.nu.argmax ()    // take consensus of node n
+                case _ : NoSuchElementException => n.nu.argmax ()    // take consensus of node n
         end if
     end predictIrecD
 
@@ -235,7 +234,6 @@ object Node:
             println ("\t" * level + "[ " + n)
             for c <- n.branch.values do printT (c, level + 1)
             println ("\t" * level + "]")
-        end if
     end printT
 
 end Node
@@ -263,7 +261,7 @@ end Node
     Tree.add (n0, (0, n1), (1, n4), (2, n5))                     // add children of n0
 
     Tree.printTree ()
-    println (s"inital entropy = ${Tree.calcEntropy (ArrayBuffer (n0))}")
+    println (s"inital entropy = ${Tree.calcEntropy (VEC (n0))}")
     println (s"final  entropy = ${Tree.calcEntropy ()}")
 
     println ("Classify New Data")

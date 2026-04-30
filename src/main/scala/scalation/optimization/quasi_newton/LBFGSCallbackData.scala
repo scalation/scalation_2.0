@@ -21,13 +21,11 @@ package quasi_newton
  *  and classes while retaining the ability to callback the methods of said
  *  logic with the correct parameters.
  *
- *  @param n                The number of variables used in the optimization.
- *  @param instance         User data provided for a given call of the L-BFGS optimization
- *                          done by `lbfgsMain` on the `LBFGS` object.  Can have `Any`
- *                          type defined by the user as long as it is the same one
- *                          expected by the `optimizationLogic` parameter.
- *  @param evaluationLogic  `EvaluationLogic` that describes the optimization steps 
- *                          for the L-BFGS optimization done by the `LBFGS` object.
+ *  @param n          the number of variables used in the optimization.
+ *  @param instance   an optional user data segment that may be provided when calling
+ *                    the `LBFGS.lbfgsMain` method (@see `OptimizationLogic`)
+ *  @param evalLogic  `EvaluationLogic` that describes the optimization steps 
+ *                    for the L-BFGS optimization done by the `LBFGS` object.
  */
-case class LBFGSCallbackData (n: Int, instance: Any, evaluationLogic: EvaluationLogic)
+case class LBFGSCallbackData (n: Int, instance: Any, evalLogic: EvaluationLogic)
 

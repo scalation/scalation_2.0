@@ -14,7 +14,7 @@ package scalation
 package modeling
 package clustering
 
-import scala.collection.mutable.{ArrayBuffer, Set}
+import scala.collection.mutable.{ArrayBuffer => VEC, Set}
 import scala.math.min
 import scala.runtime.ScalaRunTime.stringOf
 import scala.util.boundary, boundary.break
@@ -83,9 +83,9 @@ class TightClusterer (x: MatrixD, k0: Int, kmin: Int, s: Int = 0):
      *  scores together in clusters (clubs).
      *  @param md  the mean comembership matrix
      */
-    def formCandidateClusters (md: MatrixD): ArrayBuffer [Set [Int]] =
+    def formCandidateClusters (md: MatrixD): VEC [Set [Int]] =
         val avail = Array.fill (n)(true)                           // whether a point is available
-        val clubs = new ArrayBuffer [Set [Int]] ()                 // list of clubs
+        val clubs = new VEC [Set [Int]] ()                         // list of clubs
         for i <- 0 until n if avail(i) do
             val club = Set (i)                                     // put i in a club
             avail(i) = false                                       // make i unavailable
@@ -99,7 +99,7 @@ class TightClusterer (x: MatrixD, k0: Int, kmin: Int, s: Int = 0):
      *  (largest first).
      *  @param clubs  the candidate clusters
      */
-    def orderBySize (clubs: ArrayBuffer [Set [Int]]): Array [Int] =
+    def orderBySize (clubs: VEC [Set [Int]]): Array [Int] =
         val sz = clubs.map (_.size).toArray                        // record sizes of clubs
 //      new SortingI (sz).iselsort2 ()                             // indirectly sort by size
         VectorI (sz.asInstanceOf [collection.mutable.IndexedSeq [Int]]).iselsort.toArray    // indirectly sort by size
@@ -110,7 +110,7 @@ class TightClusterer (x: MatrixD, k0: Int, kmin: Int, s: Int = 0):
      *  number of clusters 'k'.  This corresponds to Algorithm A in the paper/URL.
      *  @param k  the number of clusters
      */
-    def selectCandidateClusters (k: Int): (ArrayBuffer [Set [Int]], Array [Int]) =
+    def selectCandidateClusters (k: Int): (VEC [Set [Int]], Array [Int]) =
         val md    = computeMeanComembership (k)                    // mean comembership
         val clubs = formCandidateClusters (md)                     // form candidate clusters (clubs)
         val order = orderBySize (clubs)                            // determine rank order by club size
@@ -125,8 +125,8 @@ class TightClusterer (x: MatrixD, k0: Int, kmin: Int, s: Int = 0):
      *  @param clubs  all the clubs (candidate clusters)
      *  @param order  the rank order (by club size) of all the clubs
      */
-    def pickTopQ (clubs: ArrayBuffer [Set [Int]], order: Array [Int]): ArrayBuffer [Set [Int]] =
-        val ml = ArrayBuffer [Set [Int]] ()
+    def pickTopQ (clubs: VEC [Set [Int]], order: Array [Int]): VEC [Set [Int]] =
+        val ml = VEC [Set [Int]] ()
         for (i <- 0 until min (q, clubs.size)) ml += clubs(order (i))
         ml
     end pickTopQ
@@ -144,7 +144,7 @@ class TightClusterer (x: MatrixD, k0: Int, kmin: Int, s: Int = 0):
      *  To be stable, a club must have a similar club at the next level (next k value).
      *  @param topClubs  the top clubs for each level to be search for stable clusters
      */
-    def findStable (topClubs: Array [ArrayBuffer [Set [Int]]]): (Int, Set [Int]) = boundary:
+    def findStable (topClubs: Array [VEC [Set [Int]]]): (Int, Set [Int]) = boundary:
         for lev <- 0 until topClubs.length-1 do
             for c1 <- topClubs (lev); c2 <- topClubs (lev+1) do
                 if sim (c1, c2) >= beta then break ((lev, c1))     // found a stable cluster
@@ -157,10 +157,10 @@ class TightClusterer (x: MatrixD, k0: Int, kmin: Int, s: Int = 0):
      *  assignment vector.  A basic goal is to minimize the sum of the distances
      *  between points within each cluster.
      */
-    def cluster (): ArrayBuffer [Set [Int]] =
+    def cluster (): VEC [Set [Int]] =
         val levels   = 2                                           // number of levels to try
-        val clusters = new ArrayBuffer [Set [Int]] ()
-        val topClubs = Array.ofDim [ArrayBuffer [Set [Int]]] (levels)
+        val clusters = new VEC [Set [Int]] ()
+        val topClubs = Array.ofDim [VEC [Set [Int]]] (levels)
         for kc <- k0 to kmin by -1 do                              // iteratively decrement kc (k current value)
             for k <- kc until kc + levels do
                 val (clubs, order) = selectCandidateClusters (k0)

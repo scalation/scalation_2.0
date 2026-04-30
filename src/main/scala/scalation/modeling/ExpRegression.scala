@@ -33,7 +33,7 @@ import scalation.optimization.quasi_newton.BFGS
 class ExpRegression (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
                      hparam: HyperParameter = null, nonneg: Boolean = true)
       extends Predictor (x, y, fname_, hparam)
-         with Fit (dfm = x.dim2 - 1, df = x.dim - x.dim2):
+         with Fit (dfr = x.dim2 - 1, df = x.dim - x.dim2):
 
     if nonneg && ! y.isNonnegative then flaw ("init", "response vector y must be nonnegative")
 
@@ -43,7 +43,7 @@ class ExpRegression (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
 //  private var r_dev      = -1.0                                        // residual dev: -LL, for full model
 //  private var pseudo_rSq = -1.0                                        // McFaffen's pseudo R-squared
 
-    modelName = "ExpRegression"
+    _modelName = "ExpRegression"
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** For a given parameter vector b, compute -2 * Log-Likelihood (-2LL).
@@ -96,9 +96,10 @@ class ExpRegression (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
     def train_null (): Unit =
          val b0   = new VectorD (x.dim2)                                 // use b0 = 0 for starting guess for parameters
          val bfgs = new BFGS (ll_null)                                   // minimizer for -2l
-         val b_n = bfgs.solve (b0)._2                                    // find optimal solution for parameters
+         val b_n  = bfgs.solve (b0)._2                                   // find optimal solution for parameters
 
          n_dev   = ll_null (b_n)                                         // measure of fitness for null model
+         println (s"train_null: n_dev = $n_dev")
     end train_null
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -137,10 +138,11 @@ class ExpRegression (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Build a sub-model that is restricted to the given columns of the data matrix.
      *  @param x_cols  the columns that the new model is restricted to
+     *  @param fname2  the variable/feature names for the new model (defaults to null)
      */
-    override def buildModel (x_cols: MatrixD): ExpRegression =
+    def buildModel (x_cols: MatrixD, fname2: Array [String] = null): ExpRegression =
         debug ("buildModel", s"${x_cols.dim} by ${x_cols.dim2}")
-        new ExpRegression (x_cols, y, null, hparam, nonneg)
+        new ExpRegression (x_cols, y, fname2, hparam, nonneg)
     end buildModel
 
 end ExpRegression
@@ -204,7 +206,7 @@ end ExpRegression
     println (s"x = $x")
 
     val mod = new ExpRegression (x, y)                                   // create model with with interecept (else pass x)
-    mod.trainNtest ()()                                                  // train and test the model
+    mod.inSample_Test ()                                                 // train and test the model
     println (mod.summary ())                                             // parameter/coefficient statistics
 
     val yp = mod.predict (x)
@@ -229,10 +231,10 @@ end expRegressionTest
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Test `ExpRegression` by simulating n-many observations.
-     *  @param n  number of observations
-     *  @param k  number of variables
+     *  @param n  number of observations (e.g., 10000)
+     *  @param k  number of variables (e.g., 5)
      */
-    def test (n: Int = 10000, k: Int = 5): Unit =
+    def test (n: Int, k: Int): Unit =
         val u = new Uniform (0, 1)                                       // uniform random
         val e = new Exponential (1)                                      // exponential error
         val r = new Random ()
@@ -248,9 +250,9 @@ end expRegressionTest
         for i <- y.indices do y(i) = exp (x(i) dot b) * e.gen
 
         banner ("Simulated exp regression problem with $k vars")
-        val mod = new ExpRegression (x, y)                                // create model with with interecept (else pass x)
-        mod.trainNtest ()()                                               // train and test the model
-        println (mod.summary ())                                          // parameter/coefficient statistics
+        val mod = new ExpRegression (x, y)                               // create model with with interecept (else pass x)
+        mod.inSample_Test ()                                             // train and test the model
+        println (mod.summary ())                                         // parameter/coefficient statistics
     end test
 
     for k <- 1 to 10 do test (1000, k)
@@ -285,7 +287,7 @@ end expRegressionTest2
     println (s"xy = $xy")
 
     val mod = ExpRegression (xy)()                                       // create a model
-    mod.trainNtest ()()                                                  // train and test the model
+    mod.inSample_Test ()                                                 // train and test the model
 
     val y  = xy(?, 1)                                                    // vector column 1
     val yp = mod.predict (xy.not(?, 1))                                  // matrix excluding column 1

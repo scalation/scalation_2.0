@@ -11,7 +11,7 @@
 package scalation
 package modeling
 
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.{ArrayBuffer => VEC}
 
 import scalation.mathstat._
 
@@ -22,7 +22,7 @@ import scalation.mathstat._
 trait MonitorLoss:
 
     private val debug  = debugf ("MonitorLoss", false)                 // debug function
-    private val losses = ArrayBuffer [Double] ()                       // hold values for loss function
+    private val losses = VEC [Double] ()                               // hold values for loss function
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Collect the next value for the loss function.
@@ -40,6 +40,11 @@ trait MonitorLoss:
         val epoch = VectorD.range (1, loss.dim+1)
         new Plot (epoch, loss, null, s"loss vs epoch $optName")
     end plotLoss
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the best/minumum loss seen.
+     */
+    def getBestLoss: Double = losses.min
 
 end MonitorLoss
 

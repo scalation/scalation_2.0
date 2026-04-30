@@ -12,9 +12,8 @@ package scalation
 package database
 
 import scala.collection.mutable.{ArrayBuffer => VEC}
-import scala.reflect.ClassTag
 
-class BinTree [T: ClassTag] (val elem: T):
+class BinTree [T] (val elem: T):
 
     private var left: BinTree [T] = null
     private var righ: BinTree [T] = null

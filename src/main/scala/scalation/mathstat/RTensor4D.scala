@@ -256,14 +256,14 @@ class RTensor4D (val dim: Int, val dim2: VectorI, val dim3: VectorI, val dim4: I
      *  @param j  2nd dimension (column) index of the tensor
      *  @param x  the matrix to be updated at the above position in the tensor
      */
-    def update (i: Int, j: Int, x: MatrixD): Unit = v(i) = null   // FIX x.toArray
+    def update (i: Int, j: Int, x: MatrixD): Unit = v(i)(j) = x.toArray
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Update a single matrix of the tensor to the given matrix.
      *  @param i  1st dimension (row) index of the tensor
      *  @param x  the matrix to be updated at the above position in the tensor
      */
-    def update (i: Int, x: RTensorD): Unit = v(i) = null   // FIX x.toArray
+    def update (i: Int, x: RTensorD): Unit = ???        // FIX v(i) = x.toArray
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Set all the tensor element values to x.

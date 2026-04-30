@@ -120,7 +120,7 @@ end NormalMat
 /** The `RandomMatD` class generates a random matrix of doubles.
  *  @param dim      the number of rows in the matrix
  *  @param dim2     the number of columns in the matrix
- *  @param max      generate integers in the range 0 (inclusive) to max (inclusive)
+ *  @param max      generate integers in the range 0 (inclusive) to max (inclusive) <-- note max arg first
  *  @param min      generate integers in the range 0 (inclusive) to max (inclusive)
  *  @param density  sparsity basis = 1 - density
  *  @param stream   the random number stream
@@ -136,7 +136,7 @@ case class RandomMatD (dim: Int = 5, dim2: Int = 10, max: Double = 20.0, min: Do
 
     def pf (z: MatrixD): Double = 1.0 / (max - min) ~^ (dim + dim2)
 
-    def gen: MatrixD = MatrixD (for i <- 0 until dim yield rvec.gen)
+    def gen: MatrixD = MatrixD (for _ <- 0 until dim yield rvec.gen)
 
     def igen: MatrixD = gen.toInt
 
@@ -157,12 +157,12 @@ end RandomMatD
      banner ("Test: NormalMat random matrix generation")
      rvm = NormalMat (4, 5, 0.0, 0.01)                         // random normal matrix generator
      println ("mean = " + rvm.mean)                            // with mean 0 and variance 0.01
-     for k <- 0 until 10 do println (rvm.gen)
+     cfor (0, 10) { _ => println (rvm.gen) }
 
      banner ("Test: RandomMatD random matrix generation")
      rvm = RandomMatD (2, 100)                                 // random matrix generator
      println ("mean = " + rvm.mean)
-     for k <- 0 until 10 do println (rvm.gen)
+     cfor (0, 10) { _ => println (rvm.gen) }
 
      val cor = MatrixD ((2, 2), 1.0, 0.9,                      // covariance/correlation matrix
                                 0.9, 1.0)

@@ -45,7 +45,6 @@ case class CausalLink (label: String, director: Model, val condition: () => Bool
             director.animate (this, CreateEdge, green, new QCurve (), from, to, Array (16.0 * bend))
         else
             director.animate (this, CreateEdge, green, new QCurve (), from, to, Array (bend))
-        end if
     end display
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

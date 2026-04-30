@@ -58,7 +58,6 @@ abstract class Bus (name: String, director: Model, lTime: Variate, cap: Int, pos
                 director.schedule (r_i, i)                       // FIX - use longer delay
                 rider(i) = null                                  // open seat i
                 nRiders -= 1                                     // decrement the number of riders
-            end if
         end for
     end unload
 

@@ -58,7 +58,6 @@ object MatrixI:
                     flaw ("isIntegral", s"x($i, $j) = $x_ij is not integer-valued")
                     allint = false
                     break ()
-                end if
             end for
         } // breakable
         allint

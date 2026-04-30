@@ -33,7 +33,6 @@ import scala.io.StdIn.readLine
            println (line)
         else
            cont = false
-        end if
     end while
 
 end makeVectorI

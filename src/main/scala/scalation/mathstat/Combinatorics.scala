@@ -283,14 +283,13 @@ object Combinatorics:
 //          prod *= SQRT_PI / 2~^ia
 //      else
 //          flaw ("gammaF", "only handle positive integer and halves cases")
-//      end if
 //      prod
 //  } // gammaF
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute the 'k'th degree rising factorial of 'x'.  When 'x = 1', this is
      *  the regular factorial function 'k!'.  Also known as Pochhammer's symbol.
-     *  Caveat: only works when 'k' is a nonnegative integer
+     *  @caveat:  only works when 'k' is a nonnegative integer
      *  @param k  the number of factors in the product
      *  @param x  the base number to start the product
      */
@@ -422,7 +421,7 @@ import Combinatorics._
     println ("\nBuild Pascal's Triangle using choose (n, k)")
     val max = 16
     for n <- 0 to max do
-        for i <- 1 to (max - n) / 2 do print ("\t")
+        cfor (0, (max - n) / 2) { _ => print ("\t") }
         for k <- 0 to n do
             val c = choose (n, k)
             if n % 2 == 1 then if c < 1000 then print ("    ") else print ("   ")

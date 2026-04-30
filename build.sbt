@@ -10,11 +10,15 @@ lazy val scalation = project.in(file("."))
 //     "-explain-types",       // explain type errors in more detail
        "-new-syntax",          // require `then` and `do` in control expressions.
        "-Wunused:all",         // warn of unused imports, ...
-       "-Xfatal-warnings")     // fail the compilation if there are any warnings
+       "-Werror")     // fail the compilation if there are any warnings
 //  javacOptions  += "--add-modules jdk.incubator.vector"
   )
 
 fork := true
+
+outputStrategy := Some(StdoutOutput)
+
+libraryDependencies += "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0"
 
 // resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
 // resolvers += Opts.resolver.sonatypeSnapshots
@@ -23,7 +27,7 @@ fork := true
 // ScalaFx (2D and 3D Graphics)
 // https://mvnrepository.com/artifact/org.scalafx/scalafx_3/22.0.0-R33
 // libraryDependencies += "org.scalafx" %% "scalafx" % "21.0.0-R32"
-libraryDependencies += "org.scalafx" %% "scalafx" % "22.0.0-R33"
+// libraryDependencies += "org.scalafx" %% "scalafx" % "22.0.0-R33"
 
 // Gson (json)
 // https://mvnrepository.com/artifact/com.google.code.gson/gson

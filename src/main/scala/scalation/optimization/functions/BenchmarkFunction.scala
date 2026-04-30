@@ -35,7 +35,9 @@ import scalation.mathstat.VectorD
  */
 trait BenchmarkFunction:
 
-    val functionMinimum: VectorD
+    val functionMinimum: VectorD                               // known minimal point
+
+    val bound: (VectorD, VectorD) = (null, null)               // optional (lower, upper) bounds
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** The objective function used for benchmarking or testing purposes. Can be

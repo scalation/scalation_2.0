@@ -157,10 +157,8 @@ case class VTable (name_ : String, schema_ : Schema, domain_ : Domain, key_ : Sc
                 flaw ("addE", "attempt to link to multiple targets vertices when edge type is unique")
             else
                 vset += v
-            end if
         else 
             flaw ("addE", s"elab = $elab not an edge type for $name")
-        end if
         debug (s"addE", s"$name: \t u.edge = ${u.edge}")
         this
     end addE
@@ -194,10 +192,8 @@ case class VTable (name_ : String, schema_ : Schema, domain_ : Domain, key_ : Sc
                 val vset = u.edge.getOrElse (elab, null)
                 if vset == null then u.edge += elab -> vs
                 else vset ++= vs
-            end if
         else 
             flaw ("addEs", s"elab = $elab not an edge type for $name")
-        end if
 //      debug ("addEs", s"edge = $edge")
     end addEs
 
@@ -245,7 +241,7 @@ case class VTable (name_ : String, schema_ : Schema, domain_ : Domain, key_ : Sc
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** UNION this vertex-table and r2.  Check that the two tables are compatible.
      *  If they are not, return the first table.
-     *  Caveat:  Assumes the key from the first table still works (@see create_index)
+     *  @caveat:  Assumes the key from the first table still works (@see create_index)
      *  Acts like union-all, so to remove duplicates call create_index after union.
      *  @param r2  the second table (may be a Table or VTable)
      */
@@ -300,7 +296,7 @@ case class VTable (name_ : String, schema_ : Schema, domain_ : Domain, key_ : Sc
      *  @param ref  the foreign key reference (edge-label, referenced table)
      */
     def expand (x: Schema, ref: (String, VTable)): VTable =
-        val (elab, refTab) = ref                                            // edge-label, referenced table
+        val refTab = ref._2                                                 // edge-label, referenced table
 //      val x1 = schema intersect x                                         // attributes from first table
         val x1 = meet (schema, x)                                           // attributes from first table
         val x2 = meet (refTab.schema, x)                                    // attributes from second table
@@ -371,7 +367,6 @@ case class VTable (name_ : String, schema_ : Schema, domain_ : Domain, key_ : Sc
         if tab2 != null && tab2.isInstanceOf [VTable] then
             val vtab2 = tab2.asInstanceOf [VTable]
             for (k, vl) <- vtab2.edgeType if k != elab && k != elab2 do s.addEdgeType (k, vl._1, vl._2)
-        end if
         debug ("updateEdgeTypes", s"s.edgeType = ${s.edgeType}")
     end updateEdgeTypes
 
@@ -400,7 +395,7 @@ case class VTable (name_ : String, schema_ : Schema, domain_ : Domain, key_ : Sc
      *  @param ref  the foreign key reference (edge-label, referenced table)
      */
     def edgeTable (ref: (String, Table)): VTable =
-        val (elab, refTab) = ref                                            // edge-label, referenced table
+        val refTab = ref._2                                                 // edge-label, referenced table
         val newKey = key ++ refTab.key
         val newDom = pull (key) ++ refTab.pull (refTab.key)
 
@@ -461,7 +456,6 @@ case class VTable (name_ : String, schema_ : Schema, domain_ : Domain, key_ : Sc
 //                  debug ("show", s"es.head = ${es.head}, elab = $elab")
                     val x = es.getOrElse (elab, null)
                     if x != null then prt (x.head.tuple(0), width_)
-                    end if
                 end for
             end if
             println (" |")

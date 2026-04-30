@@ -35,8 +35,8 @@ trait ZoomablePanel
     private   var scale   = 1.0
     private   var basex   = 0.0
     private   var basey   = 0.0
-    private   var originx = 0.0
-    private   var originy = 0.0
+//  private   var originx = 0.0
+//  private   var originy = 0.0
 
     addMouseWheelListener (this)
     addMouseMotionListener (this)
@@ -59,7 +59,7 @@ trait ZoomablePanel
         try
             at.inverseTransform (new Point2D.Double (x, y), p)
         catch
-            case ee: Exception => {}
+            case _ : Exception => {}
         end try
         x = p.getX ()
         y = p.getY ()
@@ -83,8 +83,8 @@ trait ZoomablePanel
     override def mouseDragged (e: MouseEvent): Unit =
         val dx   = (e.getX () - basex) / scale
         val dy   = (e.getY () - basey) / scale
-        originx += dx * scale
-        originy += dy * scale
+//      originx += dx * scale
+//      originy += dy * scale
         at.translate (dx, dy)
         basex = e.getX ()
         basey = e.getY ()

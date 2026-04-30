@@ -72,8 +72,8 @@ class VTransport (name: String, from_ : Component, to_ : Component,
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Move the entity (SimActor) smoothly down this VTransport (e.g., road).
      *  Repeatedely move it along the VTransport/Edge/QCurve.
-     *  Caveat: tokens coordinates are computed using a shadow QCurve (same coordinates
-     *  as the one that will be created by the animation engine).
+     *  @caveat:  tokens coordinates are computed using a shadow QCurve
+     *            (same coordinates as the one that will be created by the animation engine).
      */
     override def move (): Unit =
         debug ("move", s"get actor ${director.theActor} from director $director")

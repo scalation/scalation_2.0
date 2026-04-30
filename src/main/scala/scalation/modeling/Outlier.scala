@@ -243,7 +243,7 @@ end outlierTest2
     import scalation.random.Normal
 
     val normal = Normal ()
-    val y      = VectorD (for i <- 0 until 10000 yield normal.gen)
+    val y      = VectorD (for _ <- 0 until 10000 yield normal.gen)
 
     banner ("Standard Deviation Method: DistanceOutlier")
     var bounds = DistanceOutlier.calcBounds (y)

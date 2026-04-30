@@ -82,7 +82,6 @@ class GraphGen (typeSelector: Char, stream: Int = 0):
                 end for
             else
                 ch(i) = rsg.igen (degree, size-1, i)                // generate children uniformly across graph
-            end if
         end for
 
         val label  = randDistLabels (size, nLabels)                 // randomly assign vertex labels
@@ -252,7 +251,6 @@ class GraphGen (typeSelector: Char, stream: Int = 0):
                             if ! (nodes contains v_ch) then
                                 nodes += v_ch                             // add child vertex to nodes
                                 q.enqueue (v_ch)                          // put it on the BFS queue
-                            end if
                             chs2 += v_ch
                             edges += 1
                         else if nodes contains v_ch then                  // can only take edge if child in nodes
@@ -260,7 +258,6 @@ class GraphGen (typeSelector: Char, stream: Int = 0):
                             edges += 1
                         else
                             println (s"genBFSquery: can't find enough child vertices for $v")
-                        end if
                     end if
                 end for
 
@@ -274,7 +271,6 @@ class GraphGen (typeSelector: Char, stream: Int = 0):
                 maxEdges = edges
                 maxNodes = nodes.clone ()
                 maxChMap = chMap.clone ()
-            end if
 
             if nodes.size < size || edges < nedges then                   // not enough vertices/edges, try again
                 nRestarts += 1
@@ -465,7 +461,6 @@ object GraphGen:
                 if ! newNodeChildren.isEmpty then
                     for newChild <- newNodeChildren if nodes.size < size do
                         if ! nodes.contains (newChild) then { nodes += newChild; q.enqueue (newChild) }
-                    end for
                 end if
             end while
 
@@ -473,7 +468,6 @@ object GraphGen:
             if nodes.size < size then
                 nRestarts += 1
                 println ("nodes.size only " + nodes.size)
-            end if
         end while
 
         if nRestarts == maxRestarts then { println ("extractSubgraph: could not find a good query"); return null }
@@ -503,7 +497,7 @@ object GraphGen:
         vertexMap.foreach { case (oldId, newId) => new2OldIds(newId) = oldId }
 
         // for each mapped vertex, assign its mapped children
-        val ch = Array.ofDim [SET [Int]] (nodes.size).map (x => SET [Int] ())
+        val ch = Array.ofDim [SET [Int]] (nodes.size).map (_ => SET [Int] ())
         for (v, v_ch) <- chMap do ch(vertexMap (v)) = v_ch.map (vertexMap (_))
 
         // map the vertex and edge labels

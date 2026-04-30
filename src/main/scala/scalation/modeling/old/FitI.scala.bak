@@ -1,0 +1,282 @@
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** @author  John Miller
+ *  @version 2.0
+ *  @date    Thu Apr  4 13:40:25 EDT 2024
+ *  @see     LICENSE (MIT style license file).
+ *
+ *  @note    Model Support: Interval-based Quality of Fit (QoFI)
+ *
+ *  @see github.com/scikit-learn/scikit-learn/issues/20162     // used in scikit-learn
+ *       www.mdpi.com/1999-4893/13/6/132                       // defines several metrics
+ *       arxiv.org/pdf/2005.12881.pdf                          // for IS and WIS
+ *       https://www.sciencedirect.com/science/article/pii/S1364032120308005
+ *       www.datasciencewithmarco.com/blog/conformal-prediction-in-time-series-forecasting
+ */
+
+package scalation
+package modeling
+
+import scalation.mathstat._
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `QoFI` enum defines the Interval-based Quality of Fit (QoFI) measures/metrics,
+ *  i.e., prediction interval metrics.
+ *  @param name  the name of the parameter
+ */
+enum QoFI (val name: String):
+
+    case picp   extends QoFI ("picp")                          // index  0
+    case pinc   extends QoFI ("pinc")                          // index  1
+    case ace    extends QoFI ("ace")                           // index  2
+    case pinaw  extends QoFI ("pinaw")                         // index  3
+    case iscore extends QoFI ("iscore")                        // index  4
+    case wis    extends QoFI ("wis")                           // index  5
+    case pinad  extends QoFI ("pinad")                         // index  6
+    case cwc    extends QoFI ("cwc")                           // index  7
+    case crps   extends QoFI ("crps")                          // index  8
+
+end QoFI
+
+val qoFI_names     = QoFI.values.map (_.toString)              // The QoF names from the QoFI enum
+val qoFI_all_names = qoF_names ++ qoFI_names                   // All the QoF names from QoF and QoFI
+
+import QoFI._
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `FitI` companion object provides factory methods for assessing quality of
+ *  fit for standard types of modeling techniques.
+ */
+object FitI:
+
+    val N_QoFI = QoFI.values.size                                      // the number of QoFI measures
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the help string that describes the Quality of Fit (QoFI) measures
+     *  provided by the `FitI` class.
+     *  @see www.ncbi.nlm.nih.gov/pmc/articles/PMC5570302/
+     *  @see https://en.wikipedia.org/wiki/Coefficient_of_determination
+     */
+    def help: String =
+        """
+help: Interval-based Quality of Fit (QoFI) metrics/measures:
+    picp   =  prediction interval coverage probability (reliability)
+    pinc   =  prediction interval nominal coverage
+    ace    =  average coverage error
+    pinaw  =  prediction interval normalized average width (sharpness)
+    iscore =  interval score
+    wis    =  weighted interval score
+    pinad  =  prediction interval normalized average deviation (future use)
+    cwc    =  coverage width-based criterion (future use)
+    crps   =  continuous ranked probability score (future use)
+        """
+    end help
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Create a table to store statistics for QoFI measures, where each row corresponds
+     *  to the statistics on a particular QoFI measure.
+     */
+    def qofStatTable: Array [Statistic] =
+        val stats = Array.ofDim [Statistic] (N_QoFI)                        // for collecting stats on QoFI measures
+        for i <- stats.indices do stats(i) = new Statistic (values(i).toString, unbiased = true)
+        stats
+    end qofStatTable
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Tally the current QoFI measures into the statistical accumulators.
+     *  @param stats  the statistics table being updated
+     *  @param qof    the current QoFI measure vector
+     */
+    def tallyQof (stats: Array [Statistic], qof: VectorD): Unit =
+        for q <- qof.indices do stats(q).tally (qof(q))                 // tally these QoFI measures
+    end tallyQof
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the Prediction Interval Coverage Probability (PICP) metric, i.e.,
+     *  the fraction is actual values inside the prediction interval.
+     *  @param y    the given time-series (must be aligned with the interval forecast)
+     *  @param low  the lower bound
+     *  @param up   the upper bound
+     */
+    def picp_ (y: VectorD, low: VectorD, up: VectorD): Double =
+        var count = 0
+        for i<- y.indices if y(i) in (low(i), up(i)) do count += 1
+        count / y.dim.toDouble
+    end picp_
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the Prediction Interval Normalised Average Deviation (PINAD) metric, i.e.,
+     *  the normalized (by range) average deviation outside the prediction interval.
+     *  @param y    the given time-series (must be aligned with the interval forecast)
+     *  @param low  the lower bound
+     *  @param up   the upper bound
+     */
+    def pinad_ (y: VectorD, low: VectorD, up: VectorD): Double =
+        var sum = 0.0
+        for i <- y.indices do
+            sum += (if y(i) < low(i) then low(i) - y(i)
+                    else if y(i) > up(i) then y(i) - up(i)
+                    else 0.0)
+        sum / (y.dim * (y.max - y.min))
+    end pinad_
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the Interval Score (IS) metric, i.e., the ...
+     *  @see https://arxiv.org/pdf/2005.12881.pdf
+     *  @param y      the given time-series (must be aligned with the interval forecast)
+     *  @param low    the lower bound
+     *  @param up     the upper bound
+     &  @param alpha  the prediction level
+     */
+    def iscore_ (y: VectorD, low: VectorD, up: VectorD, alpha: Double = 0.1): Double =
+        val fac = 2.0 / alpha
+        var sum = 0.0
+        for i <- y.indices do
+            sum += up(i) - low(i)                                 // interval width
+            if y(i) < low(i) then sum += fac * (low(i) - y(i))    // y_i below interval penalty
+            if y(i) > up(i)  then sum += fac * (y(i) - up(i))     // y_i above interval penalty
+        sum / y.dim
+    end iscore_
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the Weighted Interval Score (WIS) metric, i.e., the ...
+     *  @see https://arxiv.org/pdf/2005.12881.pdf
+     *  @param y       the given time-series (must be aligned with the interval forecast)
+     *  @param yp      the point prediction mean/median
+     *  @param low     the lower bounds for various alpha levels
+     *  @param up      the upper bounds for various alpha levels
+     *  @param alphas  the array of prediction levels
+     */
+    def wis_ (y: VectorD, yp: VectorD, low: MatrixD, up: MatrixD,
+              alphas: Array [Double] =
+              Array (0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)): Double =
+        val k = alphas.size
+        var sum = alphas(0) * (y - yp).abs.mean
+        for j <- 1 until k do sum += alphas(j) * iscore_ (y, low(j), up(j), alphas(j))
+        sum / (2 * k + 1)
+    end wis_
+
+end FitI
+
+import FitI._
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `FitI` class provides methods to determine Interval-based Quality of Fit QoFI
+ *  metrics/measures.
+ *  @see reset to reset the degrees of freedom
+ *  @param dfm  the degrees of freedom for model/regression
+ *  @param df   the degrees of freedom for error
+ */
+class FitI (dfm_ : Double, df_ : Double)
+      extends Fit (dfm_, df_):                                 // if unknown, may use 1 and y.dim-1
+
+    private var picp   = -1.0                                  // prediction interval coverage probability
+    private var pinc   = -1.0                                  // prediction interval nominal coverage
+    private var ace    = -1.0                                  // average coverage error
+    private var pinaw  = -1.0                                  // prediction interval normalized average width
+    private var pinad  = -1.0                                  // prediction interval normalized average deviation
+    private var iscore = -1.0                                  // interval score
+    private var wis    = -1.0                                  // weighted interval score
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Diagnose the health of the model by computing the Quality of Fit (QoFI) metrics/measures,
+     *  from the error/residual vector and the predicted & actual responses.
+     *  For some models the instances may be weighted.
+     *  Note: `wis` should be computed separately.
+     *  @see `Regression_WLS`
+     *  @param y      the actual response/output vector to use (test/full)
+     *  @param yp     the point prediction mean/median
+     *  @param low    the predicted lower bound
+     *  @param up     the predicted upper bound
+     *  @param alpha  the nominal level of uncertainty (alpha) (defaults to 0.9, 90%)
+     *  @param w      the weights on the instances (defaults to null)
+     */
+    def diagnose_ (y: VectorD, yp: VectorD, low: VectorD, up: VectorD, alpha: Double = 0.1,
+                   w: VectorD = null): VectorD =
+        super.diagnose (y, yp, w)
+
+        picp   = picp_ (y, low, up)                            // prediction interval coverage probability
+        pinc   = 1 - alpha                                     // prediction interval nominal coverage
+        ace    = picp - pinc                                   // average coverage error
+        pinaw  = (up - low).mean / (y.max - y.min)             // prediction interval normalized average width
+        pinad  = pinad_ (y, low, up)                           // prediction interval normalized average deviation
+        iscore = iscore_ (y, low, up)                          // interval score
+        fit
+    end diagnose_
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Diagnose the health of the model by computing the Quality of FitI (QoFI) measures,
+     *  @param y       the given time-series (must be aligned with the interval forecast)
+     *  @param yp      the point prediction mean/median
+     *  @param low     the lower bounds for various alpha levels
+     *  @param up      the upper bounds for various alpha levels
+     *  @param alphas  the array of prediction levels
+     */
+    def diagnose_wis (y: VectorD, yp: VectorD, low: MatrixD, up: MatrixD,
+                      alphas: Array [Double] =
+                      Array (0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)): Double =
+        wis = wis_ (y, yp, low, up, alphas)
+        wis
+    end diagnose_wis
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the Quality of FitI (QoFI) measures corresponding to the labels given.
+     *  Override to add more quality of fit measures.
+     */
+    override def fit: VectorD = super.fit ++ VectorD (picp, pinc, ace, pinaw, pinad, iscore, wis)
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Show the prediction interval forecasts and relevant QoF metrics/measures.
+     *  @param yy       the aligned actual response/output vector to use (test/full)
+     *  @param yfh      the forecasts for horizon h
+     *  @param low      the predicted lower bound
+     *  @param up       the predicted upper bound
+     *  @param qof_all  all the QoF metrics (for point and interval forecasts)
+     *  @param h        the forecasting horizon
+     */
+    def show_interval_forecasts (yy: VectorD, yfh: VectorD,
+                                 low: VectorD, up: VectorD,
+                                 qof_all: VectorD, h: Int): Unit =
+        println (FitM.fitMap (qof_all, qoFI_all_names))                // fully evaluate h-steps ahead forecasts
+        new PlotM (null, MatrixD (yy, yfh, low, up),                   // aligned actual, forecasted, lower, upper
+                   Array ("yy", "yfh", "low", "up"),
+                   "Plot Prediction Intervals for horizon $h", lines = true)
+    end show_interval_forecasts
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the help string that describes the Quality of FitI (QoFI) measures
+     *  provided by the `FitI` class.  Override to correspond to fitLabel.
+     */
+    override def help: String = Fit.help ++ FitI.help
+
+end FitI
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `fitITest` main function is used to test the `FitI` class on a simulated
+ *  time series.
+ *  @see `scalation.modeling.forecasting.randomWalkTest3` for another test case
+ *  > runMain scalation.modeling.fitITest
+ */
+@main def fitITest (): Unit =
+
+    import scalation.random.Normal
+
+    for sig2 <- 10 to 50 by 10 do
+        val rv  = Normal (0, sig2)
+        val w   = math.sqrt (sig2) * 1.96
+        val yp  = VectorD.range (1, 101) + 10.0
+        val y   = yp.map (_ + rv.gen)                           // simulated time series
+        val low = yp.map (_ - w) 
+        val up  = yp.map (_ + w) 
+        new PlotM (null, MatrixD (y, yp, low, up), Array ("y", "yp", "low", "up"), "plot y, low and up")
+
+        val ft = new FitI (1, y.dim)
+        ft.diagnose_ (y, yp, low, up)
+        ft.diagnose_wis (y, yp, MatrixD (low), MatrixD (up), Array (0.1))
+        val qof = ft.fit
+        println (FitM.fitMap (qof, qoFI_all_names))
+    end for
+
+end fitITest
+

@@ -94,7 +94,6 @@ class Bidiagonal (a: MatrixD):
                     s = sdot (u(?, i), u(?, j), i)
                     f = s / h
                     for k <- i until m do u(k, j) += f * u(k, i)
-                end for
             end if
 
             q(i) = g                                     // assign ith main diagonal element
@@ -109,7 +108,6 @@ class Bidiagonal (a: MatrixD):
                 for j <- l until m do
                     s = sdot (u(i), u(j), l)
                     for k <- l until n do u(j, k) += s * e(k)
-                end for
             end if
 
             val y = abs (q(i)) + abs (e(i)); if y > bm then bm = y
@@ -127,7 +125,6 @@ class Bidiagonal (a: MatrixD):
                     for j <- l until n do
                         val s = sdot (u(i), v(?, j), l)
                         for k <- l until n do v(k, j) += s * v(k, i)
-                    end for
                 end if
                 for j <- l until n do { v(i, j) = 0.0; v(j, i) = 0.0 }
                 v(i, i) = 1.0
@@ -154,7 +151,6 @@ class Bidiagonal (a: MatrixD):
                     for j <- i until m do u(j, i) /= g
                 else
                     for j <- i until m do u(j, i) = 0.0
-                end if
                 u(i, i) += 1.0
             end for
         end transformLHS

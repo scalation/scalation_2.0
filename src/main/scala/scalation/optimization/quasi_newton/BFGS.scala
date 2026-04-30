@@ -53,11 +53,11 @@ class BFGS (f: FunctionV2S, g: FunctionV2S = null,
       extends Minimizer, PathMonitor:
 
     private val debug  = debugf ("BFGS", false)                 // debug function
-    private val flaw   = flawf ("BFGS")                         // flaw function
+//  private val flaw   = flawf ("BFGS")                         // flaw function
     private val WEIGHT = 1000.0                                 // weight on penalty for constraint violation
     private var bfgs   = true                                   // use BFGS (true) or Gradient Descent (false)
 
-    private var df: Array [FunctionV2S] = null                  // gradient as explicit functions for partials
+//  private var df: Array [FunctionV2S] = null                  // gradient as explicit functions for partials - FIX - should use
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Use the Gradient Descent algorithm rather than the default BFGS algorithm.
@@ -84,11 +84,12 @@ class BFGS (f: FunctionV2S, g: FunctionV2S = null,
      *  they are more efficient and more accurate than estimating the values
      *  using difference quotients (the default approach).
      *  @param grad  the gradient as explicit functions for partials
-     */
+     *  FIX - should use
     def setDerivatives (grad: Array [FunctionV2S]): Unit =
         if g != null then flaw ("setDerivatives", "only works for unconstrained problems")
         df = grad                                               // use given functions for partial derivatives
     end setDerivatives
+     */
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** The objective function f plus a weighted penalty based on the constraint
@@ -102,7 +103,6 @@ class BFGS (f: FunctionV2S, g: FunctionV2S = null,
         else                                                    // constrained, g(x) <= 0
             val penalty = if ineq then max (g(x), 0.0) else abs (g(x))
             f_x + abs (f_x) * WEIGHT * penalty * penalty
-        end if
     end fg
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -296,7 +296,6 @@ class BFGS (f: FunctionV2S, g: FunctionV2S = null,
         if lSearchAlg == LBFGSLineSearchAlg.BacktrackingOrthantWise then
             debug("solve", "orthantwise is not currently supported by BFGS")
             return (fg(x._1), x._1)
-        end if
 
         val lSearchImple = LBFGSLineSearch.getImple (lSearchAlg)
         val aHi = eye (x0.dim, x0.dim)                          // approximate Hessian inverse (aHi) matrix
@@ -389,7 +388,6 @@ class BFGS (f: FunctionV2S, g: FunctionV2S = null,
         if lSearchAlg == LBFGSLineSearchAlg.BacktrackingOrthantWise then
             debug("solve_", "orthantwise is not currently supported by BFGS")
             return (fg(x._1), x._1)
-        end if
 
         val lSearchImple = LBFGSLineSearch.getImple (lSearchAlg)
         val aHi = eye (x0.dim, x0.dim)                          // approximate Hessian inverse (aHi) matrix
@@ -471,12 +469,11 @@ object BFGS:
                ineq: Boolean = true, exactLS: Boolean = false,
                steepest: Boolean = true): BFGS =
         if steepest then
-           val steep = new BFGS (f, f, ineq, exactLS)
+           val steep = new BFGS (f, g, ineq, exactLS)
            steep.setSteepest ()
            steep
         else
-           new BFGS (f, f, ineq, exactLS)
-        end if
+           new BFGS (f, g, ineq, exactLS)
     end apply
 
 end BFGS

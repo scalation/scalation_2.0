@@ -94,8 +94,8 @@ end Hessenburg
  *  along the diagonal.  To improve performance, the a matrix is first reduced
  *  to Hessenburg form.  During the iterative steps, a shifted QR decomposition
  *  is performed.
- *  Caveats: (1) it will not handle eigenvalues that are complex numbers,
- *           (2) it uses a simple shifting strategy that may slow convergence.
+ *  @caveat:  (1) it will not handle eigenvalues that are complex numbers,
+ *            (2) it uses a simple shifting strategy that may slow convergence.
  *  @param a  the matrix whose eigenvalues are sought 
  */
 class Eigenvalue (a: MatrixD):
@@ -113,12 +113,12 @@ class Eigenvalue (a: MatrixD):
 
     for k <- 0 until ITERATIONS if converging do        // major iterations
         converging = true
-        for l <- 0 until ITERATIONS do                  // minor iterations
+        cfor (0, ITERATIONS) { _ =>                     // minor iterations
             val s     = g(n - 1, n - 1)                 // the shift parameter
             val eye_g = eye (g.dim, g.dim)
             val (qq, rr) = (new Fac_QR (g - eye_g * s)).factor12 ()
             g = rr.asInstanceOf [MatrixD] * qq.asInstanceOf [MatrixD] + eye_g * s      // FIX
-        end for
+        } // cfor
 
         for i <- 0 until n do e(i) = g(i, i)            // extract eigenvalues from diagonal
         val e0 = e(0)                                   // consider one eigenvalue
@@ -126,7 +126,6 @@ class Eigenvalue (a: MatrixD):
             converging = false                          // end major iterations
         else
             lastE = e0                                  // save this eigenvalue
-        end if
 
         println ("-" * 60)
         println (s"Eigenvalue: on iteration $k: g = $g")
@@ -237,8 +236,8 @@ end SymmetricQRstep
 /** The `EigenvalueSym` class is used to find the eigenvalues of an n-by-n
  *  symmetric matrix a using an iterative technique, the Symmetric QR Algorithm.
  *  @see Algorithm 8.3.3 in Matrix Computations.
- *  Caveats: (1) it will not handle eigenvalues that are complex numbers,
- *           (2) it uses a simple shifting strategy that may slow convergence.
+ *  @caveat:  (1) it will not handle eigenvalues that are complex numbers,
+ *            (2) it uses a simple shifting strategy that may slow convergence.
  *  @param a  the symmetric matrix whose eigenvalues are sought
  */
 class EigenvalueSym (a: MatrixD):

@@ -16,6 +16,7 @@
  *  inline def ρ (newName: String): T = rename (newName)
  *  inline def π (x: String): T = project (strim (x))
  *  inline def π (cPos: IndexedSeq [Int]): T = project (cPos)
+ *  inline def π_ (x: String): T = project (schema diff strim (x))
  *  inline def σπ (a: String, apred: APredicate): T = selproject (a, apred)
  *  inline def σ (a: String, apred: APredicate): T = select (a, apred)
  *  inline def σ (predicate: Predicate): T = select (predicate)
@@ -33,6 +34,7 @@
  *  inline def ⋉ (x: Schema, y: Schema, r2: T): T = leftJoin (x, y, r2)
  *  inline def ⋊ (x: Schema, y: Schema, r2: T): T = rightJoin (x, y, r2)
  *  inline def / (r2: T): T = divide (r2)
+ *  inline def ÷ (r2: T): T = divide (r2)
  *  inline def γ (ag: String): T = groupBy (ag)
  *  inline def ℱ (ag: String, f_as: (AggFunction, String)*): T = aggregate (ag, f_as :_*)
  *  inline def ↑ (x: String*): T = orderBy (x :_*)
@@ -230,7 +232,7 @@ trait Tabular [T <: Tabular [T]] (val name: String, val schema: Schema, val doma
     /** Add LINKAGE from this table to the refTab, by adding a FOREIGN KEY CONSTRAINT
      *  to this table specifying the foreign key attribute fkey and the table it
      *  references refTab.
-     *  Caveat:  a foreign key may not be composite.
+     *  @caveat:  a foreign key may not be composite.
      *  @param fkey    the foreign key attribute
      *  @param refTab  the table being referenced (to its primary key)
      */
@@ -304,6 +306,16 @@ trait Tabular [T <: Tabular [T]] (val name: String, val schema: Schema, val doma
 
     inline def π (cPos: IndexedSeq [Int]): T = project (cPos)
 
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** PROJECTOUT the tuples in this table onto 'schema - the given attribute names'.
+     *  @param x  the schema/attribute names to project out
+     */
+    inline def projectOut (x: Schema): T = project (schema diff x)
+
+    inline def projectOut (x: String): T = project (schema diff strim (x))
+
+    inline def π_ (x: String): T = project (schema diff strim (x))
+
     // ========================================================== SELECT-PROJECT
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -358,7 +370,7 @@ trait Tabular [T <: Tabular [T]] (val name: String, val schema: Schema, val doma
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** UNION this table and r2.  Check that the two tables are compatible.
      *  If they are not, return the first table.
-     *  Caveat:  Assumes the key from the first table still works (@see create_index)
+     *  @caveat:  Assumes the key from the first table still works (@see create_index)
      *  Acts like union-all, so to remove duplicates call create_index after union.
      *  @param r2  the second table
      */
@@ -398,7 +410,7 @@ trait Tabular [T <: Tabular [T]] (val name: String, val schema: Schema, val doma
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** JOIN this table and r2 keeping concatenated tuples that satisfy the predicate.
-     *  Caveat:  Assumes both keys are needed for the new key (depending on the
+     *  @caveat:  Assumes both keys are needed for the new key (depending on the
      *           predicate both may not be required).
      *  @param predicate  the join predicate to be satisfied
      *  @param r2         the second table
@@ -436,7 +448,7 @@ trait Tabular [T <: Tabular [T]] (val name: String, val schema: Schema, val doma
     /** Compute the EQUI-JOIN via the INDEX JOIN (IJ) algorithm of this table and the
      *  referenced table keeping concatenated tuples that are equal on the primary key
      *  and foreign key attributes.  Uses a UNIQUE INDEX (UI) on the primary key.
-     *  Caveat:  Requires the foreign key table to be first [ fkey_table join ((fkey, pkey_table) ].
+     *  @caveat:  Requires the foreign key table to be first [ fkey_table join ((fkey, pkey_table) ].
      *  Usage:   deposit join (("cname", customer))
      *           as if join_
      *  @param ref  the foreign key reference (foreign key attribute, referenced table)
@@ -449,7 +461,7 @@ trait Tabular [T <: Tabular [T]] (val name: String, val schema: Schema, val doma
     /** Compute the EQUI-JOIN via the INDEX JOIN (IJ) algorithm of this table and the
      *  referenced table keeping concatenated tuples that are equal on the primary key
      *  and foreign key attributes.  Uses a NON-UNIQUE INDEX (NUI) on the foreign key.
-     *  Caveat:  Requires the foreign key table to be first [ fkey_table _join ((fkey, pkey_table) ].
+     *  @caveat:  Requires the foreign key table to be first [ fkey_table _join ((fkey, pkey_table) ].
      *  Usage:   deposit _join (("cname", customer))
      *  @param ref  the foreign key reference (foreign key attribute, referenced table)
      */
@@ -459,7 +471,7 @@ trait Tabular [T <: Tabular [T]] (val name: String, val schema: Schema, val doma
     /** Compute the EQUI-JOIN via the SORT-MERGE JOIN (SMJ) algorithm of this table and the
      *  referenced table keeping concatenated tuples that are equal on the primary key
      *  and foreign key attributes.  Requires both tables to be ordered.
-     *  Caveat:  Requires the foreign key table to be first [ fkey_table _join ((fkey, pkey_table) ].
+     *  @caveat:  Requires the foreign key table to be first [ fkey_table _join ((fkey, pkey_table) ].
      *  Usage:   deposit _join (("cname", customer))
      *  @param ref  the foreign key reference (foreign key attribute, referenced table)
      */
@@ -479,7 +491,7 @@ trait Tabular [T <: Tabular [T]] (val name: String, val schema: Schema, val doma
     /** Compute the NATURAL JOIN via the INDEX JOIN (IJ) algorithm of this table and
      *  r2 keeping concatenated tuples that agree on the common attributes.  Uses a
      *  UNIQUE INDEX on the primary key.
-     *  Caveat:  Requires the foreign key table to be first [ fkey_table join_ ((fkey, pkey_table) ].
+     *  @caveat:  Requires the foreign key table to be first [ fkey_table join_ ((fkey, pkey_table) ].
      *  Usage:   deposit join_ customer
      *  @param r2  the second table
      */
@@ -489,7 +501,7 @@ trait Tabular [T <: Tabular [T]] (val name: String, val schema: Schema, val doma
     /** Compute the NATURAL JOIN via the INDEX JOIN (IJ) algorithm of this table and
      *  r2 keeping concatenated tuples that agree on the common attributes.  Uses a
      *  NON-UNIQUE INDEX on the foreign key.
-     *  Caveat:  Requires the foreign key table to be first [ fkey_table _join ((fkey, pkey_table) ].
+     *  @caveat:  Requires the foreign key table to be first [ fkey_table _join ((fkey, pkey_table) ].
      *  Usage:   deposit _join customer
      *  @param r2  the second table
      */
@@ -499,7 +511,7 @@ trait Tabular [T <: Tabular [T]] (val name: String, val schema: Schema, val doma
     /** Compute the NATURAL JOIN via the SORT-MERGE JOIN (SMJ) algorithm of this table and
      *  r2 keeping concatenated tuples that agree on the common attributes.  Requires
      *  both tables to be ordered.
-     *  Caveat:  Requires the foreign key table to be first [ fkey_table _join_ pkey_table ].
+     *  @caveat:  Requires the foreign key table to be first [ fkey_table _join_ pkey_table ].
      *  Usage:   deposit _join_ customer
      *  @param r2  the second table
      */
@@ -588,6 +600,8 @@ trait Tabular [T <: Tabular [T]] (val name: String, val schema: Schema, val doma
     def divide (r2: T): T
 
     inline def / (r2: T): T = divide (r2)
+
+    inline def ÷ (r2: T): T = divide (r2)
 
     // ================================================================ GROUP BY
 

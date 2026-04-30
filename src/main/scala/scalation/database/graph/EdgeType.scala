@@ -48,7 +48,7 @@ class EdgeType (_name: String,
      */
     def newShapeObj: CurvilinearShape =
         shape match
-        case s: Arrow => Arrow ()
+        case _ : Arrow => Arrow ()
         case _        => QArrow ()
         end match
     end newShapeObj
@@ -233,7 +233,7 @@ class EdgeType (_name: String,
                 println ("|-" + "-" * len + "-|")
                 System.out.print ("| ")
                 prt ("from", wj)
-                for (k, v) <- tuple0 do prt (k, wj)
+                for (k, _) <- tuple0 do prt (k, wj)
                 prt ("to", wj)
                 println (" |")
 
@@ -245,7 +245,7 @@ class EdgeType (_name: String,
                     if edges (i).from == null then prt ("null-vertex", wj)
                     else prt (edges (i).from.name, wj)
 
-                    for (k, v) <- tuple_i do prt (v, wj)
+                    for (_, v) <- tuple_i do prt (v, wj)
 
                     if edges(i).to == null then prt ("null-vertex", wj)
                     else prt (edges(i).to.name, wj)

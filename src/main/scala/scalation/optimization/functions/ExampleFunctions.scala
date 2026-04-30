@@ -222,6 +222,8 @@ object ReciprocalFunction extends BenchmarkFunction:
 
     val functionMinimum: VectorD = VectorD (1.06035, 4)
 
+    override val bound: (VectorD, VectorD) = (VectorD (0.2, 0.2), VectorD (10.0, 10.0))
+
     def objFunction (x: VectorD): Double =
         1 / x(0) + x(0) ~^ 4 + (x(0) - 3.0) ~^ 2 + (x(1) - 4.0) ~^ 2 + 1.0
 

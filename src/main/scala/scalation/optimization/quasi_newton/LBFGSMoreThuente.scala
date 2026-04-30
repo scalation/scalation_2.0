@@ -56,14 +56,14 @@ object LBFGSMoreThuente extends LBFGSLineSearch:
         var fNew = f
         var stpNew = stp
 
-        /* Check the input parameters for errors. */
+        // Check the input parameters for errors.
         if stp <= 0 then
             return LBFGSLineSearchFailure (LBFGSReturnCode.InvalidPrms, LBFGSLineSearchIncomplete (xNew, fNew))
         
-        /* Compute the initial gradient in the search direction. */
+        // Compute the initial gradient in the search direction.
         val dginit = g dot s
 
-        /* Make sure that s points to a descent direction. */
+        // Make sure that s points to a descent direction.
         if 0 < dginit then
             return LBFGSLineSearchFailure (LBFGSReturnCode.IncreaseGradient, LBFGSLineSearchIncomplete (xNew, fNew))
         
@@ -94,7 +94,6 @@ object LBFGSMoreThuente extends LBFGSLineSearch:
             else
                 stmin = stx
                 stmax = stpNew + 4.0 * (stpNew - stx)
-            end if
 
             // Clip the step in the range of [stpmin, stpmax]
             if stpNew < params.minStep then stpNew = params.minStep
@@ -104,13 +103,12 @@ object LBFGSMoreThuente extends LBFGSLineSearch:
             if (brackt && ((stpNew <= stmin || stmax <= stpNew) || params.maxLineSearch <= count + 1 || errorCode.nonEmpty)) ||
                (brackt && (stmax - stmin <= params.xtol * stmax)) then
                 stpNew = stx
-            end if
 
             // Compute the current value of xNew: xNew <- x + (*stp) * s.
             xNew = x + (s * stpNew)
 
             // Evaluate the function and gradient values
-            val evaluationResults = cd.evaluationLogic.evaluate (cd.instance, xNew, cd.n, stpNew)
+            val evaluationResults = cd.evalLogic.evaluate (cd.instance, xNew, cd.n, stpNew)
             fNew = evaluationResults.objFunctionValue
             gNew = evaluationResults.gradientVector
 
@@ -275,7 +273,6 @@ object LBFGSMoreThuente extends LBFGSLineSearch:
                 newt = if abs(t - mc) < abs(t - mq) then mc else mq
             else
                 newt = if abs(t - mc) > abs(t - mq) then mc else mq
-            end if
         else
             /* Case 4: a lower function value, derivatives of the
                same sign, and the magnitude of the derivative does

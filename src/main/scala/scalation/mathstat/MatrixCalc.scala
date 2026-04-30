@@ -101,7 +101,7 @@ end matrixCalc0
  */
 @main def matrixCalc2 (): Unit =
 
-    val csvFile = "scores.csv"
+    val csvFile = ".../...csv"
 
     val xx = MatrixD.load (csvFile, 1, 3, fullPath = true)                        // skip 1 row and 3 columns
     val n = xx.dim2 - 3                                                           // last column should be empty
@@ -109,9 +109,11 @@ end matrixCalc0
 
     println (s"x = $x")
 
-    val w = x(0)(0 until n)                                                       // weights for grades
+//  val w = x(0)(0 until n)                                                       // weights for grades
+//  val w = VectorD (2,2,2.5,0.25,0.25,0.6,0.6,0.6,1.2)                           // 4 projects
+    val w = VectorD (2,2,2.5,0.25,0.25,0.75,0.75,1.5)                             // 3 projects
     println (s"total weight = ${w.sum}")                                          // total weight
-    for i <- 1 until x.dim do x(i, n) = round (w dot x(i)(0 until n)).toDouble    // weighted total
+    for i <- 0 until x.dim do x(i, n) = round (w dot x(i)(0 until n)).toDouble    // weighted total
     println (s"new x = $x")                                                       // updated matrix
 
 end matrixCalc2
@@ -123,37 +125,14 @@ end matrixCalc2
  */
 @main def matrixCalc3 (): Unit =
 
-   val x1 = VectorD (81,93,80,100,100,95,77,94)                                   // original   +1 on Exam I
-   val x2 = VectorD (80,93,80,120,100,95,77,94)                                   // corrected +20 on Homework
-   val x3 = VectorD (98,96,88,100,100,100,100,100,100)                            // make-up
+   val x1 = VectorD (80,90,80,100,100,90,80,90)
+   val x2 = VectorD (90,90,80,100,100,100,100,100,100)
 
    val w  = VectorD (2,2,2.5,0.25,0.25,0.75,0.75,1.5)
    val w2 = VectorD (2,2,2.5,0.25,0.25,0.6,0.6,0.6,1.2)
 
-   println (s"w * x1 = ${w dot x1}")                                              // 868
-   println (s"w * x2 = ${w dot x2}")                                              // 871
-   println (s"w2 * x3 = ${w2 dot x3}")                                            // 958
+   println (s"w * x1  = ${w dot x1}")
+   println (s"w2 * x2 = ${w2 dot x2}")
 
 end matrixCalc3
-
-
-//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `matrixCals4` main function allows for Custom calculations.
- *  > runMain scalation.mathstat.matrixCalc4
- */
-@main def matrixCalc4 (): Unit =
-
-   val x = MatrixD ((7, 13),
-       4.67647, 4.85294, 4.70588, 4.82353, 4.73529, 4.55882, 4.67647, 4.58824, 4.97059, 4.76471, 4.55882, 4.50000, 4.64706,  // 6370 sp24
-       4.12500, 4.12500, 4.37500, 4.37500, 4.25000, 4.12500, 4.37500, 4.12500, 4.75000, 4.50000, 4.62500, 4.00000, 4.62500,  // 4370 sum24
-       5.00000, 5.00000, 5.00000, 5.00000, 5.00000, 5.00000, 5.00000, 5.00000, 5.00000, 5.00000, 5.00000, 5.00000, 5.00000,  // 6370 sum24
-       3.33333, 3.50000, 3.33333, 4.08333, 3.50000, 2.91667, 3.72727, 3.33333, 4.41667, 3.75000, 4.08333, 3.16667, 3.50000,  // 4360 fa24
-       4.77778, 4.88889, 4.66667, 4.88889, 4.77778, 4.55556, 4.77778, 4.66667, 4.88889, 4.88889, 4.88889, 4.66667, 4.77778,  // 6360 fa24
-       3.54545, 3.63636, 4.09091, 4.18182, 3.63636, 3.00000, 4.09091, 3.72727, 4.72727, 3.63636, 4.58333, 3.45455, 3.91667,  // 4370 fa24
-       3.83333, 4.08333, 4.58333, 4.83333, 4.16667, 3.91667, 4.08333, 4.00000, 4.83333, 4.75000, 4.58333, 4.00000, 4.50000)  // 6370 fa24
-
-   for i <- x.indices do println (x(i).mean)
-   println (x.sum / (7 * 13))
-
-end matrixCalc4
 

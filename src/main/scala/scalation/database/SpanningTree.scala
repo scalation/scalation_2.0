@@ -78,7 +78,6 @@ class SpanningTree (g: MatrixD):
             out(j) = false                                    // j is no longer outsise the tree
             qu.enqueue (j)
             return j
-        end if
         -1
     end findNext
 

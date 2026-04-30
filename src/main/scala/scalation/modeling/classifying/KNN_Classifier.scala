@@ -45,7 +45,7 @@ class KNN_Classifier (x: MatrixD, y: VectorI, fname_ : Array [String] = null,
     private val count      = new VectorI (k)                              // how many nearest neighbors in each class.
     private var d          = VectorD.nullv                                // vector to hold distances
 
-    modelName = s"KNN_Classifier_$kappa"                                  // name of the model
+    _modelName = s"KNN_Classifier_$kappa"                                 // name of the model
 
     if kappa < 3 then flaw ("init", s"number of neighbors kappa = $kappa < 3")
 
@@ -255,7 +255,8 @@ end kNN_ClassifierTest3
     banner ("original imbalanced yb")
     println (s"yb = $yb")
 
-    val idx = Classifier.downsample (yb, 100)                // use these indices
+//  val idx = Classifier.downsample (yb, 100)                // use these indices - 100 part not implemented yet
+    val idx = Classifier.downsample (yb)                     // use these indices
     val x_  = x(idx)                                         // new x-matrix
     val y_  = yb(idx)                                        // new y-vector
 

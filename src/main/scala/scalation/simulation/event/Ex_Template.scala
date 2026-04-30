@@ -79,7 +79,6 @@ class SOMEModel (name: String = "SOME", reps: Int = 1, nStop: Int = 100, stream:
             if nArr < nStop - 1 then
                 val toArrive = Entity (iArrivalRV.gen, 0.0, SOMEModel.this)
                 schedule (Arrival (toArrive, toArrive.iArrivalT))
-            end if
             nArr += 1                                      // update the current state
         end occur
 

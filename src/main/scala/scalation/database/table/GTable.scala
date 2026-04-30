@@ -166,7 +166,6 @@ object GTable:
             else                                                            // REMAINING LINES
                 val token = ln.split (sep, -1).map (_.trim)                 // array of token strings
                 s.vertices += Vertex (makeTuple (token, domain, pos))
-            end if
 
             l_no += 1
         end for
@@ -249,10 +248,8 @@ class GTable (name_ : String, schema_ : Schema, domain_ : Domain, key_ : Schema)
                 flaw ("addE", s"$name: attempt to link to multiple targets vertices when edge type is unique, elab = $elab")
             else
                 eset += e
-            end if
         else 
             flaw ("addE", s"elab = $elab not an edge type for $name")
-        end if
         this
     end addE
 
@@ -305,10 +302,8 @@ class GTable (name_ : String, schema_ : Schema, domain_ : Domain, key_ : Schema)
                 val eset = u.edge.getOrElse (elab, null)
                 if eset == null then u.edge += elab -> es
                 else eset ++= es
-            end if
         else 
             flaw ("addEs", s"elab = $elab not an edge type for $name")
-        end if
     end addEs
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -389,7 +384,7 @@ class GTable (name_ : String, schema_ : Schema, domain_ : Domain, key_ : Schema)
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** UNION this graph-table and r2.  Check that the two tables are compatible.
      *  If they are not, return the first table.
-     *  Caveat:  Assumes the key from the first table still works (@see create_index)
+     *  @caveat:  Assumes the key from the first table still works (@see create_index)
      *  Acts like union-all, so to remove duplicates call create_index after union.
      *  @param r2  the second table (may be a Table or GTable)
      */
@@ -446,7 +441,7 @@ class GTable (name_ : String, schema_ : Schema, domain_ : Domain, key_ : Schema)
      *  @param ref  the foreign key reference (edge-label, referenced table)
      */
     def expand (x: Schema, ref: (String, GTable)): GTable =
-        val (elab, refTab) = ref                                            // edge-label, referenced table
+        val refTab = ref._2                                                 // edge-label, referenced table
 //      val x1 = schema intersect x                                         // attributes from first table
         val x1 = meet (schema, x)                                           // attributes from first table
         val x2 = meet (refTab.schema, x)                                    // attributes from second table

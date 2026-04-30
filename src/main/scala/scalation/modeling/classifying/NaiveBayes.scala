@@ -47,11 +47,10 @@ class NaiveBayes (x: MatrixD, y: VectorI, fname_ : Array [String] = null, k: Int
 
     private val debug = debugf ("NaiveBayes", true)                      // debug function
 
-    modelName = "NaiveBayes"                                             // name of the model
+    _modelName = "NaiveBayes"                                            // name of the model
 
     if vc == null then
         shift2zero (x); vc = vc_fromData (x)                             // set value counts from data
-    end if
 
     private val me   = hparam("me").toDouble                             // m-estimates (me == 0 => regular MLE estimates)
     private val me_v = NaiveBayes.me_vc (me, vc)                         // for Laplace smoothing: me / vc_j for all j
@@ -78,16 +77,15 @@ class NaiveBayes (x: MatrixD, y: VectorI, fname_ : Array [String] = null, k: Int
     override def train (x_ : MatrixD = x, y_ : VectorI = y): Unit =
         super.train (x_, y_)                                             // set class frequencies nu_y and probabilities p_y
         val nu_Xy = RTensorD.freq (x_, vc, y, k)                         // Joint Frequency Tables (JFTs)
-        p_Xy      = cProb_Xy (x_, y_, nu_Xy)                             // Conditional Probability Tables (CPTs)
+        p_Xy      = cProb_Xy (x_, nu_Xy)                                 // Conditional Probability Tables (CPTs)
     end train
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute the conditional probability of X given y for each feature xj.
      *  @param x_     the integer-valued data vectors stored as rows of a matrix
-     *  @param y_     the class vector, where y(i) = class for row i of the matrix x, x(i)
      *  @param nu_Xy  the joint frequency of X and y for each feature xj and class value
      */
-    def cProb_Xy (x_ : MatrixD, y_ : VectorI, nu_Xy: RTensorD): RTensorD =
+    def cProb_Xy (x_ : MatrixD, nu_Xy: RTensorD): RTensorD =
         val pXy = new RTensorD (x_.dim2, vc, k)
         for j <- x_.indices2; xj <- 0 until vc(j) do
             pXy(j, xj) = (nu_Xy(j, xj) + me_v(j)) / (nu_y + me)          // Conditional Probability Tables (CPTs)

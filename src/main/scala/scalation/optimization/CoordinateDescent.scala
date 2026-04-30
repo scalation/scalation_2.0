@@ -100,13 +100,13 @@ end CoordinateDescent
     def f(x: VectorD): Double = (x(0) - 3)~^2 + (x(1) - 4)~^2 + 1
     var optimizer = new CoordinateDescent (f)
     var opt = optimizer.solve (x0)
-    println ("optimal solution (f(x), x) = $opt")
+    println (s"optimal solution (f(x), x) = $opt")
 
     banner ("Minimize: x_0^4 + (x_0 - 3)^2 + (x_1 - 4)^2 + 1")
     def g(x: VectorD): Double = x(0)~^4 + (x(0) - 3)~^2 + (x(1) - 4)~^2 + 1
     optimizer = new CoordinateDescent (g)
     opt = optimizer.solve (x0)
-    println ("optimal solution (g(x), x) = $opt")
+    println (s"optimal solution (g(x), x) = $opt")
 
     banner ("Minimizer: x_0/4 + 5x_0^2 + x_0^4 - 9x_0^2 x_1 + 3x_1^2 + 2x_1^4")
     // @see math.fullerton.edu/mathews/n2003/gradientsearch/GradientSearchMod/Links/GradientSearchMod_lnk_5.html
@@ -114,7 +114,7 @@ end CoordinateDescent
     def f3 (x: VectorD): Double = x(0)/4 + 5*x(0)~^2 + x(0)~^4 - 9*x(0)~^2*x(1) + 3*x(1)~^2 + 2*x(1)~^4
     optimizer = new CoordinateDescent (f3)
     opt = optimizer.solve (x0)
-    println ("optimal solution (f3(x), x) = $opt")
+    println (s"optimal solution (f3(x), x) = $opt")
 
 end coordinateDescentTest
 

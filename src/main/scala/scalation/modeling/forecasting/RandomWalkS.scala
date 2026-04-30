@@ -37,11 +37,12 @@ import Example_LakeLevels.y
 class RandomWalkS (y: VectorD, hh: Int, tRng: Range = null,
                    hparam: HyperParameter = RandomWalkS.hp,
                    bakcast: Boolean = false)
-      extends Forecaster (y, hh, tRng, hparam, bakcast):
+      extends Forecaster (y, hh, tRng, hparam, bakcast)
+         with NoSubModels:
 
     private val sw = hparam("sw").toDouble                              // slope weight (same as RW when sw = 0
 
-    modelName = s"RandomWalkS"
+    _modelName = "RandomWalkS"
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Predict a value for y_t using the 1-step ahead forecast based on the 

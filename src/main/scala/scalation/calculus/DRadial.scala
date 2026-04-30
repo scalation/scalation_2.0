@@ -108,7 +108,6 @@ class DRadial (centers: VectorD = VectorD (0.0), radialType_ : RadialType = GAUS
         if n > 3 || n < 0 then
             flaw ("dPolyHarmonicSpline", "Only derivatives up to order 3 are currently supported")
             return NaN
-        end if
 
         if r == 0.0 then return 0.0
 

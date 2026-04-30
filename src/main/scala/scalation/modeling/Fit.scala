@@ -8,9 +8,15 @@
  *  @note    Model Support: Quality of Fit (QoF)
  *
  *  @see facweb.cs.depaul.edu/sjost/csc423/documents/f-test-reg.htm
- *  @see avesbiodiv.mncn.csic.es/estadistica/ejemploaic.pdf
- *  @see en.wikipedia.org/wiki/Bayesian_information_criterion
- *  @see www.forecastpro.com/Trends/forecasting101August2011.html
+ *       avesbiodiv.mncn.csic.es/estadistica/ejemploaic.pdf
+ *       en.wikipedia.org/wiki/Bayesian_information_criterion
+ *       www.forecastpro.com/Trends/forecasting101August2011.html
+ *
+ *  @see github.com/scikit-learn/scikit-learn/issues/20162     // used in scikit-learn
+ *       www.mdpi.com/1999-4893/13/6/132                       // defines several metrics
+ *       arxiv.org/pdf/2005.12881.pdf                          // for IS and WIS
+ *       https://www.sciencedirect.com/science/article/pii/S1364032120308005
+ *       www.datasciencewithmarco.com/blog/conformal-prediction-in-time-series-forecasting
  */
 
 package scalation
@@ -29,39 +35,38 @@ import scalation.random.CDF.{fisherCDF, studentTCDF}
  */
 enum QoF (val name: String):
 
-    case rSq     extends QoF ("rSq")                         // index  0
-    case rSqBar  extends QoF ("rSqBar")                      // index  1
-    case sst     extends QoF ("sst")                         // index  2
-    case sse     extends QoF ("sse")                         // index  3
+    case rSq    extends QoF ("rSq")                            // index  0  0-3 related to R^2
+    case rSqBar extends QoF ("rSqBar")                         // index  1
+    case sst    extends QoF ("sst")                            // index  2
+    case sse    extends QoF ("sse")                            // index  3
 
-    case sde     extends QoF ("sde")                         // index  4
-    case mse0    extends QoF ("mse0")                        // index  5
-    case rmse    extends QoF ("rmse")                        // index  6
-    case mae     extends QoF ("mae")                         // index  7
-    case smape   extends QoF ("smape")                       // index  8
+    case sde    extends QoF ("sde")                            // index  4  4-8 various error metrics
+    case mse0   extends QoF ("mse0")                           // index  5
+    case rmse   extends QoF ("rmse")                           // index  6
+    case mae    extends QoF ("mae")                            // index  7
+    case smape  extends QoF ("smape")                          // index  8
 
-    case m       extends QoF ("m")                           // index  9
-    case dfm     extends QoF ("dfm")                         // index 10
-    case df      extends QoF ("df")                          // index 11
-    case fStat   extends QoF ("fStat")                       // index 12
-    case aic     extends QoF ("aic")                         // index 13
-    case bic     extends QoF ("bic")                         // index 14
+    case m      extends QoF ("m")                              // index  9  9-14 degrees of freedom and information criteria
+    case dfr    extends QoF ("dfr")                            // index 10
+    case df     extends QoF ("df")                             // index 11
+    case fStat  extends QoF ("fStat")                          // index 12
+    case aic    extends QoF ("aic")                            // index 13
+    case bic    extends QoF ("bic")                            // index 14
 
-    case mape    extends QoF ("mape")                        // index 15
-    case mase    extends QoF ("mase")                        // index 16
-    case smapeIC extends QoF ("smapeIC")                     // index 17
+    case mape   extends QoF ("mape")                           // index 15  15-17 time series metrics (also 8)
+    case mase   extends QoF ("mase")                           // index 16
+    case smapeC extends QoF ("smapeC")                         // index 17
 
-    case picp    extends QoF ("picp")                        // index 18 
-    case pinc    extends QoF ("pinc")                        // index 19
-    case ace     extends QoF ("ace")                         // index 20
-    case pinaw   extends QoF ("pinaw")                       // index 21
-    case pinad   extends QoF ("pinad")                       // index 22
-    case iscore  extends QoF ("iscore")                      // index 23
-    case wis     extends QoF ("wis")                         // index 24
+    case picp   extends QoF ("picp")                           // index 18  18-23 for prediction intervals 
+    case pinc   extends QoF ("pinc")                           // index 19
+    case ace    extends QoF ("ace")                            // index 20
+    case pinaw  extends QoF ("pinaw")                          // index 21
+    case mis    extends QoF ("mis")                            // index 22
+    case wis    extends QoF ("wis")                            // index 23
 
 end QoF
 
-val qoF_names = QoF.values.map (_.toString)                 // The QoF names from the QoF enum
+val qoF_names = QoF.values.map (_.toString)                    // The QoF names from the QoF enum
 
 import QoF._
 
@@ -74,6 +79,8 @@ object Fit:
     val MIN_FOLDS = 3                                                       // minimum number of folds for cross-validation
     val N_QoF     = QoF.values.size                                         // the number of QoF measures
 
+    val α_ = VectorD (0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)  // values of α (type I error) used by WIS
+
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the help string that describes the Quality of Fit (QoF) measures
      *  provided by the `Fit` trait.  The QoF measures are divided into two groups:
@@ -85,35 +92,34 @@ object Fit:
     def help: String =
         """
 help: Quality of Fit (QoF) metrics/measures:
-    rSq     =  R-squared, the Coefficient of Determination (R^2)
-    rSqBar  =  adjusted R-squared (R^2-bar)
-    sst     =  Sum of Squares Total (ssr + sse)
-    sse     =  Sum of Squares for Error (SSE = RSS)
+    rSq    =  R-squared, the Coefficient of Determination (R^2)
+    rSqBar =  adjusted R-squared (R^2-bar)
+    sst    =  Sum of Squares Total (SST) [ssr + sse]
+    sse    =  Sum of Squares for Error (SSE = RSS)
 
-    sde     =  Standard Deviation of Errors
-    mse0    =  raw Mean Square Error (MSE = SSE / m)
-    rmse    =  Root Mean Square Error (RMSE)
-    mae     =  Mean Absolute Error (MAE)
-    smape   =  symmetric Mean Absolute Percentage Error (sMAPE)
+    sde    =  Standard Deviation of Errors (SDE)
+    mse0   =  raw Mean Square Error (MSE = SSE / m)
+    rmse   =  Root Mean Square Error (RMSE)
+    mae    =  Mean Absolute Error (MAE)
+    smape  =  symmetric Mean Absolute Percentage Error (sMAPE)
 
-    m       =  Number of Observations
-    dfm     =  Degrees of Freedom taken by the model, e.g., one lost per parameter
-    df      =  Degrees of Freedom left for residuals/errors
-    fStat   =  Fisher's Statistic
-    aic     =  Akaike Information Criterion (AIC)
-    bic     =  Bayesian Information Criterion (BIC)
+    m      =  Number of Observations
+    dfr    =  Degrees of Freedom (DFr) taken by the regression/model, e.g., one lost per parameter
+    df     =  Degrees of Freedom (DF) left for residuals/errors
+    fStat  =  Fisher's Statistic
+    aic    =  Akaike Information Criterion (AIC)
+    bic    =  Bayesian Information Criterion (BIC)
 
-    mape    =  Mean Absolute Percentage Error (MAPE)
-    mase    =  Mean Absolute Scaled Error (MASE)
-    smapeIC =  symmetric Mean Absolute Percentage Error Information Criterion (sMAPE-IC)
+    mape   =  Mean Absolute Percentage Error (MAPE)
+    mase   =  Mean Absolute Scaled Error (MASE)
+    smapeC =  symmetric Mean Absolute Percentage Error information Criterion (sMAPE-IC)
 
-    picp    =  prediction interval coverage probability
-    pinc    =  prediction interval nominal coverage
-    ace     =  average coverage error
-    pinaw   =  prediction interval normalized average width
-    pinad   =  prediction interval normalized average deviation
-    iscore  =  interval score
-    wis     =  weighted interval score
+    picp   =  Prediction Interval empirical Coverage Probability (PICP)
+    pinc   =  Prediction Interval Nominal Coverage probability (PINC) [1 - α/2]
+    ace    =  Average Coverage Error (ACE) [empirical - nominal coverage, i.e., picp - pinc]
+    pinaw  =  Prediction Interval Normalized Average Width (PINAW)
+    mis    =  Mean Interval Score (MIS) [ over given instances ]
+    wis    =  Weighted Interval Score (WIS) [ over several α values ]
         """
     end help
 
@@ -132,12 +138,12 @@ help: Quality of Fit (QoF) metrics/measures:
      *  @param cv_fit  the fit array of statistics for cross-validation (upon test sets)
      */
     def qofVector (fit: VectorD, cv_fit: Array [Statistic]): VectorD =
-        val cv = if cv_fit == null then -0.0                                // cv not computed
-                 else cv_fit(rSq.ordinal).mean                              // mean for R^2 cv
+        val cv = if cv_fit == null then fit(smapeC.ordinal)                 // cv not computed => use sMAPE_IC
+                 else 100 * cv_fit(rSq.ordinal).mean                        // mean for R^2 cv
         VectorD (100 * fit(rSq.ordinal),                                    // R^2 as percentage
                  100 * fit(rSqBar.ordinal),                                 // R^2 Bar as percentage
                  fit(smape.ordinal),                                        // sMAPE
-                 100 * cv)                                                  // R^2 cv as percentage
+                 cv)                                                        // R^2 cv as percentage, or sMAPE_IC
     end qofVector
 
     val qofVectorSize = 4                                                   // must correspond to size of qofVector
@@ -153,6 +159,16 @@ help: Quality of Fit (QoF) metrics/measures:
     end qofStatTable
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Show the quality of fit measures/metrics for each response/output variable.
+     @  @see `FitM.showFitMap`
+     *  @param ftMat  the matrix of QoF values (qof x var)
+     *  @param ftLab  the array of QoF labels (defaults to QoF.values.map (_.toString))
+     */
+    def showFitMap (ftMat: MatrixD, ftLab: Array [String] = QoF.values.map (_.toString)): String =
+        FitM.showFitMap (ftMat, ftLab)
+    end showFitMap
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Tally the current QoF measures into the statistical accumulators.
      *  @param stats  the statistics table being updated
      *  @param qof    the current QoF measure vector
@@ -160,7 +176,6 @@ help: Quality of Fit (QoF) metrics/measures:
     def tallyQof (stats: Array [Statistic], qof: VectorD): Unit =
         if qof(sst.ordinal) > 0.0 then                                      // requires variation in test set
             for q <- qof.indices do stats(q).tally (qof(q))                 // tally these QoF measures
-        end if
     end tallyQof
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -182,7 +197,7 @@ help: Quality of Fit (QoF) metrics/measures:
      *  @param y  the given time-series
      *  @param h  the forecasting horizon or stride (defaults to 1)
      */
-    def mae_n (y: VectorD, h: Int = 1): Double =
+    inline def mae_n (y: VectorD, h: Int = 1): Double =
         var sum = 0.0
         for t <- h until y.dim do sum += abs (y(t) - y(t-h))
         sum / (y.dim - h)
@@ -196,75 +211,94 @@ help: Quality of Fit (QoF) metrics/measures:
      *  @param yp  the forecasted time-series
      *  @param h   the forecasting horizon or stride (defaults to 1)
      */
-    def mase (y: VectorD, yp: VectorD, h: Int = 1): Double =
-        mae (y, yp, h) / mae_n (y, 1)                          // compare to Naive (one-step)
-//      mae (y, yp, h) / mae_n (y, h)                          // compare to Naive (h-steps)
+    inline def mase (y: VectorD, yp: VectorD, h: Int = 1): Double =
+        mae (y, yp, h) / mae_n (y, 1)                                       // compare to Naive (one-step)
+//      mae (y, yp, h) / mae_n (y, h)                                       // compare to Naive (h-steps)
     end mase
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the Prediction Interval Coverage Probability (PICP) metric, i.e.,
-     *  the fraction is actual values inside the prediction interval.
-     *  @param y    the given time-series (must be aligned with the interval forecast)
-     *  @param low  the lower bound
-     *  @param up   the upper bound
+     *  the fraction of actual values inside the prediction interval.
+     *  While PINC is the nominal/desired coverage probability (1 - α), PICP is
+     *  the corresponding empirical coverage probability.
+     *  @param y       the given time-series (must be aligned with the interval forecast)
+     *  @param low_up  the (lower, upper) bound vectors used for prediction intervals
      */
-    inline def picp_ (y: VectorD, low: VectorD, up: VectorD): Double =
+    inline def picp_ (y: VectorD, low_up: (VectorD, VectorD)): Double =
         var count = 0
-        for i<- y.indices if y(i) in (low(i), up(i)) do count += 1
+        for i <- y.indices if y(i) in (low_up._1(i), low_up._2(i)) do count += 1
         count / y.dim.toDouble
     end picp_
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the Prediction Interval Normalised Average Deviation (PINAD) metric, i.e.,
      *  the normalized (by range) average deviation outside the prediction interval.
-     *  @param y    the given time-series (must be aligned with the interval forecast)
-     *  @param low  the lower bound
-     *  @param up   the upper bound
+     *  @param y       the given time-series (must be aligned with the interval forecast)
+     *  @param low_up  the (lower, upper) bound vectors used for prediction intervals
      */
-    inline def pinad_ (y: VectorD, low: VectorD, up: VectorD): Double =
+    inline def pinad_ (y: VectorD, low_up: (VectorD, VectorD)): Double =
         var sum = 0.0
         for i <- y.indices do
-            sum += (if y(i) < low(i) then low(i) - y(i)
-                    else if y(i) > up(i) then y(i) - up(i)
+            sum += (if y(i) < low_up._1(i) then low_up._1(i) - y(i)
+                    else if y(i) > low_up._2(i) then y(i) - low_up._2(i)
                     else 0.0)
         sum / (y.dim * (y.max - y.min))
     end pinad_
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Return the Interval Score (IS) metric, i.e., the ...
+    /** Return the Mean Interval Score (MIS) metric which starts with the average prediction
+     *  interval width and adds a penalty for each true_value y(i) that is outside
+     *  the prediction interval.  Smaller (in absolute value) scores are better.
+     *  @see huiwenn.github.io/predictive-distributions
      *  @see arxiv.org/pdf/2005.12881.pdf
-     *  @param y      the given time-series (must be aligned with the interval forecast)
-     *  @param low    the lower bound
-     *  @param up     the upper bound
-     &  @param alpha  the prediction level
+     *  @see search.r-project.org/CRAN/refmans/scoringutils/html/interval_score.html
+     *
+     *       score = (up − low) + α/2 * (low − true_value) ∗ is(true_value < low)
+     *                          + α/2 * (true_value − up)  ∗ is(true_value > up)
+     *
+     *  @param y       the given time-series (must be aligned with the interval forecast)
+     *  @param low_up  the (lower, upper) bound vectors used for prediction intervals
+     &  @param α       the significance level (1 - p_)
      */
-    def iscore_ (y: VectorD, low: VectorD, up: VectorD, alpha: Double = 0.1): Double =
-        val fac = 2.0 / alpha
+    inline def mis_ (y: VectorD, low_up: (VectorD, VectorD), α: Double = 0.1): Double =
+        val (low, up) = low_up
+//      val pf  = 2.0 / α                                                   // penalty factor
+        val pf  = 4.0 / α                                                   // penalty factor - based on α/2
         var sum = 0.0
         for i <- y.indices do
-            sum += up(i) - low(i)                                 // interval width
-            if y(i) < low(i) then sum += fac * (low(i) - y(i))    // y_i below interval penalty
-            if y(i) > up(i)  then sum += fac * (y(i) - up(i))     // y_i above interval penalty
-        sum / y.dim
-    end iscore_
+            sum += up(i) - low(i)                                           // interval width
+            if y(i) < low(i) then sum += pf * (low(i) - y(i))               // y_i below interval penalty
+            if y(i) > up(i) then  sum += pf * (y(i) - up(i))                // y_i above interval penalty
+        sum / y.dim                                                         // return the mean score
+    end mis_
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Return the Weighted Interval Score (WIS) metric, i.e., the ...
+    /** Return the Weighted Interval Score (WIS) metric, i.e., a weighted average of
+     *  K prediction intervals each calculated for a different alpha (α) level.
+     *  WIS approximates the Continuous Ranked Probability Score (CRPS).
      *  @see arxiv.org/pdf/2005.12881.pdf
+     *  @see pmc.ncbi.nlm.nih.gov/articles/PMC7880475/pdf/pcbi.1008618.pdf (equation 1)
      *  @param y       the given time-series (must be aligned with the interval forecast)
      *  @param yp      the point prediction mean/median
-     *  @param low     the lower bounds for various alpha levels
-     *  @param up      the upper bounds for various alpha levels
-     *  @param alphas  the array of prediction levels
+     *  @param low_up  the (lower, upper) bound vectors used for prediction intervals
+     *  @param α       the vector of significance levels (defaults to the K = 11 prediction intervals 
+     *                     used by the COVID-19 Forecast Hub)
      */
-    def wis_ (y: VectorD, yp: VectorD, low: MatrixD, up: MatrixD,
-              alphas: Array [Double] =
-              Array (0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)): Double =
-        val k = alphas.size
-        var sum = alphas(0) * (y - yp).abs.mean
-        for j <- 1 until k do sum += alphas(j) * iscore_ (y, low(j), up(j), alphas(j))
-        sum / (2 * k + 1)
+    def wis_ (y: VectorD, yp: VectorD, low_up: (MatrixD, MatrixD), α: VectorD = α_): Double =
+        val w   = α * 0.25
+        val ww  = 0.5
+        var sum = ww * (y - yp).abs.mean
+        for k <- α.indices do sum += w(k) * mis_ (y, (low_up._1(k), low_up._2(k)), α(k))
+        sum / (α.dim + 0.5)
     end wis_
+
+/*
+        MAY NEED TO FIX -- use prediction median instead of prediction mean
+        val kk  = α.dim
+        var sum = α(0) * (y - yp).abs.mean
+        for k <- 1 until kk do sum += α(k) * mis_ (y, low_up._1(k), low_up._2(k), α(k))
+        sum / (2 * k + 1)
+*/
 
 end Fit
 
@@ -273,162 +307,195 @@ import Fit._
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `Fit` trait provides methods to determine basic Quality of Fit QoF measures.
  *  @see reset to reset the degrees of freedom
- *  @param dfm  the degrees of freedom for model/regression
+ *  @param dfr  the degrees of freedom for regression/model
  *  @param df   the degrees of freedom for error
  */
-trait Fit (protected var dfm: Double, protected var df: Double)
+trait Fit (protected var dfr: Double, protected var df: Double)
       extends FitM:
 
-    private val debug   = debugf ("Fit", false)                 // debug function
-    private val flaw    = flawf  ("Fit")                        // flaw function
+    private val debug   = debugf ("Fit", false)                             // debug function
+    private val flaw    = flawf  ("Fit")                                    // flaw function
 
-    private val pIC     = 2.0                                   // penalty multiplier for sMAPE IC
-    private var df_t    = dfm + df                              // total degrees of freedom
-    private var r_df    = if df > 1.0 then df_t / df            // ratio of degrees of freedom (total / error)
-                         else dfm + 1.0                         // case for for less than 1 dof error
+    private val pIC     = 2.0                                               // penalty multiplier for sMAPE IC
+    private var df_t    = dfr + df                                          // total degrees of freedom
+    private var r_df    = if df > 1.0 then df_t / df                        // ratio of degrees of freedom (total / error)
+                         else dfr + 1.0                                     // case for for less than 1 dof error
 
-    private var mse     = -1.0                                  // mean of squares for error MSE (unbiased)
-    private var rse     = -1.0                                  // residual standard error (RSE)
-    private var msr     = -1.0                                  // mean of squares for regression/model (MSR)
+    private var mse     = -1.0                                              // mean of squares for error MSE (unbiased)
+    private var rse     = -1.0                                              // residual standard error (RSE)
+    private var msr     = -1.0                                              // mean of squares for regression/model (MSR)
 
-    private var rSqBar  = -1.0                                  // adjusted R-squared (R^2 Bar)
-    private var fStat   = -1.0                                  // F statistic (Quality of Fit)
-    private var p_fS    = -1.0                                  // p-value for fStat 
-    private var aic     = -1.0                                  // Akaike Information Criterion (AIC)
-    private var bic     = -1.0                                  // Bayesian Information Criterion (BIC)
+    private var rSqBar  = -1.0                                              // adjusted R-squared (R^2 Bar)
+    private var fStat   = -1.0                                              // F statistic (Quality of Fit)
+    private var p_fS    = -1.0                                              // p-value for fStat 
+    private var aic     = -1.0                                              // Akaike Information Criterion (AIC)
+    private var bic     = -1.0                                              // Bayesian Information Criterion (BIC)
 
     // Measures used for time series @see www.forecastpro.com/Trends/forecasting101August2011.html
-    private var mape    = -1.0                                  // Mean Absolute Percentage Error (MAPE)
-    private var mase    = -1.0                                  // Mean Absolute Scaled Error (MASE)
-    private var smapeIC = -1.0                                  // symmetric Mean Absolute Percentage Error Information Criteria (sMAPE-IC)
-//  private var nmae    = -1.0                                  // normalized MAE (MAD/Mean Ratio)
+    private var mape    = -1.0                                              // Mean Absolute Percentage Error (MAPE)
+    private var mase    = -1.0                                              // Mean Absolute Scaled Error (MASE)
+    private var smapeC  = -1.0                                              // symmetric Mean Absolute Percentage Error Information Criteria (sMAPE-IC)
+//  private var nmae    = -1.0                                              // normalized MAE (MAD/Mean Ratio)
 
-    private var picp    = -1.0                                  // prediction interval coverage probability
-    private var pinc    = -1.0                                  // prediction interval nominal coverage
-    private var ace     = -1.0                                  // average coverage error
-    private var pinaw   = -1.0                                  // prediction interval normalized average width
-    private var pinad   = -1.0                                  // prediction interval normalized average deviation
-    private var iscore  = -1.0                                  // interval score
-    private var wis     = -1.0                                  // weighted interval score
+    private var picp    = -1.0                                              // Prediction Interval empirical Coverage Probability (PICP)
+    private var pinc    = -1.0                                              // Prediction Interval Nominal Coverage probability (PINC)
+    private var ace     = -1.0                                              // Average Coverage Error (picp - pinc)
+    private var pinaw   = -1.0                                              // Prediction Interval Normalized Average Width (PINAW)
+    private var mis     = -1.0                                              // Mean Interval Score (MIS) [over given instances]
+    private var wis     = -1.0                                              // Weighted Interval Score (WIS) [over several α values]
 
-    protected var sig2e = -1.0                                  // MLE estimate of the population variance on the residuals 
+    protected var sig2e = -1.0                                              // MLE estimate of the population variance on the residuals 
 
-    protected var yForm: Transform = null                      // optional transformation of the response variable y
-    protected var scaledMetrics: Boolean = false                // whether to use scaled metrics (otherwise use the default orifinal scale)
+    protected var yForm: Transform = null                                   // optional transformation of the response variable y
+    protected var scaledMetrics: Boolean = false                            // whether to use scaled metrics (otherwise use the default original scale)
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Return the the y-transformation.
+    /** Return the y-transformation.
      */
     def getYForm: Transform = yForm
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Reset the degrees of freedom to the new updated values.  For some models,
      *  the degrees of freedom is not known until after the model is built.
-     *  @param df_update  the updated degrees of freedom (model, error)
+     *  @param df_update  the updated degrees of freedom (regression/model, error)
      */
     def resetDF (df_update: (Double, Double)): Unit =
-        dfm  = df_update._1; df = df_update._2                 // degrees of freedom
-        df_t = dfm + df                                        // total degrees of freedom
-        r_df = if df > 1.0 then df_t / df                      // ratio of degrees of freedom (total / error)
-               else dfm + 1.0                                  // case for for less than 1 dof error
-        debug ("resetDF", s"dfm = $dfm, df = $df")
+        dfr  = df_update._1; df = df_update._2                              // degrees of freedom
+        df_t = dfr + df                                                     // total degrees of freedom
+        r_df = if df > 1.0 then df_t / df                                   // ratio of degrees of freedom (total / error)
+               else dfr + 1.0                                               // case for for less than 1 DoF error
+        debug ("resetDF", s"dfr = $dfr, df = $df")
     end resetDF
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the mean of the squares for error (sse / df).  Must call diagnose first.
      */
-    def mse_ : Double = mse
+    inline def mse_ : Double = mse
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Diagnose the health of the model by computing the Quality of Fit (QoF) measures,
      *  from the error/residual vector and the predicted & actual responses.
      *  For some models the instances may be weighted.
      *  @see `Regression_WLS`
-     *  @param y_   the actual response/output vector to use (test/full)
-     *  @param yp_  the predicted response/output vector (test/full)
-     *  @param w    the weights on the instances (defaults to null)
+     *  @param y_raw   the actual response/output vector to use (test/full)
+     *  @param yp_raw  the predicted response/output vector (test/full)
+     *  @param w       the weights on the instances (defaults to null)
      */
-    override def diagnose (y_ : VectorD, yp_ : VectorD, w: VectorD = null): VectorD =
-        val (y, yp) = if scaledMetrics || yForm == null then (y_, yp_)
-                      else (yForm.fi(y_), yForm.fi(yp_))
-        super.diagnose (y, yp, w)                                 // compute `FitM` metrics
+    override def diagnose (y_raw: VectorD, yp_raw: VectorD, w: VectorD = null): VectorD =
+        val idx = y_raw.indexOf (NO_DOUBLE)                                 // skip all after NO_DOUBLE (filler)
 
-        val e = y - yp                                            // FIX - avoid computing twice
+        val (y_, yp_) = if idx < 0 then (y_raw, yp_raw) else (y_raw(0 until idx), yp_raw(0 until idx))
+        val (y, yp)   = if scaledMetrics || yForm == null then (y_, yp_)
+                        else (yForm.fi(y_), yForm.fi(yp_))
+        super.diagnose (y, yp, w)                                           // compute `FitM` metrics
+
+        val e = y - yp                                                      // FIX - avoid computing twice
 //      println (s"Fit.diagnose:\n y = $y,\n yp = $yp,\n e = $e")
 
-        if dfm < 0 || df < 0 then
-            flaw ("diagnose", s"degrees of freedom dfm = $dfm and df = $df must be non-negative")
+        if dfr < 0 || df < 0 then
+            flaw ("diagnose", s"degrees of freedom dfr = $dfr and df = $df must be non-negative")
 
-        msr    = if dfm == 0 then 0.0 else ssr / dfm              // mean squared regression/model
-        mse    = sse / df                                         // mean squares error
+        msr    = if dfr == 0 then 0.0 else ssr / dfr                        // Mean Squared Regression
+        mse    = sse / df                                                   // Mean squared Error
 
-        rse    = sqrt (mse)                                       // residual standard error
-        rSqBar = 1 - (1-rSq) * r_df                               // adjusted R-squared
+        rse    = sqrt (mse)                                                 // Residual Standard Error
+        rSqBar = 1 - (1-rSq) * r_df                                         // adjusted R-squared
 
-        fStat  = msr / mse                                        // F statistic (quality of fit)
-        p_fS = if dfm == 0 then -0.0
-               else 1.0 - fisherCDF (fStat, dfm.toInt, df.toInt)  // p-value for fStat   
-        if p_fS.isNaN then p_fS = -0.0                            // NaN => check error message produced by fisherCDF
+        fStat  = msr / mse                                                  // F statistic (quality of fit)
+        p_fS = if dfr == 0 then -0.0
+               else 1.0 - fisherCDF (fStat, dfr.toInt, df.toInt)            // p-value for fStat   
+        if p_fS.isNaN then p_fS = -0.0                                      // NaN => check error message produced by fisherCDF
 
         if sig2e == -1.0 then sig2e = e.variance_
 
-        val ln_m = log (m)                                        // natural log of m (ln(m))
-        aic    = ll() + 2 * (dfm + 1)                             // Akaike Information Criterion
-                                                                  //   the + 1 on dfm accounts for the sig2e, which is
-                                                                  //   an additional parameter to be estimated in MLE
-        bic    = aic + (dfm + 1) * (ln_m - 2)                     // Bayesian Information Criterion
-        mape   = 100 * (e.abs / y.abs).sum / m                    // mean absolute percentage error
-        mase   = Fit.mase (y, yp)                                 // mean absolute scaled error
-        smapeIC = smape + pIC * (dfm + 1) / y.dim.toDouble        // sSMAPE Information Criterion
+        val ln_m = log (m)                                                  // natural log of m (ln(m))
+        aic    = ll() + 2 * (dfr + 1)                                       // Akaike Information Criterion
+                                                                            //   the + 1 on dfr accounts for the sig2e, which is
+                                                                            //   an additional parameter to be estimated in MLE
+        bic    = aic + (dfr + 1) * (ln_m - 2)                               // Bayesian Information Criterion
+        mape   = 100 * (e.abs / y.abs).sum / m                              // Mean Absolute Percentage Error
+        mase   = Fit.mase (y, yp)                                           // Mean Absolute Scaled Error
+        smapeC = smape + pIC * (dfr + 1) / y.dim.toDouble                   // sMAPE Information Criterion
         fit
     end diagnose
 
-//      nmae   = mae / mu                                         // normalized MAE (MAD/Mean Ratio)
-//      nrmse  = rmse / mu                                        // normalized RMSE
+//      nmae   = mae / mu                                                   // normalized MAE (MAD/Mean Ratio)
+//      nrmse  = rmse / mu                                                  // normalized RMSE
 //  issues concerning mean: full, train or test?
 //      val ym   = if ym_ == -0.0 then { debug ("diagnose", "test mean"); mu }
 //                 else                { debug ("diagnose", "train mean"); ym_ }
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Diagnose the health of the model by computing the Quality of Fit (QoF) metrics/measures,
-     *  from the error/residual vector and the predicted & actual responses.
-     *  For some models the instances may be weighted.  Include interval measures.
-     *  Note: `wis` should be computed separately.
-     *  @see `Regression_WLS`
-     *  @param y      the actual response/output vector to use (test/full)
-     *  @param yp     the point prediction mean/median
-     *  @param low    the predicted lower bound
-     *  @param up     the predicted upper bound
-     *  @param alpha  the nominal level of uncertainty (alpha) (defaults to 0.9, 90%)
-     *  @param w      the weights on the instances (defaults to null)
+    /** Diagnose the health of the model by computing the Quality of Fit (QoF)
+     *  metrics/measures, from the error/residual vector and the predicted &
+     *  actual responses.  For some models the instances may be weighted.
+     *  This method also includes PREDICTION INTERVAL (PI) metrics/measures.
+     *  @see otexts.com/fpp2/prediction-intervals.html
+     *  Note: `wis` should be computed separately as the bounds are matrices.
+     *  @param y       the actual response/output vector to use (test/full)
+     *  @param yp      the point prediction mean/median
+     *  @param low_up  the predicted (lower, upper) bounds vectors
+     *  @param α       the significance/nominal level of uncertainty (α) (defaults to 0.1, 10%)
+     *  @param w       the weights on the instances (defaults to null)
      */
-    def diagnose_ (y: VectorD, yp: VectorD, low: VectorD, up: VectorD, alpha: Double = 0.1,
+    def diagnose_ (y: VectorD, yp: VectorD, low_up: (VectorD, VectorD), α: Double = 0.1,
                    w: VectorD = null): VectorD =
-        diagnose (y, yp, w)
+        diagnose (y, yp, w)                                                 // call the main diagnose method for non-PI metrics
 
-        picp   = picp_ (y, low, up)                            // prediction interval coverage probability
-        pinc   = 1 - alpha                                     // prediction interval nominal coverage
-        ace    = picp - pinc                                   // average coverage error
-        pinaw  = (up - low).mean / (y.max - y.min)             // prediction interval normalized average width
-        pinad  = pinad_ (y, low, up)                           // prediction interval normalized average deviation
-        iscore = iscore_ (y, low, up)                          // interval score
+        picp  = picp_ (y, low_up)                                           // Prediction Interval empirical Coverage Probability
+        pinc  = 1 - α/2                                                     // Prediction Interval Nominal Coverage probability
+        ace   = picp - pinc                                                 // Average Coverage Error (empirical - nominal)
+        pinaw = (low_up._2 - low_up._1).mean / (y.max - y.min)              // Prediction Interval Normalized Average Width
+                                                                            //     average PI width / range of y values
+        mis   = mis_ (y, low_up)                                            // Mean Interval Score
         fit
     end diagnose_
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Diagnose the health of the model by computing the Quality of Fit (QoF) measures,
+     *  specifically for the weighted interval score that allows using custom α levels.
      *  @param y       the given time-series (must be aligned with the interval forecast)
      *  @param yp      the point prediction mean/median
-     *  @param low     the lower bounds for various alpha levels
-     *  @param up      the upper bounds for various alpha levels
-     *  @param alphas  the array of prediction levels
+     *  @param low_up  the predicted (lower, upper) bounds matrices for various α levels
+     *                     (column for each α level)
+     *  @param α       the vector of significance levels (defaults to the K = 11 prediction
+     *                     intervals used by the CDC Forecast Hub)
      */
-    def diagnose_wis (y: VectorD, yp: VectorD, low: MatrixD, up: MatrixD,
-                      alphas: Array [Double] =
-                      Array (0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)): Double =
-        wis = wis_ (y, yp, low, up, alphas)
+    def diagnose_wis (y: VectorD, yp: VectorD, low_up: (MatrixD, MatrixD), α: VectorD = α_): Double =
+        wis = wis_ (y, yp, low_up, α)
         wis
     end diagnose_wis
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Diagnose the health of the model by computing the Quality of Fit (QoF) measures
+     *  for both POINT PREDICTIONS and PREDICTION INTERVALS.
+     *  @param y       the given time-series (must be aligned with the interval forecast)
+     *  @param yp      the point prediction mean/median
+     *  @param low_up  the predicted (lower, upper) bounds matrices for various α levels
+     *                     (column for each α level)
+     *  @param α       the vector of significance levels (defaults to the K = 11 prediction
+     *                     intervals used by the CDC Forecast Hub)
+     *  @param iα      the index for the main significance level out of the vector α
+     */
+    def diagnose_pi (y: VectorD, yp: VectorD, low_up: (MatrixD, MatrixD), α: VectorD = α_,
+                     iα: Int = 2): (VectorD, Int) =
+        diagnose_ (y, yp, MatrixD.at (low_up, iα), α(iα))
+        wis = wis_ (y, yp, low_up, α)
+        (fit, iα) 
+    end diagnose_pi
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Diagnose the health of the model by computing the Quality of Fit (QoF) measures,
+     *  from the predicted & actual matrix responses (output variable per column).
+     *  For some models the instances may be weighted.
+     *  @see `Regression_WLS`
+     *  @param yy   the actual response/output matrix to use (test/full)
+     *  @param yyp  the predicted response/output matrix (test/full)
+     *  @param w    the weights on the instances (defaults to null)
+     */
+    def diagnose_mat (yy: MatrixD, yyp: MatrixD, w: VectorD = null): MatrixD =
+        MatrixD (for k <- yy.indices2 yield diagnose (yy(?, k), yyp(?, k), w)).ᵀ 
+    end diagnose_mat
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** The log-likelihood function times -2.  Override as needed.
@@ -451,32 +518,14 @@ trait Fit (protected var dfm: Double, protected var df: Double)
      *  Override to add more quality of fit measures.
      */
     override def fit: VectorD = VectorD (rSq, rSqBar, sst, sse, sde, mse0, rmse, mae,
-                                         smape, m, dfm, df, fStat, aic, bic, mape, mase, smapeIC,
-                                         picp, pinc, ace, pinaw, pinad, iscore, wis)
+                                         smape, m, dfr, df, fStat, aic, bic, mape, mase, smapeC,
+                                         picp, pinc, ace, pinaw, mis, wis)
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the Quality of Fit (QoF) measures corresponding to the labels given.
      *  Override to add more quality of fit measures.
      */
-//  def fit_ : VectorD = fit ++ VectorD (picp, pinc, ace, pinaw, pinad, iscore, wis)
-
-    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Show the prediction interval forecasts and relevant QoF metrics/measures.
-     *  @param yy       the aligned actual response/output vector to use (test/full)
-     *  @param yfh      the forecasts for horizon h
-     *  @param low      the predicted lower bound
-     *  @param up       the predicted upper bound
-     *  @param qof_all  all the QoF metrics (for point and interval forecasts)
-     *  @param h        the forecasting horizon
-     */
-    def show_interval_forecasts (yy: VectorD, yfh: VectorD,
-                                 low: VectorD, up: VectorD,
-                                 qof_all: VectorD, h: Int): Unit =
-        println (FitM.fitMap (qof_all, qoF_names))                     // fully evaluate h-steps ahead forecasts
-        new PlotM (null, MatrixD (yy, yfh, low, up),                   // aligned actual, forecasted, lower, upper
-                   Array ("yy", "yfh", "low", "up"),
-                   "Plot Prediction Intervals for horizon $h", lines = true)
-    end show_interval_forecasts
+//  def fit_ : VectorD = fit ++ VectorD (picp, pinc, ace, pinaw, mis, wis)
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the help string that describes the Quality of Fit (QoF) measures
@@ -485,7 +534,61 @@ trait Fit (protected var dfm: Double, protected var df: Double)
     override def help: String = Fit.help
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Produce a QoF summary for a model with diagnostics for each predictor x_j
+    /** Show the QoF metrics/measures in vector qof.
+     *  @param qof  the QoF metrics (e.g., for point and interval predictions/forecasts)
+     */
+    def showQoF (qof: VectorD): Unit = println (FitM.fitMap (qof, qoF_names))
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Make the PREDICTION INTERVAL (PI) lower and upper bound vectors from
+     *  the point predictions and the interval half widths.
+     *  @param yp   the vector of point predictions (y-hat)
+     *  @param ihw  the vector of interval half widths (one for each prediction)
+     */
+    inline def PIbounds (yp: VectorD, ihw: VectorD): (VectorD, VectorD) = (yp - ihw, yp + ihw)
+
+    inline def PIbounds (yp: VectorD, ihw_ : MatrixD): (MatrixD, MatrixD) = (-ihw_ + yp, ihw_ + yp)
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Produce a PREDICTION INTERVAL half width for each prediction yp (y-hat). 
+     *  @caveat:  PREDICTION INTERVAL are built assuming Gaussian errors.
+     *  Note: `Fac_Cholesky is used to compute the inverse of xtx.
+     *  @see `predictCInt` in `Predictor`
+     *  @see stats.stackexchange.com/questions/585660/what-is-the-formula-for-prediction-interval-in-multivariate-case
+     *  @see www.geeksforgeeks.org/data-analysis/confidence-and-prediction-intervals-with-statsmodels/
+     *  @param x_   the testing/full data/input matrix
+     *  @param df_  the error/residual degrees of freedom
+     *  @param α    the significance level α = .1 for TWO TAILS:  left tail .05 | 1 - α = .90 | .05 right tail
+     *                  e.g., for AutoMPG, t_crit (385, 0.90) = 1.6488210657096942
+     *                                     t_crit (385, 0.95) = 1.966
+     */
+    def predictInt (x_ : MatrixD, df_ : Double = df, α: Double = .1): VectorD =
+        val facCho = new Fac_Cholesky (x_.ᵀ  * x_)                          // create a Cholesky factorization of xtx
+        val xtxInv = facCho.inverse                                         // take inverse
+        val sig2   = mse_
+        val p_     = 1 - α/2                                                // need p_-th quantile
+        val t_     = t_crit (df_.toInt, p_)                                 // critical value from the t-distribution (two tails)
+        debug ("predictInt", s"t_crit (${df_.toInt}, $p_) = $t_")
+        val ihw    = new VectorD (x_.dim)
+        for i <- x_.indices do
+            val x_i = x_(i)                                                 // use i-th predictor vector for ihw(i)
+            ihw(i)  = t_ * sqrt (sig2 * (1 + (x_i dot xtxInv * x_i)))
+        ihw                                                                 // return vector of Interval Half Widths (IHWs)
+    end predictInt
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Produce a PREDICTION INTERVAL half width for each prediction yp (y-hat) and
+     *  each significance level.
+     *  @param x_   the testing/full data/input matrix
+     *  @param df_  the error/residual degrees of freedom
+     *  @param α    the significance levels to be used (defaults to `Fit.α_`)
+     */
+    def predictInt_ (x_ : MatrixD, df_ : Double = df, α: VectorD = α_): MatrixD =
+        MatrixD (α.map (predictInt (x_, df_, _)))
+    end predictInt_
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Produce a QoF SUMMARY for a model with diagnostics for each predictor x_j
      *  and the overall Quality of Fit (QoF).
      *  Note: `Fac_Cholesky is used to compute the inverse of xtx.
      *  @param x_     the testing/full data/input matrix
@@ -493,11 +596,12 @@ trait Fit (protected var dfm: Double, protected var df: Double)
      *  @param b      the parameters/coefficients for the model
      *  @param vifs   the Variance Inflation Factors (VIFs)
      */
-    override def summary (x_ : MatrixD, fname: Array [String], b: VectorD, vifs: VectorD = null): String =
+    override def summary (x_ : MatrixD = null, fname: Array [String] = null, b: VectorD = null,
+                          vifs: VectorD = null): String =
 
-        val facCho = new Fac_Cholesky (x_.transpose * x_)      // create a Cholesky factorization of xtx
-        val diag   = facCho.inverse(?)                         // take inverse and get main diagonal
-        val stdErr = (diag * mse_).sqrt                        // standard error of coefficients
+        val facCho = new Fac_Cholesky (x_.ᵀ  * x_)                          // create a Cholesky factorization of xtx
+        val diag   = facCho.inverse(?)                                      // take inverse and get main diagonal
+        val stdErr = (diag * mse_).sqrt                                     // standard error of coefficients
 
         val stats = (sumCoeff (b, stdErr, vifs), fmt(rse), fmt(rSq), fmt(rSqBar))
         debug ("summary", s"stats = $stats")
@@ -511,7 +615,7 @@ SUMMARY
 ${stats._1}
     Residual standard error: ${stats._2} on $df degrees of freedom
     Multiple R-squared:  ${stats._3},	Adjusted R-squared:  ${stats._4}
-    F-statistic: $fStat on $dfm and $df DF,  p-value: $p_fS
+    F-statistic: $fStat on $dfr and $df DF,  p-value: $p_fS
 ----------------------------------------------------------------------------------
         """
     end summary
@@ -526,10 +630,9 @@ ${stats._1}
         debug ("sumCoeff", s"stdErr = $stdErr")
         var t, p: VectorD = null
         if stdErr != null then
-            t  = b / stdErr                                           // Student's T statistic
+            t  = b / stdErr                                                 // Student's T statistic
             p  = if df > 0 then t.map ((x: Double) => 2.0 * studentTCDF (-abs (x), df))   // p value
                  else -VectorD.one (b.dim)
-        end if
         val sb = new StringBuilder ()
         for j <- b.indices do
             sb.append ("    x" + j + "\t " + fmt(b(j)) +
@@ -549,7 +652,7 @@ end Fit
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `TestFit` class can be used for comparing two vectors on the basis of QoF.
- *  The degrees of freedom (dfm) for the "model" is assumed to be 1.
+ *  The degrees of freedom (dfr) for the "model" is assumed to be 1.
  *  Can be used when the degrees of freedom are not known.
  *  @param m  the size of vectors to compare
  */
@@ -564,13 +667,14 @@ end TestFit
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `fitTest` main function is used to test the `Fit` trait on a simulated dataset.
+ *  It test the `diagnose` method to get metrics on POINT PREDICTIONS.
  *  > runMain scalation.modeling.fitTest
  */
 @main def fitTest (): Unit =
 
 //  import scalation.random.Normal
 
-    for sig2 <- 10 to 50 by 10 do
+    for sig2 <- 10 to 50 by 10 do                                           // test for increasing noise
 //      val rv = Normal (0, sig2)
         val rv = SimpleUniform (-sig2, sig2)
         val y  = VectorD.range (1, 101) + 10.0
@@ -588,6 +692,7 @@ end fitTest
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `fitTest2` main function is used to test the `Fit` class on a simulated
  *  time series.
+ *  It test the `diagnose_` method to get metrics on PREDICTION INTERVALS.
  *  @see `scalation.modeling.forecasting.randomWalkTest3` for another test case
  *  > runMain scalation.modeling.fitTest2
  */
@@ -595,20 +700,21 @@ end fitTest
 
     import scalation.random.Normal
 
-    for sig2 <- 10 to 50 by 10 do
+    for sig2 <- 10 to 50 by 10 do                                           // test for increasing noise
         val rv  = Normal (0, sig2)
         val w   = math.sqrt (sig2) * 1.96
         val yp  = VectorD.range (1, 101) + 10.0
-        val y   = yp.map (_ + rv.gen)                           // simulated time series
+        val y   = yp.map (_ + rv.gen)                                       // simulated time series
         val low = yp.map (_ - w)
         val up  = yp.map (_ + w)
         new PlotM (null, MatrixD (y, yp, low, up), Array ("y", "yp", "low", "up"), "plot y, low and up")
 
         object ft extends Fit (1, y.dim)
-        ft.diagnose_ (y, yp, low, up)
-        ft.diagnose_wis (y, yp, MatrixD (low), MatrixD (up), Array (0.1))
+        ft.diagnose_ (y, yp, (low, up))
+        ft.diagnose_wis (y, yp, (MatrixD (low), MatrixD (up)), VectorD (0.1))   // FIX - WIS needs multiple α levels
         val qof = ft.fit
         println (FitM.fitMap (qof, qoF_names))
     end for
 
 end fitTest2
+

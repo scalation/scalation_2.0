@@ -78,7 +78,6 @@ class Dgraph (name: String, bipartite: Boolean = false):
             if bipartite && edge.from.primary == edge.to.primary then
                 flaw ("addEdge", "node types for edge endpoints may not be the same")
                 return false
-            end if
             outEdges += edge
             true
         end addEdge
@@ -140,7 +139,6 @@ class Dgraph (name: String, bipartite: Boolean = false):
             shape.setLine (p1, p2, bend)
         else if direct then                                           // directly set the line (use factory methods to move)
             shape.setLine (p1, p2)
-        end if
 
         //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
         /** Move the edge endpoints, p1 and p2, so edge connects to node boundaries,
@@ -304,7 +302,7 @@ class Dgraph (name: String, bipartite: Boolean = false):
          *  @param w      the width of the token
          *  @param h      the height of the token
          */
-        def this (shape: RectangularShape, label: String, primary: Boolean, color: Color,
+        def this (shape: RectangularShape, label: String, color: Color,
                   x: Double, y: Double, w: Double, h: Double) =
             this (shape, label, true, color, null, w, h)
             shape.setFrame (x, y, w, h)
@@ -401,7 +399,7 @@ class Dgraph (name: String, bipartite: Boolean = false):
      *  @param level  the recursion level
      */
     def traverse (n: Node, level: Int): Unit =
-        for i <- 0 until level do print ("\t")
+        cfor (0, level) { _ =>  print ("\t") }
         println (n)                              // print visited node
         //visited.add (n)
         val outgoing = n.outEdges

@@ -13,10 +13,9 @@ package mathstat
 
 import java.util.Arrays.copyOf
 
-import scala.collection.immutable.{IndexedSeq => IIndexedSeq}
-import scala.collection.immutable.Set
-import scala.collection.generic._
-import scala.collection.mutable._
+import scala.collection.generic.DefaultSerializable
+import scala.collection.immutable.{IndexedSeq => IIndexedSeq, Set}
+import scala.collection.mutable.IndexedSeq
 import scala.runtime.ScalaRunTime.stringOf
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -36,7 +35,6 @@ class VectorS (val dim: Int,
         v = Array.ofDim [String] (dim)
     else if dim > v.length then
         flaw ("init", s"vector dimension is larger than space: dim = $dim > v.length = $v.length")
-    end if
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the length of this vector.
@@ -118,7 +116,6 @@ class VectorS (val dim: Int,
             else
                 b.v(k) = v(i)
                 k += 1
-            end if
         end for
         (a, b)
     end split
@@ -631,7 +628,6 @@ class VectorS (val dim: Int,
             iqsort (rk, q + 1, r)                          // recursively sort right partition
         else
             iselsort (rk, p, r)                            // use simple sort when small
-        end if
         rk
     end iqsort
 
@@ -703,7 +699,6 @@ class VectorS (val dim: Int,
             if v(j) < v(k) then j else if v(i) < v(k) then k else i
         else
             if v(j) > v(k) then j else if v(i) > v(k) then k else i
-        end if
     end med3
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

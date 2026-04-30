@@ -41,10 +41,10 @@ class ConjugateGradient (f: FunctionV2S, g: FunctionV2S = null,
       extends Minimizer:
 
     private val debug  = debugf ("ConjugateGradient", true)   // debug function
-    private val flaw   = flawf ("ConjugateGradient")          // flaw function
+//  private val flaw   = flawf ("ConjugateGradient")          // flaw function
     private val WEIGHT = 1000.0                               // weight on penalty for constraint violation
 
-    private var gr: FunctionV2V = null                        // gradient (vector of partial derivatives)
+//  private var gr: FunctionV2V = null                        // gradient (vector of partial derivatives) - FIX - should be used
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute the beta function using the Polak-Ribiere (PR) technique.  The
@@ -61,11 +61,13 @@ class ConjugateGradient (f: FunctionV2S, g: FunctionV2S = null,
      *  they are more efficient and more accurate than estimating the values
      *  using difference quotients (the default approach).
      *  @param partials  the array of partial derivative functions
-     */
+     *  FIX - should be used
+     * 
     def setDerivatives (partials: FunctionV2V): Unit =
         if g != null then flaw ("setDerivatives", "only works for unconstrained problems")
         gr = partials                           // use given functions for partial derivatives
     end setDerivatives
+     */
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** The objective function f plus a weighted penalty based on the constraint
@@ -79,7 +81,6 @@ class ConjugateGradient (f: FunctionV2S, g: FunctionV2S = null,
         else                                                  // constrained, g(x) <= 0
             val penalty = if ineq then max (g(x), 0.0) else abs (g(x))
             f_x + abs (f_x) * WEIGHT * penalty * penalty
-        end if
     end fg
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

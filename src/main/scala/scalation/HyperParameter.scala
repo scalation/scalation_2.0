@@ -38,12 +38,12 @@ class HyperParameter extends Cloneable:
     def default (name: String): ValueType = hparam (name)._2
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Given the name, update the hyper-parameter value.
+    /** Given the name, update the hyper-parameter value.  Note (v, d) for value, default
      *  @param name   the name of the hyper-parameter
      *  @param value  the value of the hyper-parameter
      */
     def update (name: String, value: ValueType): Unit =
-        val (v, d) = hparam (name)
+        val (_, d) = hparam (name)
         hparam += name -> (value, d)
     end update
 
@@ -54,7 +54,7 @@ class HyperParameter extends Cloneable:
      */
     def updateReturn (name: String, value: ValueType): HyperParameter =
         val hp2 = clone ().asInstanceOf [HyperParameter]
-        val (v, d) = hp2.hparam (name)
+        val (_, d) = hp2.hparam (name)
         hp2.hparam += name -> (value, d)
         hp2
     end updateReturn
@@ -66,7 +66,7 @@ class HyperParameter extends Cloneable:
     def updateReturn (nvs: (String, ValueType)*): HyperParameter =
         val hp2 = clone ().asInstanceOf [HyperParameter]
         for nv <- nvs do
-            val (v, d) = hp2.hparam (nv._1)
+            val (_, d) = hp2.hparam (nv._1)
             hp2.hparam += nv._1 -> (nv._2, d)
         end for
         hp2
@@ -74,11 +74,12 @@ class HyperParameter extends Cloneable:
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Concatenate this hyper-parameter map with a second hyper-parameter map.
+     *  When the names are the same, the value for hp2 is taken.
      *  @param hp2  the second hyper-parameter map
      */
     def ++ (hp2: HyperParameter): HyperParameter =
         val hp3 = clone ().asInstanceOf [HyperParameter]
-        for (n, v) <- hp2.hparam do hp3.hparam += n -> v
+        for (n, v) <- hp2.hparam do hp3.hparam += n -> v           // (n, v) name, value pair
         hp3
     end ++
  
@@ -139,6 +140,7 @@ end HyperParameter
 
     val hp2 = new HyperParameter
     hp2 += ("cThresh", 0.5, 0.5)
+    hp2 += ("eta", 0.2, 0.2)
 
     println (s"hp ++ hp2 = ${hp ++ hp2}")
 

@@ -76,6 +76,8 @@ trait Clusterer:
 
     protected var stream = 0                                         // the stream to use for random numbers
 
+//  _taskType = TaskType.Cluster                                     // the type of task performed -- FIX -- subtrait of Model
+
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Set the names for the clusters.
      *  @param nm  the array of names

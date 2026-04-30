@@ -130,7 +130,6 @@ class Stationarity_KPSS (yy : VectorD, lags_ : Int, lagsType_ : String, trend_ :
         else if trend == "nc" then
             throw new IllegalArgumentException
                   ("\n ERROR: olsDetrend: no detrending possible when regression trend is no constant.\n")
-        end if
 
         if trend == "c" then
             y = y - y.mean                                             // use mean centered
@@ -175,13 +174,11 @@ class Stationarity_KPSS (yy : VectorD, lags_ : Int, lagsType_ : String, trend_ :
         if newTrend then                                               // if new trend
             setData ()                                                 // set back to original data for new detrending
             olsDetrend ()                                              // detrending data by OLS
-        end if
 
         if newTrend || newLags then                                    // if new trend or new lags
             computeStat ()                                             // computing statistic
             newTrend = false
             newLags  = false
-        end if
 
         stat
     end statistic
@@ -222,7 +219,7 @@ end Stationarity_KPSS
     val nobs = 1000
 
     val noise = new Normal ()                                          // generating stationary random data
-    val y = VectorD (for i <- 0 until nobs yield noise.gen)
+    val y = VectorD (for _ <- 0 until nobs yield noise.gen)
 
     val test = new Stationarity_KPSS (y, 0, "short", "c")              // init KPSS test with lags of type short and constant trend
     test.show ()                                                       // outputting test results

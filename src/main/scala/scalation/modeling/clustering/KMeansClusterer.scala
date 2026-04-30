@@ -138,7 +138,6 @@ class KMeansClusterer (x: MatrixD, k: Int, val flags: Array [Boolean] = Array (f
                     to_c(i) = c2                                         // reassign point x_i to cluster c2
                     done    = false                                      // changed clusters => not done
                     if immediate then go = false                         // optionally return after first change
-                end if
             end if
         } // cfor
         done                                                             // return whether there were no changes

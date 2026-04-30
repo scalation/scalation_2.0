@@ -33,9 +33,10 @@ import scalation.random.Randi
 class RandomWalk (y: VectorD, hh: Int, tRng: Range = null,
                   hparam: HyperParameter = null,
                   bakcast: Boolean = false)
-      extends Forecaster (y, hh, tRng, hparam, bakcast):
+      extends Forecaster (y, hh, tRng, hparam, bakcast)
+         with NoSubModels:
 
-    modelName = s"RandomWalk"
+    _modelName = "RandomWalk"
 
 end RandomWalk
 
@@ -140,7 +141,7 @@ end randomWalkTest2
 
     mod.forecastAll (y)                                                   // forecast h-steps ahead (h = 1 to hh) for all y
     mod.diagnoseAll (y, mod.getYf)
-//  println (s"Final In-ST Forecast Matrix yf = ${mod.getYf}")
+    println (s"Final In-ST Forecast Matrix yf = ${mod.getYf}")
 
 end randomWalkTest3
 
@@ -165,17 +166,41 @@ end randomWalkTest3
     mod.setSkip (0)
     mod.rollValidate ()                                                   // TnT with Rolling Validation
     mod.diagnoseAll (y, mod.getYf, Forecaster.teRng (y.dim))              // only diagnose on the testing set
-    println (s"Final TnT Forecast Matrix yf = ${mod.getYf}")
+    println (s"Final TnT Forecast Matrix yf = ${mod.getYf}")              // flat forecast matrix yf
+    println (s"Final TnT Forecast Matrix yf = ${mod.slant (mod.getYf)}")  // slanted yf -- easier to visualize
 
 end randomWalkTest4
 
 
-//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `randomWalkTest5` main function tests the `RandomWalk` class on small dataset.
- *  Test forecasts (h = 1 step ahead forecasts).
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `randomWalkTest5` main function tests the `RandomWalk` class on a simple dataset
+ *  using In-Sample Testing (In-ST).
+ *  Test forecasts (h = 1 to hh steps ahead forecasts).
  *  > runMain scalation.modeling.forecasting.randomWalkTest5
  */
 @main def randomWalkTest5 (): Unit =
+
+    val y_ = VectorD (1, 3, 5, 7, 9, 11, 13, 15, 17, 19)
+
+    val hh = 3                                                            // maximum forecasting horizon
+
+    val mod = new RandomWalk (y_, hh)                                     // create model for time series data
+    banner (s"In-ST Forecasts: ${mod.modelName} on Simple Dataset")
+    mod.trainNtest ()()                                                   // train and test on full dataset
+
+    mod.forecastAll ()                                                    // forecast h-steps ahead (h = 1 to hh) for all y
+    mod.diagnoseAll (y_, mod.getYf)
+    println (s"Final In-ST Forecast Matrix yf = ${mod.getYf}")
+
+end randomWalkTest5
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `randomWalkTest6` main function tests the `RandomWalk` class on small dataset.
+ *  Test forecasts (h = 1 step ahead forecasts).
+ *  > runMain scalation.modeling.forecasting.randomWalkTest6
+ */
+@main def randomWalkTest6 (): Unit =
 
     val y  = VectorD (1, 3, 4, 2, 5, 7, 9, 8, 6, 3)
 
@@ -185,16 +210,16 @@ end randomWalkTest4
     println (s"Final In-ST Forecast Matrix yf = ${mod.getYf}")
     new Baseline (y, "RW")
 
-end randomWalkTest5
+end randomWalkTest6
 
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `randomWalkTest6` main function tests the `RandomWalk` class on small dataset.
+/** The `randomWalkTest7` main function tests the `RandomWalk` class on small dataset.
  *  Test forecasts (h = 1 step ahead forecasts).
- *  > runMain scalation.modeling.forecasting.randomWalkTest6 <stm>
+ *  > runMain scalation.modeling.forecasting.randomWalkTest7 <stm>
  *  @param stm  the random number stream to use (command-line argument, e.g., 2)
  */
-@main def randomWalkTest6 (stm: Int): Unit =
+@main def randomWalkTest7 (stm: Int): Unit =
 
     val y  = VectorD (1, 3, 4, 2, 5, 7, 9, 8, 6, 3)
     val n  = y.dim
@@ -205,5 +230,5 @@ end randomWalkTest5
 
     new Plot (null, y ++ yy, null, "training and testing sets", lines = true)
 
-end randomWalkTest6
+end randomWalkTest7
 

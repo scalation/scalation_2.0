@@ -54,7 +54,8 @@ object GippsDynamics
        extends Dynamics:
 
     private val debug   = debugf ("GippsDynamics", true)            // debug function
-    private val EPSILON = 1.0                                       // FIX - hack - minimum velocity
+    private val flaw    = flawf ("GippsDynamics")                   // flaw function
+    private val EPSILON = 0.1                                       // FIX - hack - minimum velocity
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Update the vehicle's velocity and position using Gipps' Model (located in `Motion`)
@@ -63,8 +64,8 @@ object GippsDynamics
      *  @param length  the length of the road (`VTransport`)
      */
     def updateM (car: Vehicle, length: Double): Unit =
-        debug ("updateM", s"car = $car with car.myNode = ${car.myNode}")
-        val ref       = car.myNode.prev
+        debug ("updateM", s"car = $car with car.myNode = ${car.myNode}")        // may switch to myPathNode
+        val ref       = car.myNode.ahead
         val car_ahead = if ref == null then null else ref.elem.asInstanceOf [Vehicle]
         debug ("updateM", s"car = $car (velocity and position) based on car_ahead = $car_ahead")
 
@@ -101,22 +102,34 @@ object GippsDynamics
     end gipps
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Return the velocity of the vehicle based on Gipps' model.
+    /** Return the new velocity v_n(t+rt) of the vehicle n based on Gipps' model.
+     *  @seee en.wikipedia.org/wiki/Gipps%27_model
      *  @param an  the max acceleration of drivers
      *  @param bn  the max deceleration of drivers (negative #)
      *  @param sp  the size of vehicles
      *  @param Vn  the desired velocity of driver n
      *  @param xn  the current position of driver n
      *  @param vn  the current velocity of driver n
-     *  @param xp  the current position of the predecessor
-     *  @param vp  the current velocity of the predecessor
+     *  @param xp  the current position of the predecessor (car ahead)
+     *  @param vp  the current velocity of the predecessor (car ahead)
      *  @param rt  the reaction time of drivers
      */
     private def gipps (an: Double, bn: Double, sp: Double, Vn: Double, xn: Double,
                        vn: Double, xp: Double, vp: Double, rt: Double): Double =
-        val free = vn * 2.5 * an * rt * (1.0 - vn / Vn) * sqrt (0.025 + vn / Vn)
-        val cong = bn * rt + sqrt (bn * bn * rt * rt - bn * (2 * (xp - sp - xn) - vn * rt - vp * vp / bn))
-        min (free, cong)
+
+        // when the car ahead is not close, approach desired speed
+        val free = vn + 2.5 * an * rt * (1.0 - vn / Vn) * sqrt (0.025 + vn / Vn)
+
+        // when close to car ahead, hard braking (negative) is reduced based on car gap
+        val brake  = bn * rt                                           // hard braking
+        var red_sq = bn~^2 * rt~^2 - bn * (2 * (xp - sp - xn) - vn * rt - vp~^2 / bn)
+        if red_sq < 0.0 then
+            flaw ("gipps", s"braking reduction squared can't be negative red_sq = $red_sq")
+            red_sq = 0.0
+        val reduce = sqrt (red_sq)
+        val cong   = brake + reduce
+
+        min (free, cong)                                               // take the minimum
     end gipps
 
 end GippsDynamics
@@ -142,8 +155,9 @@ object IDMDynamics
      *  @param length  the length of the road (`VTransport`)
      */
     def updateM (car: Vehicle, length: Double): Unit =
-        debug ("updateM", s"car = $car")
-        var a = iDM (car, car.myNode.prev.asInstanceOf [Vehicle], del)
+        debug ("updateM", s"car = $car, length = $length")
+//      var a = iDM (car, car.myNode.prev.asInstanceOf [Vehicle], del)
+        var a = iDM (car, car.myNode.ahead.asInstanceOf [Vehicle], del)
         debug ("updateM", s"car = $car \t the new ACCELERATION is: $a")
         if a.isNaN then         a = 0.0
         if a.isNegInfinity then a = bmax                            // max braking acceleration
@@ -214,9 +228,9 @@ object IDMDynamics
      *  @param an   the max acceleration of drivers
      *  @param vn   the current velocity of driver n
      *  @param Vn   the desired velocity of driver n
-     *  @param del  the acceleration exponent (defaults to 4)
+     *  @param del  the acceleration exponent (commonly to 4)
      */
-    private def iDMFree (an: Double, vn: Double, Vn: Double, del: Double = 4.0): Double =
+    private def iDMFree (an: Double, vn: Double, Vn: Double, del: Double): Double =
         an * (1.0 - (vn / Vn) ~^ del)
     end iDMFree
 

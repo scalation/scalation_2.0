@@ -30,14 +30,15 @@ import scalation.scala2d.Colors._
  *  @param x       the x vector of data values (horizontal), use null to use y's index
  *  @param y       the y vector of data values (primary vertical, black)
  *  @param z       the z vector of data values (secondary vertical, red) to compare with y
- *  @param _title  the title of the plot
+ *  @param title   the title of the plot
  *  @param lines   flag for generating a line plot
  */
-class Plot (x: VectorD, y: VectorD, z: VectorD = null, _title: String = "Plot y vs. x", lines: Boolean = false)
-      extends VizFrame (_title, null):
+class Plot (x: VectorD, y: VectorD, z: VectorD = null, title: String = "Plot y vs. x", lines: Boolean = false)
+      extends VizFrame (title, null):
 
-    val xx: VectorD = if x == null then VectorD.range (0, y.dim) else x
-    val canvas      = new Canvas (xx, y, z, getW, getH, lines)
+    private val xx: VectorD = if x == null then VectorD.range (0, y.dim) else x
+    private val canvas      = new Canvas (xx, y, z, getW, getH, lines)
+
     getContentPane.add (canvas, BorderLayout.CENTER)
     setVisible (true)
 
@@ -51,14 +52,14 @@ object Plot:
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Create a plot object from integer vectors.
-     *  @param x       the x vector of data values (horizontal)
-     *  @param y       the y vector of data values (primary vertical)
-     *  @param z       the z vector of data values (secondary vertical) to compare with y
-     *  @param _title  the title of the plot
-     *  @param lines   flag for generating a line plot
+     *  @param x      the x vector of data values (horizontal)
+     *  @param y      the y vector of data values (primary vertical)
+     *  @param z      the z vector of data values (secondary vertical) to compare with y
+     *  @param title  the title of the plot
+     *  @param lines  flag for generating a line plot
      */
-    def apply (x: VectorI, y: VectorI, z: VectorI = null, _title: String, lines: Boolean = false): Plot =
-        new Plot (x.toDouble, y.toDouble, if z == null then null else z.toDouble, _title, lines)
+    def apply (x: VectorI, y: VectorI, z: VectorI = null, title: String, lines: Boolean = false): Plot =
+        new Plot (x.toDouble, y.toDouble, if z == null then null else z.toDouble, title, lines)
     end apply
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -72,8 +73,9 @@ object Plot:
      */
     def drawAxes (g2d: Graphics2D, baseX: Int, baseY: Int, frameW: Int, frameH: Int,
                   offset: Int, minX: Double, maxY: Double, deltaX: Double, deltaY: Double): Unit =
-        val stepsX = 10                                    // number of x-steps for axis
-        val stepsY = 10                                    // number of y-steps for axis
+
+        val stepsX = 10                                      // number of x-steps for axis
+        val stepsY = 10                                      // number of y-steps for axis
 
         val axis = Line (0, 0, 0, 0)
         g2d.setPaint (black)
@@ -90,7 +92,7 @@ object Plot:
 
         var x_pos = 0
         var y_pos = baseY + 15
-        var step  = deltaX / stepsX                        // for x-axis
+        var step  = deltaX / stepsX                          // for x-axis
         for j <- 0 to stepsX do
             val x_val = clip (minX + j * step)
             x_pos = offset - 8 + j * (frameW - 2 * offset) / stepsX
@@ -99,8 +101,8 @@ object Plot:
 
         // Draw the labels on the y-axis
 
-        x_pos = baseX - 30
-        step  = deltaY / stepsY                            // for y-axis
+        x_pos = baseX - 40 
+        step  = deltaY / stepsY                              // for y-axis
         for j <- 0 to stepsY do
             val y_val = clip (maxY - j * step)
             y_pos = offset + 2 + j * (frameH - 2 * offset) / stepsY
@@ -109,12 +111,13 @@ object Plot:
     end drawAxes
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Convert value to string and cut out the first four characters.
-     *  @param x  the value to convert and cut
+    /** Convert value to string and cut out the first five characters.
+     *  @caveat:  only work for numbers < million, may rescale data otherwise
+     *  @param x  the value to convert and clip/cut
      */
     def clip (x: Double): String =
         val s = x.toString 
-        s.substring (0, min (s.length, 4))
+        s.substring (0, min (s.length, 5))
     end clip
 
 end Plot
@@ -151,13 +154,13 @@ class Canvas (x: VectorD, y: VectorD, z: VectorD, width: Int, height: Int, lines
 //    extends Panel:
       extends ZoomablePanel:
 
-    private val EPSILON  = 1E-9                             // number close to zero
-    private val SCALE    = 10                               // FIX - pass as a parameter
-    private val offset   = 80                               // offset frame to axis
-    private val frameW   = width                            // frame width
-    private val frameH   = height                           // frame height
-    private val baseX    = offset                           // base for x-axis
-    private val baseY    = frameH - offset                  // base for y-axis
+    private val EPSILON  = 1E-9                               // number close to zero
+    private val SCALE    = 10                                 // FIX - pass as a parameter
+    private val offset   = 80                                 // offset frame to axis
+    private val frameW   = width                              // frame width
+    private val frameH   = height                             // frame height
+    private val baseX    = offset                             // base for x-axis
+    private val baseY    = frameH - offset                    // base for y-axis
 
     private val minX     = floor (SCALE * x.min) / SCALE.toDouble
     private val maxX     = ceil (x.max + EPSILON)
@@ -178,25 +181,25 @@ class Canvas (x: VectorD, y: VectorD, z: VectorD, width: Int, height: Int, lines
      */
     override def paintComponent (gr: Graphics): Unit =
         super.paintComponent (gr)
-        val g2d = gr.asInstanceOf [Graphics2D]              // use hi-res graphics
+        val g2d = gr.asInstanceOf [Graphics2D]                // use hi-res graphics
 
-        g2d.setTransform (at)                               // used for zooming (at @see `ZoomablePanel`)
+        g2d.setTransform (at)                                 // used for zooming (at @see `ZoomablePanel`)
 
         Plot.drawAxes (g2d, baseX, baseY, frameW, frameH, offset, minX, maxY, deltaX, deltaY)
 
         //:: Draw the dots for the data points being plotted
 
-        var x_pos  = 0                                      // current x position
-        var y_pos  = 0                                      // current y position
-        var px_pos = 0                                      // previous x position
-        var py_pos = 0                                      // previous y position
+        var x_pos  = 0                                        // current x position
+        var y_pos  = 0                                        // current y position
+        var px_pos = 0                                        // previous x position
+        var py_pos = 0                                        // previous y position
 
         for i <- 0 until y.dim do
             val xx = round ((x(i) - minX) * (frameW - 2 * offset))
-            x_pos = (xx / deltaX).asInstanceOf [Int] + offset
+            x_pos = (xx / deltaX).toInt + offset
             val yy = round ((maxY - y(i)) * (frameH - 2 * offset))
-            y_pos = (yy / deltaY).asInstanceOf [Int] + offset
-            dot.setFrame (x_pos, y_pos, diameter, diameter)         // x, y, w, h
+            y_pos = (yy / deltaY).toInt + offset
+            dot.setFrame (x_pos, y_pos, diameter, diameter)   // x, y, w, h
 
             g2d.setPaint (black)
             g2d.fill (dot)
@@ -205,10 +208,9 @@ class Canvas (x: VectorD, y: VectorD, z: VectorD, width: Int, height: Int, lines
             if i != 0 && lines then
                 g2d.setStroke (new BasicStroke (1.0f))
                 g2d.drawLine (px_pos+1, py_pos+1, x_pos+1, y_pos+1)
-            end if
 
-            px_pos = x_pos                                  // update previous x
-            py_pos = y_pos                                  // update previous y
+            px_pos = x_pos                                    // update previous x
+            py_pos = y_pos                                    // update previous y
         end for
 
         g2d.setStroke (new BasicStroke (2.0f))
@@ -216,10 +218,10 @@ class Canvas (x: VectorD, y: VectorD, z: VectorD, width: Int, height: Int, lines
         if z != null then
             for i <- 0 until min (y.dim, z.dim) do
                 val xx = round ((x(i) - minX) * (frameW - 2 * offset))
-                x_pos = (xx / deltaX).asInstanceOf [Int] + offset
+                x_pos = (xx / deltaX).toInt + offset
                 val yy = round ((maxY - z(i)) * (frameH - 2 * offset))
-                y_pos = (yy / deltaY).asInstanceOf [Int] + offset
-                dot.setFrame (x_pos, y_pos, diameter, diameter)         // x, z, w, h
+                y_pos = (yy / deltaY).toInt + offset
+                dot.setFrame (x_pos, y_pos, diameter, diameter)   // x, z, w, h
                 g2d.setPaint (red)
                 g2d.fill (dot)
 
@@ -227,10 +229,9 @@ class Canvas (x: VectorD, y: VectorD, z: VectorD, width: Int, height: Int, lines
                 if i != 0 && lines then
                     g2d.setStroke (new BasicStroke (1.0f))
                     g2d.drawLine (px_pos+1, py_pos+1, x_pos+1, y_pos+1)
-                end if
 
-                px_pos = x_pos                              // update previous x
-                py_pos = y_pos                              // update previous y
+                px_pos = x_pos                                // update previous x
+                py_pos = y_pos                                // update previous y
             end for
         end if
 

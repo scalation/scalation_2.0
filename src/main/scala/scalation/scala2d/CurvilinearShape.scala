@@ -67,7 +67,7 @@ trait CurvilinearShape extends Shape:
      *  @param p2  the ending point
      */
     def setLine (p1: R2, pc: R2, p2: R2): Unit =
-        flaw ("setFrame (p1, pc, p2)", "this method is not overridden by mixin class")
+        flaw (s"setLine (p1 = $p1, pc = $pc, p2 = $p2)", "method is not overridden by mixin class")
     end setLine
 
     def setLine (p1: VectorD, pc: VectorD, p2: VectorD): Unit =
@@ -83,7 +83,7 @@ trait CurvilinearShape extends Shape:
      *  @param height  the height of object traversing the curve
      */
     def next (width: Double, height: Double): R2 =
-        flaw ("next (width, height)", "this method is not overridden by mixin class")
+        flaw (s"next (width = $width, height = $height)", "method is not overridden by mixin class")
         null
     end next
 

@@ -13,9 +13,11 @@
 package scalation
 package modeling
 
+import scala.collection.mutable.{ArrayBuffer => VEC}
 import scala.runtime.ScalaRunTime.stringOf
 
 import scalation.mathstat._
+import scalation.theory.Variable
 
 type MatrixI = MatrixD             // MatrixI object exists, MatrixI class uses MatrixD
 
@@ -48,8 +50,10 @@ end ExpandableVariable
  *  categorical (treatment) variables t into a multiple linear regression.
  *  This is done by introducing dummy variables dj to distinguish the treatment level.
  *  The problem is again to fit the parameter vector b in the augmented regression equation
+ *
  *      y  =  b dot x + e  =  b0  +  b_1   * x_1  +  b_2   * x_2  +  ... b_k * x_k
  *                                +  b_k+1 * d_1  +  b_k+2 * d_2  +  ... b_k+l * d_l + e
+ *
  *  where e represents the residuals (the part not explained by the model).
  *  Use Least-Squares (minimizing the residuals) to solve for the parameter vector b
  *  using the Normal Equations:
@@ -65,7 +69,8 @@ end ExpandableVariable
  */
 class RegressionCat (x_ : MatrixD, t: MatrixI, y: VectorD, fname_ : Array [String] = null,
                      hparam: HyperParameter = Regression.hp)
-      extends Regression (x_ ++^ RegressionCat.dummyVars (t), y, fname_, hparam)
+      extends Regression (x_ ++^ RegressionCat.dummyVars (t), y, 
+                          RegressionCat.formNames (fname_, x_.dim2), hparam)
          with ExpandableVariable:
 
     private val debug = debugf ("RegressionCat", true)                      // the flaw function
@@ -76,9 +81,9 @@ class RegressionCat (x_ : MatrixD, t: MatrixI, y: VectorD, fname_ : Array [Strin
     if x_.dim != m then flaw ("init", s"dimensions of x_ = ${x_.dim} and y = $m are incompatible")
     if t.dim  != m then flaw ("init", s"dimensions of t  = ${t.dim}  and y = $m are incompatible")
 
-    modelName = s"RegressionCat_${t.dim2}"
+    _modelName = s"RegressionCat_${t.dim2}"
 
-    debug ("init", s"$modelName on x_t = $getX, y = $y")
+    debug ("init", s"$modelName on \n x_t(0) = ${getX(0)}, \n y(0) = ${y(0)}")
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Expand the vector zt into a vector of terms/columns including dummy variables.
@@ -105,7 +110,7 @@ end RegressionCat
  */
 object RegressionCat:
 
-    private val debug = debugf ("RegressionCat", true)                    // debug function
+    private val debug = debugf ("RegressionCat", false)                   // debug function
     private var shift: VectorI = null                                     // for saving shift
     private var tmax:  VectorI = null                                     // for saving tmax
 
@@ -122,6 +127,7 @@ object RegressionCat:
                hparam: HyperParameter = Regression.hp): RegressionCat =
         val x = xt(?, 0 until nCat)                                        // cont vars
         val t: MatrixI = xt(?, nCat until xt.dim2)                         // cat vars
+        debug ("apply", s"x.dims = ${x.dims}, t.dims = ${t.dims}")
         new RegressionCat (x, t, y, fname, hparam)
     end apply
 
@@ -136,6 +142,19 @@ object RegressionCat:
      */
     def rescale (x: MatrixD, t: MatrixI, y: VectorD, fname: Array [String] = null,
                  hparam: HyperParameter = Regression.hp): RegressionCat = ???      // FIX
+
+    def formNames (fname: Array [String], nCat: Int): Array [String] =
+        if fname == null then null
+        else
+            val names = fname.slice(0, nCat).to (VEC)
+            println (s"formNames: nCat = $nCat, fname.length = ${fname.length}, ${stringOf (fname)}")
+            for j <- nCat until fname.length do
+                val namej = fname(j)
+                println (s"formNames: j-nCat = ${j-nCat}")
+                for k <- 1 to tmax(j-nCat) do names += s"${namej}_$k"
+            names.toArray
+        end if
+    end formNames
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the shift in categorical/treatment variables to make them start at zero
@@ -174,15 +193,15 @@ object RegressionCat:
      *  @see `Variable`
      *  Note:  To maintain consistency `Variable` is the only place where values for
      *  dummy variables should be set.
-     *  @param t    the categorical/treatment vector
-     *  @param sht  the amount to shift the vector
-     *  @param tmx  the maximum vector categorical/treatment after shifting
+     *  @param t     the categorical/treatment vector
+     *  @param shft  the amount to shift the vector
+     *  @param tmx   the maximum vector categorical/treatment after shifting
      */
-    def dummyVar (t: VectorI, shf: VectorI = shift, tmx: VectorI = tmax): VectorD =
+    def dummyVar (t: VectorI, shft: VectorI = shift, tmx: VectorI = tmax): VectorD =
         val xd  = new VectorD (tmx.sum)
         var col = 0
         for j <- t.indices do
-            val td = Variable.dummyVar (t(j), shift(j), tmax(j))
+            val td = Variable.dummyVar (t(j), shft(j), tmax(j))
             for k <- td.indices do
                 xd(col) = td(k); col += 1
         end for
@@ -197,7 +216,7 @@ object RegressionCat:
     def stringVec2Dummy (svec: VectorS): MatrixD =
         val ivec = VectorS (svec).map2Int._1                         // VectorS to VectorI
         debug ("stringVec2Dummy", s"svec = $svec -> ivec = $ivec")
-        val imat = MatrixI (ivec).transpose                          // VectorI as column in MatrixI 
+        val imat = MatrixI (ivec).ᵀ                                  // VectorI as column in MatrixI 
         dummyVars (imat)                                             // MatrixD of dummy columns
     end stringVec2Dummy
 
@@ -233,7 +252,7 @@ end RegressionCat
     banner ("Regression Model")
     val reg = new Regression (xt, y)                                  // create model with with interecept (else pass x)
     println (s"xt = $xt")
-    reg.trainNtest ()()                                               // train and test the model
+    reg.inSample_Test ()                                              // train and test the model
     println (reg.summary ())                                          // parameter/coefficient statistics
 
     banner ("Make Predictions")
@@ -243,7 +262,7 @@ end RegressionCat
     banner ("RegressionCat Model")
     val mod = new RegressionCat (x, t, y)                             // treated as categorical
     println (s"xt = ${mod.getX}")
-    mod.trainNtest ()()                                               // train and test the model
+    mod.inSample_Test ()                                              // train and test the model
     println (mod.summary ())                                          // parameter/coefficient statistics
 
     banner ("Make Predictions")
@@ -285,7 +304,7 @@ end regressionCatTest
     banner ("Regression Model")
     val reg = new Regression (xt, y)                                  // treated as ordinal
     println (s"xt = $xt")
-    reg.trainNtest ()()                                               // train and test the model
+    reg.inSample_Test ()                                              // train and test the model
     println (reg.summary ())                                          // parameter/coefficient statistics
     val yp = reg.predict (z)
     println (s"predict ($z) = $yp")
@@ -293,7 +312,7 @@ end regressionCatTest
     banner ("RegressionCat Model")
     val mod = new RegressionCat (x, t, y)                             // treated as categorical
     println (s"xt = ${mod.getX}")
-    mod.trainNtest ()()                                               // train and test the model
+    mod.inSample_Test ()                                              // train and test the model
     println (mod.summary ())                                          // parameter/coefficient statistics
     val ze = VectorD (1.0, 20.0, 80.0, 2, 1)                          // expanded vector
     assert (ze == mod.expand (z))
@@ -313,7 +332,8 @@ end regressionCatTest2
 
     val x1 = VectorS ("English", "French", "German", "Spanish")
     val (xe, map) = x1.map2Int                                        // map strings to integers
-    val xm = MatrixI (xe).transpose                                   // form a matrix from vector
+    println (s"map = $map")
+    val xm = MatrixI (xe).ᵀ                                           // form a matrix from vector
     val xd = RegressionCat.dummyVars (xm)                             // make dummy variable columns
 
     println (s"encoded        xe = $xe")                              // encoded
@@ -327,17 +347,17 @@ import Example_AutoMPG.{oxr, y, oxr_fname}
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `regressionCatTest4` main function tests the `RegressionCat` class using the AutoMPG
  *  dataset.  Assumes no missing values.  It tests forward, backward and stepwise selection.
+ *  It makes a `Regression` model to be compared to `RegressionCat` in the next test case.
  *  > runMain scalation.modeling.regressionCatTest4
  */
 @main def regressionCatTest4 (): Unit =
-
 
 //  println (s"oxr = $oxr")
 //  println (s"y   = $y")
 
     banner ("AutoMPG Regression")
     val mod = new Regression (oxr, y, oxr_fname)                      // create model with intercept (else pass x)
-    mod.trainNtest ()()                                               // train and test the model
+    mod.inSample_Test ()                                              // train and test the model
     println (mod.summary ())                                          // parameter/coefficient statistics
 
     banner ("Cross-Validation")
@@ -350,8 +370,7 @@ import Example_AutoMPG.{oxr, y, oxr_fname}
         val (cols, rSq) = mod.selectFeatures (tech)                   // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${oxr.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for Regression with $tech", lines = true)
+        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Regression with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
 
@@ -365,15 +384,22 @@ end regressionCatTest4
  */
 @main def regressionCatTest5 (): Unit =
 
+    println (s"regressionCatTest5: oxr.dims = ${oxr.dims}")
 //  println (s"oxr = $oxr")
 //  println (s"y   = $y")
 
-    banner ("AutoMPG RegressionCat")
-    val mod = RegressionCat (oxr, y, 6, oxr_fname)                    // create model with intercept (else pass x)
-    mod.trainNtest ()()                                               // train and test the model
-    println (mod.summary ())                                          // parameter/coefficient statistics
+    val nCat = 7                                                      // treat column 7 (origin) as the first categorical variable
 
-    banner ("Cross-Validation")
+    banner ("AutoMPG RegressionCat")
+    val mod = RegressionCat (oxr, y, nCat, oxr_fname)                 // create model with intercept (else pass x)
+    mod.inSample_Test ()                                              // train and test the model
+    println (mod.summary ())                                          // parameter/coefficient statistics
+    Predictor.makePredictionInt (mod, mod.getX, y, mod.predict (mod.getX))      // make and show PREDICTION INTERVALs
+
+    banner ("AutoMPG Validation Test")
+    mod.validate ()()                                                 // train-test split
+/*
+    banner ("AutoMPG Cross-Validation")
     FitM.showQofStatTable (mod.crossValidate ())
 
     println (s"oxr_fname = ${stringOf (oxr_fname)}")
@@ -383,10 +409,10 @@ end regressionCatTest4
         val (cols, rSq) = mod.selectFeatures (tech)                   // R^2, R^2 bar, R^2 cv
         val k = cols.size
         println (s"k = $k, n = ${oxr.dim2}")
-        new PlotM (null, rSq.transpose, Array ("R^2", "R^2 bar", "R^2 cv"),
-                   s"R^2 vs n for RegressionCat with $tech", lines = true)
+        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for RegressionCat with $tech", lines = true)
         println (s"$tech: rSq = $rSq")
     end for
+*/
 
 end regressionCatTest5
 
@@ -411,12 +437,12 @@ end regressionCatTest5
 
     banner ("Regression with Cat Var - Remove One Dummy")
     var mod = new Regression (x(?, 0 until 3), y)                     // create model with one dummy removed
-    mod.trainNtest ()()                                               // train and test the model
+    mod.inSample_Test ()                                              // train and test the model
     println (mod.summary ())                                          // parameter/coefficient statistics
 
     banner ("Regression with Cat Var - Remove Intercept")
     mod = new Regression (x(?, 1 until 4), y)                         // create model with intercept removed
-    mod.trainNtest ()()                                               // train and test the model
+    mod.inSample_Test ()                                              // train and test the model
     println (mod.summary ())                                          // parameter/coefficient statistics
 
     println (s"[0, 1, 0]: ${mod.predict (VectorD (0, 1, 0))}") 
@@ -424,7 +450,7 @@ end regressionCatTest5
 
     banner ("Encode Dummy Variables")
     val x_enc = VectorI (0, 0, 1, 1, 0)                               // encoded vector
-    val dm    = MatrixI (x_enc).transpose                             // form a dummy matrix (dummy columns) from encoded vector
+    val dm    = MatrixI (x_enc).ᵀ                                     // form a dummy matrix (dummy columns) from encoded vector
     val t     = RegressionCat.dummyVars (dm)
     println (s"encoded        x_enc = $x_enc")                        // encoded vector
     println (s"matrix encoded dm    = $dm")                           // matrix encoded column
@@ -432,17 +458,17 @@ end regressionCatTest5
 
     banner ("Regression with Cat Var - Use Regression")
     mod = new Regression (x(?, 0 until 2) ++^ dm, y)                  // create model from matrices x prefix and dm
-    mod.trainNtest ()()                                               // train and test the model
+    mod.inSample_Test ()                                              // train and test the model
     println (mod.summary ())                                          // parameter/coefficient statistics
 
     banner ("Regression with Cat Var - Use RegressionCat")
     mod = new RegressionCat (x(?, 0 until 2), dm, y)                  // create model from matrices x prefix and dm 
-    mod.trainNtest ()()                                               // train and test the model
+    mod.inSample_Test ()                                              // train and test the model
     println (mod.summary ())                                          // parameter/coefficient statistics
 
     banner ("Regression with Cat Var - Keep Intercept and All Dummies")
     mod = new Regression (x, y)                                       // create model with all dummies
-    mod.trainNtest ()()                                               // train and test the model
+    mod.inSample_Test ()                                              // train and test the model
     println (mod.summary ())                                          // parameter/coefficient statistics
 
 end regressionCatTest6
@@ -468,7 +494,7 @@ end regressionCatTest6
     println (s"xs = ${stringOf (xs)}")                                // data containing strings
     println (s"y  = $y")                                              // response vector
 
-    val x   = MatrixD (for j <- 0 to 1 yield VectorD.fromValueTypes (xs(j))).transpose 
+    val x   = MatrixD (for j <- 0 to 1 yield VectorD.fromValueTypes (xs(j))).ᵀ 
     val xs2 = VectorS.fromValueTypes (xs(2))
     val dm  = RegressionCat.stringVec2Dummy (xs2)
 
@@ -477,7 +503,7 @@ end regressionCatTest6
 
     banner ("Regression with Cat Var - Use RegressionCat")
     val mod = new RegressionCat (x, dm, y)                            // create model from matrices x prefix and dm 
-    mod.trainNtest ()()                                               // train and test the model
+    mod.inSample_Test ()                                              // train and test the model
     println (mod.summary ())                                          // parameter/coefficient statistics
 
 end regressionCatTest7

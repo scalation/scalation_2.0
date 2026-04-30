@@ -107,7 +107,7 @@ def getFromURL_File (path: String): Iterator [String] =
 //          return fromURL (new URL (path)).getLines ()
             return fromURL (new URI (path).toURL).getLines ()
         catch
-            case mue: MalformedURLException => 
+            case _ : MalformedURLException => 
         end try    
     end if
 
@@ -117,7 +117,6 @@ def getFromURL_File (path: String): Iterator [String] =
     else
         println (s"getFromURL_File: file '$path' does not exist, try prefixing DATA-DIR")
         fromFile (DATA_DIR + path).getLines ()
-    end if
 end getFromURL_File
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -216,6 +215,7 @@ end cfor
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** C/Java style for loop (over a range) provides improved performance.
  *  usage: cfor (0, 10) { i => a(i) = 2 * i }
+ *  usage: cfor (0, 10) { _ => println (rng.gen) }
  *  usage: cfor (0, 10, 2) { i => a(i) = 2 * i }
  *  @see august.nagro.us/scala-for-loop.html
  *  @param start  initialization value (i = start)
@@ -296,7 +296,7 @@ end Σ
  */
 inline def summation (n: Int)(inline formula: => Double): Double =
     var sum_ = 0.0
-    cfor (0, n) { i => sum_ += formula }
+    cfor (0, n) { _ => sum_ += formula }
     sum_
 end summation
 
@@ -337,7 +337,8 @@ end median3
 
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `cforTest` test the cfor loops that are faster replacements for Scala's for-comprehension.
+/** The `cforTest` main function tests the cfor loops that are faster replacements for Scala's
+ *  for-comprehension.
  *  Run this code for performance results.  Note, due to JIT, reordering the code may change
  *  the relative performance.  Generally, case 4 "cfor (0, 100000) { ... }" is the fastest.
  *  @see Timer.scala
@@ -440,7 +441,8 @@ end cforTest
 
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `cforTest2` test the cfor loops that are faster replacements for Scala's for-yield.
+/** The `cforTest2` main function test the cfor loops that are faster replacements for Scala's
+ *  for-yield.
  *  Run this code for performance results.  Note, due to JIT, reordering the code may change
  *  the relative performance.  Generally, case 4 "cfor (0, 100000) { ... }" is the fastest.
  *  @see Timer.scala

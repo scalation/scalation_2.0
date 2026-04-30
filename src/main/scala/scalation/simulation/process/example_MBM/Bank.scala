@@ -46,7 +46,7 @@ end testCorrBank
  *  (1) using the transport's 'jump' method rather than its 'move' method and
  *  (2) reducing the time through the transport by an order of magnitude.
  *  It also has animation turned off, by default.
- *  Caveat: must add 'from' and 'to' components before transport!!
+ *  @caveat:  must add 'from' and 'to' components before transport!!
  *  @param name       the name of the simulation model
  *  @param nBatch     the number of batches to run
  *  @param sizeB      the size of each batch

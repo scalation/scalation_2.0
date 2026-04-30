@@ -370,7 +370,6 @@ end timeIntervalTest2
         for cls <- periods do
             if lab conflict cls then
                 println (s"Found time conflict between lab ${lab.format} and cls ${cls.format}")
-            end if
     end for
 
 end timeIntervalTest3

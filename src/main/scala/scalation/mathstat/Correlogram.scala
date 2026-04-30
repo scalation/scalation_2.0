@@ -109,9 +109,8 @@ trait Correlogram (y: VectorD, adjusted: Boolean = true):
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Plot both the Auto-Correlation Function (ACF) and the Partial Auto-Correlation
      *  Function (PACF) with confidence bound.
-     *  @param show  whether to show the ACF, PACF values
      */
-    def plotCorrelogram (show: Boolean = true): Unit =
+    def plotCorrelogram (): Unit =
         plotFunc (acF, "ACF")
         plotFunc (pacF, "PACF")
     end plotCorrelogram

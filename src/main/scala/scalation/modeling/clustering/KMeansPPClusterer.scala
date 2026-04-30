@@ -121,7 +121,7 @@ class KMeansPPClusterer (x: MatrixD, k: Int, algo: Algorithm = HARTIGAN,
      *  Indicate done, if no points changed clusters (for stopping rule).
      *  @param first  whether this is the first call to 'reassign'
      */
-    private def reassign (first: Boolean = false): Boolean =
+    private def reassign (first: Boolean): Boolean =
         var done = true
         for i <- x.indices do
             if first then                                        // first call => no c0

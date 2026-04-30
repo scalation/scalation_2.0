@@ -112,34 +112,34 @@ import Example_BasketBall._
     println (s"ox_fname = ${stringOf (ox_fname)}")
 
     banner ("Basketball: Regression - no intercept")
-    var mod = new Regression (x, y, x_fname)                  // create model with no intercept
-    mod.trainNtest ()()                                       // train and test the model
-    println (mod.summary ())                                  // parameter/coefficient statistics
+    var mod = new Regression (x, y, x_fname)                           // create model with no intercept
+    mod.inSample_Test ()                                               // train and test the model
+    println (mod.summary ())                                           // parameter/coefficient statistics
 
     banner ("Basketball: Regression - all columns")
-    mod = new Regression (ox, y, ox_fname)                    // create model with intercept (else pass x)
-    mod.trainNtest ()()                                       // train and test the model
-    println (mod.summary ())                                  // parameter/coefficient statistics
+    mod = new Regression (ox, y, ox_fname)                             // create model with intercept (else pass x)
+    mod.inSample_Test ()                                               // train and test the model
+    println (mod.summary ())                                           // parameter/coefficient statistics
 
     banner ("Basketball: Quadratic Regression")
-    mod = SymbolicRegression.quadratic (x, y, x_fname)        // create quadratic model
-    mod.trainNtest ()()                                       // train and test the model
-    println (mod.summary ())                                  // parameter/coefficient statistics
+    mod = SymbolicRegression.quadratic (x, y, x_fname)                 // create quadratic model
+    mod.inSample_Test ()                                               // train and test the model
+    println (mod.summary ())                                           // parameter/coefficient statistics
 
     banner ("Basketball: Quadratic Regression with Cross Terms")
-    mod = SymbolicRegression.quadratic (x, y, x_fname, cross = true)  // create quadratic model with cross terms
-    mod.trainNtest ()()                                       // train and test the model
-    println (mod.summary ())                                  // parameter/coefficient statistics
+    mod = SymbolicRegression.quadratic (x, y, x_fname, cross = true)   // create quadratic model with cross terms
+    mod.inSample_Test ()                                               // train and test the model
+    println (mod.summary ())                                           // parameter/coefficient statistics
 
     banner ("Basketball: Cubic Regression")
-    mod = SymbolicRegression.cubic (x, y, x_fname)            // create cubic model
-    mod.trainNtest ()()                                       // train and test the model
-    println (mod.summary ())                                  // parameter/coefficient statistics
+    mod = SymbolicRegression.cubic (x, y, x_fname)                     // create cubic model
+    mod.inSample_Test ()                                               // train and test the model
+    println (mod.summary ())                                           // parameter/coefficient statistics
 
     banner ("Basketball: Cubic Regression with Cross Terms")
-    mod = SymbolicRegression.cubic (x, y, x_fname, cross = true)   // create cubic model with cross terms
-    mod.trainNtest ()()                                       // train and test the model
-    println (mod.summary ())                                  // parameter/coefficient statistics
+    mod = SymbolicRegression.cubic (x, y, x_fname, cross = true)       // create cubic model with cross terms
+    mod.inSample_Test ()                                               // train and test the model
+    println (mod.summary ())                                           // parameter/coefficient statistics
 
 end example_BasketBallTest
 

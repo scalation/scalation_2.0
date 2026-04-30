@@ -125,7 +125,7 @@ help: Quality of Fit (QoF) measures:
      *  @param k   the number of class labels {0, 1, ... , k-1}
      */
     def test (fc: FitC, y_ : VectorI, yp: VectorI, k: Int = 2): Unit =
-        banner ("Actual Class Values/Labels")
+        banner (s"Actual Class Values/Labels with k = $k")
         println (s"y_ = $y_")                                  // actual class values
 
         banner ("Predicted Class Values/Labels")
@@ -192,7 +192,7 @@ end FitC
  *  accuracy, precision, recall, specificity and Cohen's kappa coefficient.
  *  @see `modeling.Fit`
  *  Must call the confusion method before calling the other methods.
- *  @param k       the number distinct class values/labels (defaults to 2)
+ *  @param k  the number distinct class values/labels (defaults to 2)
  */
 trait FitC (k: Int = 2)
       extends FitM:

@@ -116,11 +116,11 @@ end example_BPressureTest
     import Example_BPressure._
 
     var mod = new Regression (x, y)                                 // regression model x0, x1, x2, x3 with no intercept
-    mod.trainNtest ()()                                             // train and test the model
+    mod.inSample_Test ()                                            // train and test the model
     println (mod.summary ())                                        // parameter/coefficient statistics
 
     mod = new Regression (x01, y)                                   // regression model x0, x1 with no intercept
-    mod.trainNtest ()()                                             // train and test the model
+    mod.inSample_Test ()                                            // train and test the model
     println (mod.summary ())                                        // parameter/coefficient statistics
 
 end example_BPressureTest2

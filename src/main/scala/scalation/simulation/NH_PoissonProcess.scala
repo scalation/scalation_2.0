@@ -5,7 +5,7 @@
  *  @date    Wed Aug 25 15:38:28 EDT 2021
  *  @see     LICENSE (MIT style license file).
  *
- *  @note    Non-Homogeneous Process Process (NHPP)
+ *  @note    Non-Homogeneous (changing arrival rate) Poisson Process (NHPP)
  */
 
 package scalation
@@ -23,7 +23,7 @@ import scalation.mathstat._
  *  @param stream   the random number stream to use
  */
 class NH_PoissonProcess (t: Double, lambdaf: FunctionS2S, stream: Int = 0)
-      extends PoissonProcess (t, 1.0, stream):
+      extends PoissonProcess (t, 1.0, stream):                     // use rate = 1 as it will be adjusted
 
     private val lambdaBar = func2vector (lambdaf, (0, t)).mean
 
@@ -39,9 +39,9 @@ class NH_PoissonProcess (t: Double, lambdaf: FunctionS2S, stream: Int = 0)
         val atime = ArrayBuffer [Double] ()
         var now   = 0.0
         while now <= t do
-            val lamb = lambdaf (now)                    // current value of the lambda function
+            val lamb = lambdaf (now)                               // current value of the lambda function
             println (s"lamb = $lamb")
-            now     += t_ia.gen / lamb                  // adjust by dividing current lambda
+            now     += t_ia.gen / lamb                             // adjust by dividing current lambda
             atime   += now 
         end while
         t_a = VectorD (atime)
@@ -59,7 +59,7 @@ end NH_PoissonProcess
  */
 @main def nH_PoissonProcessTest (): Unit =
 
-    val t_end = 50.0                                        // simulate for 50 minutes
+    val t_end = 50.0                                               // simulate for 50 minutes
     val tl    = VectorD.range (0, 101) / 2.0 
     def lambdaf (t: Double): Double = 1.5 - 0.001 * (t - 25.0)~^2
     new Plot (tl, func2vector (lambdaf, (0, t_end)), null, "Arrival Rate Function: lambdaf", lines = true)
@@ -94,7 +94,7 @@ end nH_PoissonProcessTest
     val data = MatrixD.load (fileName)
     val ord  = 19
 
-    val (t, y) = (data(?, 0) * 60.0, data(?, 1))                 // (time, vehicle count)
+    val (t, y) = (data(?, 0) * 60.0, data(?, 1))                   // (time, vehicle count)
     new Plot (t, y, null, "traffic data")
     val mod = PolyRegression (t, y, ord, null, Regression.hp)
     mod.train ()

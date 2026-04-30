@@ -12,7 +12,6 @@ package scalation
 
 import scala.collection.mutable.ArrayDeque
 import scala.math.round
-import scala.reflect.ClassTag
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `MultiArrayDeques` class provides a data structure for storing multiple
@@ -22,7 +21,7 @@ import scala.reflect.ClassTag
  *  distance (from the start) to be found in another lane.
  *  @param nLanes  the number of lanes
  */
-class MultiArrayDeques [A: ClassTag] (nLanes: Int):
+class MultiArrayDeques [A] (nLanes: Int):
 
     private val lane = Array.fill (nLanes)(ArrayDeque [A] ())              // allocated n lanes
 

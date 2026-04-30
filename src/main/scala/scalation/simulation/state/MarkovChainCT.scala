@@ -58,7 +58,6 @@ class MarkovCT (tr: MatrixD):
                 jump(i, j) = if s =~ 0.0 then 0.0 else tr(i, j) / s
             else                                               // on-diagonal
                 jump(i, i) = if s =~ 0.0 then 1.0 else 0.0
-            end if
         end for
     end for
 

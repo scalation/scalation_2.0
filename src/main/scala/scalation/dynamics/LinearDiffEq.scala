@@ -23,9 +23,9 @@ import scalation.mathstat._
  *  initial value vector y0 = y(0) must also be given.  Note, higher-order differential
  *  equations may be converted to first-order by introducing additional variables.
  *  The above equation is the homogeneous case.
- *  Caveats: the following cases are not currently handled:
- *  (1) The non-homogeneous equation: d/dt y(t) = a * y(t) + f(t).
- *  (2) Complex or repeated eigenvalues.
+ *  @caveat:  the following `LinearDiffEq` cases are not currently handled:
+ *            (1) The non-homogeneous equation: d/dt y(t) = a * y(t) + f(t).
+ *            (2) Complex or repeated eigenvalues.
  *  @param a   the coefficient matrix
  *  @param y0  the initial value vector
  */

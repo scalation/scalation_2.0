@@ -14,7 +14,8 @@ package activity
 
 import java.util.concurrent.ConcurrentLinkedQueue
 
-import collection.mutable.PriorityQueue
+import scala.annotation.unused
+import scala.collection.mutable.PriorityQueue
 
 import scalation.animation.{AnimateCommand, DgAnimator}
 import scalation.animation.CommandType._
@@ -381,7 +382,7 @@ class ArcI (val place: PlaceI, val transition: Transition, incoming: Boolean, va
      *  @param time         the current time
      *  @param firingDelay  the time it takes for the transition to fire
      */
-    def _tokenFlow (tokens: VectorI, time: Double, firingDelay: Double): VectorI =
+    def _tokenFlow (tokens: VectorI, @unused time: Double, firingDelay: Double): VectorI =
         tokenFlow (tokens, minTokens, rates, firingDelay / scaleFactor)
     end _tokenFlow
 
@@ -546,11 +547,12 @@ class PetriNet (colors: Array [Color], placeI: Array [PlaceI], placeD: Array [Pl
 
             val tokens = pI.tokens
             for i <- 0 until tokens.dim do          // number of tokens by color at this place
-                for j <- 0 until tokens(i) do
+                cfor (0, tokens(i)) { _ =>
                     val tk_id = Counter.next ()
                     println ("PetriNet.initAnimation: token " + tk_id + " for place " + pI.id)
                     cqueue.add (AnimateCommand (CreateToken, tk_id, Ellipse (), "tk" + tk_id, false,
                                                 colors(i), null, 0, pI.id))
+                } // cfor
             end for
         end for
 

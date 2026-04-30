@@ -89,23 +89,22 @@ object Tree:
         val tree = new Tree (root, depth)                   // make a tree from root
         if depth > 0 then
             val imax = rng.igen
-            for i <- 0 until imax do genPre (depth, root, 1, i, imax)       // add root's children
-        end if
+            cfor (0, imax) { _ => genPre (depth, root, 1) }  // i, imax)       // add root's children
 
         //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
         /*  Recursive helper method for generating a tree using a pre-order traversal.
          *  @param depth  the depth of the tree
          *  @param p      the parent node
          *  @param lev    the level of the node
-         *  @param ord    the birth order of the node
-         *  @param sibs   the number of siblings
+         *  -param ord    the birth order of the node
+         *  -param sibs   the number of siblings
          */
-        def genPre (depth: Int, p: TreeNode, lev: Int, ord: Int, sibs: Int): Unit =
+//      def genPre (depth: Int, p: TreeNode, lev: Int, ord: Int, sibs: Int): Unit =
+        def genPre (depth: Int, p: TreeNode, lev: Int): Unit =
             val n = tree.add (p)                                            // add node n to tree
             if lev < depth then
                 val imax = rng.igen
-                for i <- 0 until imax do genPre (depth, n, lev+1, i, imax)  // add n's children
-            end if
+                cfor (0, imax) { _ => genPre (depth, n, lev+1) }  // i, imax)  // add n's children
         end genPre
 
         tree
@@ -183,7 +182,6 @@ class Tree (val root: TreeNode, depth: Int, val name: String = "tree"):
         if p != null then
             p.child += n                                    // add n as child of p
             n.ord = p.child.size - 1                        // record n's birth order
-        end if
         n                                                   // return node n
     end add
 
@@ -200,7 +198,6 @@ class Tree (val root: TreeNode, depth: Int, val name: String = "tree"):
         if p != null then
             p.child += n                                    // add n as child of p
             n.ord = p.child.size - 1                        // record n's birth order
-        end if
         n                                                   // return node n
     end add
 
@@ -258,10 +255,10 @@ end treeTest
     val FANOUT = 3
     val root = new TreeNode (0, 0)                          // nid = 0, lev = 0
     val ct = new Tree (root, 2)                             // root, depth = 2
-    for i <- 0 until FANOUT do
+    cfor (0, FANOUT) { _ =>
         val n = ct.add (ct.root)
-        for j <- 0 until FANOUT do ct.add (n)
-    end for
+        cfor (0, FANOUT) { _ => ct.add (n) }
+    } // cfor
     ct.printTree ()
 
 end treeTest2

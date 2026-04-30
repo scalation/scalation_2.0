@@ -12,7 +12,6 @@
 
 package scalation
 
-import scala.reflect.ClassTag
 import scala.util.Random
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -21,7 +20,7 @@ import scala.util.Random
  *  @tparam V         the type of the values assigned to keys in this sorted map
  *  @param  ordering  the implicit ordering used to compare objects of type K
  */
-class SkipList [K: ClassTag, V: ClassTag] (using ordering: Ordering [K]):
+class SkipList [K, V] (using ordering: Ordering [K]):
 
     private val maxlevel = 10                                      // maximum number of levels for the skip  list
     private val random   = new Random ()
