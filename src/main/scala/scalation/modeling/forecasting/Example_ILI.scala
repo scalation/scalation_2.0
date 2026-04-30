@@ -415,7 +415,11 @@ end example_ILITest9
     val pow = 1.5
     hp("p")     = p                                                     // endo lags
     hp("q")     = q                                                     // exo lags
+<<<<<<< HEAD
     hp("spec")  = 1                                                     // trend specification: 0, 1, 2, 3, 4
+=======
+    hp("spec")  = 1                                                     // trend specification: 0, 1, 2, 3, 5
+>>>>>>> 1de2987cdb83cc2aacb70ac69a877404c29286c1
     hp("lwave") = 20                                                    // wavelength (distance between peaks)
     hp("cross") = 1
     RidgeRegression.hp("lambda") = 1.0
@@ -455,3 +459,107 @@ end example_ILITest9
 
 end example_ILITest10
 
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `example_ILITest10` main function test the `Example_ILI` object.
+ *  This test compares the several models for several values of p and q.
+ *  > runMain scalation.modeling.forecasting.example_ILITest11
+ */
+@main def example_ILITest11 (): Unit =
+
+    import MakeMatrix4TS.hp
+
+    //    val exo_vars = Array ("%WEIGHTED ILI", "%UNWEIGHTED ILI")
+    val exo_vars = Array("OT")
+
+    val (xe, y)  = loadData (exo_vars, response)
+    println (s"xe.dims = ${xe.dims}, y.dim = ${y.dim}")
+
+    val hh = 6                                                          // maximum forecasting horizon
+    val p  = 6
+    val q  = 6
+    hp("p")     = p                                                     // endo lags
+    hp("q")     = q                                                     // exo lags
+    hp("spec")  = 1                                                     // trend specification: 0, 1, 2, 3, 5
+    hp("lwave") = 20                                                    // wavelength (distance between peaks)
+    hp("cross") = 0
+    hp("lambda") = 1.0
+
+
+    banner("RandomWalkS")
+    val mod1 = RandomWalkS(y, hh) // create model for time series data
+    banner(s"In-ST Forecasts: ${mod1.modelName} on ILI Dataset")
+    mod1.trainNtest()() // train and test on full dataset
+    mod1.forecastAll() // forecast h-steps ahead (h = 1 to hh) for all y
+    mod1.diagnoseAll(mod1.getY, mod1.getYf)
+
+    println("rollValidate")
+    mod1.setSkip(0)
+    mod1.rollValidate() // TnT with Rolling Validation
+    mod1.diagnoseAll(mod1.getY, mod1.getYf, Forecaster.teRng(y.dim), 0)
+
+
+    banner("AR")
+    val mod2 = AR(y, hh) // create model for time series data
+    banner(s"In-ST Forecasts: ${mod2.modelName} on ILI Dataset")
+    mod2.trainNtest()() // train and test on full dataset
+    mod2.forecastAll() // forecast h-steps ahead (h = 1 to hh) for all y
+    mod2.diagnoseAll(mod2.getY, mod2.getYf)
+
+    println("rollValidate")
+    mod2.setSkip(0)
+    mod2.rollValidate() // TnT with Rolling Validation
+    mod2.diagnoseAll(mod2.getY, mod2.getYf, Forecaster.teRng(y.dim), 0)
+
+
+    banner("ARX")
+    val mod3 = ARX(xe, y, hh) // create model for time series data
+    banner(s"In-ST Forecasts: ${mod3.modelName} on ILI Dataset")
+    mod3.trainNtest_x()() // train and test on full dataset
+    mod3.forecastAll() // forecast h-steps ahead (h = 1 to hh) for all y
+    mod3.diagnoseAll(mod3.getY, mod3.getYf)
+
+    println("rollValidate")
+    mod3.setSkip(0)
+    mod3.rollValidate() // TnT with Rolling Validation
+    mod3.diagnoseAll(mod3.getY, mod3.getYf, Forecaster.teRng(y.dim), 0)
+
+
+    banner("ARX_D")
+    val mod4 = ARX_D(xe, y, hh) // create model for time series data
+    banner(s"In-ST Forecasts: ${mod4.modelName} on ILI Dataset")
+    mod4.trainNtest_x()() // train and test on full dataset
+    mod4.forecastAll() // forecast h-steps ahead (h = 1 to hh) for all y
+    mod4.diagnoseAll(mod4.getY, mod4.getYf)
+
+    println("rollValidate")
+    mod4.setSkip(0)
+    mod4.rollValidate() // TnT with Rolling Validation
+    mod4.diagnoseAll(mod4.getY, mod4.getYf, Forecaster.teRng(y.dim), 0)
+
+
+    banner("ARX_Quad")
+    val mod5 = ARX_Quad(xe, y, hh) // create model for time series data
+    banner(s"In-ST Forecasts: ${mod5.modelName} on ILI Dataset")
+    mod5.trainNtest_x()() // train and test on full dataset
+    mod5.forecastAll() // forecast h-steps ahead (h = 1 to hh) for all y
+    mod5.diagnoseAll(mod5.getY, mod5.getYf)
+
+    println("rollValidate")
+    mod5.setSkip(0)
+    mod5.rollValidate() // TnT with Rolling Validation
+    mod5.diagnoseAll(mod5.getY, mod5.getYf, Forecaster.teRng(y.dim), 0)
+
+
+    banner("ARX_Quad_D")
+    val mod6 = ARX_Quad_D(xe, y, hh) // create model for time series data
+    banner(s"In-ST Forecasts: ${mod6.modelName} on ILI Dataset")
+    mod6.trainNtest_x()() // train and test on full dataset
+    mod6.forecastAll() // forecast h-steps ahead (h = 1 to hh) for all y
+    mod6.diagnoseAll(mod6.getY, mod6.getYf)
+
+    println("rollValidate")
+    mod6.setSkip(0)
+    mod6.rollValidate() // TnT with Rolling Validation
+    mod6.diagnoseAll(mod6.getY, mod6.getYf, Forecaster.teRng(y.dim), 0)
+
+end example_ILITest11

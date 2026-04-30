@@ -48,7 +48,7 @@ class ARX (x: MatrixD, y: VectorD, hh: Int, n_exo: Int, fname: Array [String],
            tForms: TransformMap = Map ("tForm_y" -> null))
       extends Forecaster_Reg (x, y, hh, fname, tRng, hparam, bakcast):
 
-    private   val debug = debugf ("ARX", true)                          // debug function
+    private   val debug = debugf ("ARX", false)                          // debug function
     protected val p     = hparam("p").toInt                             // use the last p endogenous values (p lags)
     protected val q     = hparam("q").toInt                             // use the last q exogenous values (q lags)
     protected val spec  = hparam("spec").toInt                          // trend terms: 0 - implicit constant, 1 - linear, 2 - quadratic

@@ -47,9 +47,15 @@ abstract class Forecaster_Reg (x: MatrixD, y: VectorD, hh: Int, fname: Array [St
       extends Forecaster (y, hh, tRng, hparam, bakcast)
          with FeatureSelection:
 
+<<<<<<< HEAD
     private val debug   = debugf ("Forecaster_Reg", false)                // debug function
     private val flaw    = flawf ("Forecaster_Reg")                        // flaw function
 
+=======
+    private   val debug = debugf ("Forecaster_Reg", false)                // debug function
+    private   val flaw  = flawf ("Forecaster_Reg")                        // debug function
+    protected val reg   = new REGRESSION (x, y, fname, hparam)            // delegate training to regression
+>>>>>>> 1de2987cdb83cc2aacb70ac69a877404c29286c1
     protected val nneg  = hparam("nneg").toInt == 1                       // 0 => unrestricted, 1 => predictions must be non-negative
     protected val reg   = REGRESSION.center (x, y, fname, hparam ++ REGRESSION.hp)  // delegate training to regularized regression
                                                                                     // `center` centers the data
