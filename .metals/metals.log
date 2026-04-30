@@ -419,3 +419,6 @@ Caused by: java.io.IOException: Connection reset by peer
 	... 22 more
 
 2026.04.30 16:19:19 INFO  Cancelling compilation on Bloop server
+2026.04.30 16:19:26 INFO  Created report: Optional[file:///C:/Users/youse/OneDrive/Documents/GitHub/scalation_2.0/build.sbt]
+2026.04.30 16:19:26 INFO  java.lang.NullPointerException: Cannot read the array length because "a" is null (full report at: "C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0\.metals\.reports\metals-full\2026-04-30\r_compiler-error_(scalation_5f2-0-build)_16-19-26-398.md")
+2026.04.30 16:19:30 WARN  Using H2 2.4.240 which is newer than the version Flyway has been verified with. The latest verified version of H2 is 2.3.232.
