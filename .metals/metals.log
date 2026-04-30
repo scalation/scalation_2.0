@@ -108,3 +108,7 @@ Exception in thread "pool-8-thread-1" java.lang.InterruptedException
 2026.04.30 16:04:03 INFO  time: Imported build in 0.9s
 2026.04.30 16:05:02 WARN  Using H2 2.4.240 which is newer than the version Flyway has been verified with. The latest verified version of H2 is 2.3.232.
 2026.04.30 16:05:29 INFO  time: indexed workspace in 1m26s
+2026.04.30 16:09:57 INFO  compiling scalation (578 scala sources)
+2026.04.30 16:11:03 INFO  time: compiled scalation in 1m6s
+2026.04.30 16:11:03 INFO  compiling scalation (578 scala sources)
+2026.04.30 16:11:53 INFO  time: compiled scalation in 49s
