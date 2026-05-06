@@ -7,6 +7,8 @@
  *
  *  @note    Model Framework: Abstract Class for Forecasters with Matrix Input
  *           most models will need to override `train`, `predict`, `forecast` and `forecastAt`
+ *
+ *  @see `scalation.modeling.neuralnet.RidgeRegressionMV`
  */
 
 package scalation
@@ -17,10 +19,8 @@ import scala.annotation.unused
 import scala.collection.mutable.{ArrayBuffer => VEC, LinkedHashSet => LSET}
 import scala.math.max
 
-//import scalation.modeling.neuralnet.{RegressionMV => REGRESSION}
-import scalation.modeling.neuralnet.{RidgeRegressionMV => REGRESSION}
-
 import scalation.mathstat._
+import scalation.modeling.neuralnet.{RidgeRegressionMV => REGRESSION}
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `Forecaster_D` abstract class provides a common framework for several forecasters.
@@ -40,7 +40,7 @@ abstract class Forecaster_D (x: MatrixD, y: MatrixD, hh: Int, fname: Array [Stri
       extends Forecaster (y(?, 0), hh, tRng, hparam, bakcast):          // no automatic backcasting, @see `ARY_D.apply`
 
     private val debug = debugf ("Forecaster_D", false)                  // debug function
-    protected val reg = REGRESSION.center (x, y, fname, hparam ++ REGRESSION.hp)  // delegate training to multi-variate regression
+    protected val reg = REGRESSION.center (x, y, fname, hparam ++ REGRESSION.hp)  // delegate training to multi-variate regularized regression
 
     protected var bb: MatrixD = null                                    // use parameter matrix bb instead of vector b
     

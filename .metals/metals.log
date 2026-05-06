@@ -422,3 +422,48 @@ Caused by: java.io.IOException: Connection reset by peer
 2026.04.30 16:19:26 INFO  Created report: Optional[file:///C:/Users/youse/OneDrive/Documents/GitHub/scalation_2.0/build.sbt]
 2026.04.30 16:19:26 INFO  java.lang.NullPointerException: Cannot read the array length because "a" is null (full report at: "C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0\.metals\.reports\metals-full\2026-04-30\r_compiler-error_(scalation_5f2-0-build)_16-19-26-398.md")
 2026.04.30 16:19:30 WARN  Using H2 2.4.240 which is newer than the version Flyway has been verified with. The latest verified version of H2 is 2.3.232.
+2026.04.30 16:27:50 INFO  Started: Metals version 1.6.7 in folders 'C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0' for client Visual Studio Code 1.118.1.
+2026.04.30 16:27:52 INFO  Memory monitor started
+Apr 30, 2026 4:27:53 PM org.eclipse.lsp4j.jsonrpc.services.GenericEndpoint notify
+INFO: Unsupported notification method: $/setTrace
+2026.04.30 16:27:56 INFO  Shutting down server
+2026.04.30 16:27:56 INFO  Memory monitor stopped
+2026.04.30 16:27:56 INFO  shutting down Metals
+2026.04.30 16:27:57 WARN  Using H2 2.4.240 which is newer than the version Flyway has been verified with. The latest verified version of H2 is 2.3.232.
+2026.04.30 16:27:58 INFO  Exiting server
+2026.05.06 14:09:13 INFO  Started: Metals version 1.6.7 in folders 'C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0' for client Visual Studio Code 1.118.1.
+2026.05.06 14:09:15 INFO  Memory monitor started
+May 06, 2026 2:09:16 PM org.eclipse.lsp4j.jsonrpc.services.GenericEndpoint notify
+INFO: Unsupported notification method: $/setTrace
+2026.05.06 14:09:18 WARN  Using H2 2.4.240 which is newer than the version Flyway has been verified with. The latest verified version of H2 is 2.3.232.
+2026.05.06 14:09:19 INFO  Attempting to connect to the build server...
+2026.05.06 14:09:19 INFO  Found a Bloop server running
+2026.05.06 14:09:19 INFO  tracing is disabled for protocol BSP, to enable tracing of incoming and outgoing JSON messages create an empty file at C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0\.metals\bsp.trace.json or C:\Users\youse\AppData\Local\scalameta\metals\cache\bsp.trace.json
+2026.05.06 14:09:18 INFO  Attempting to connect to the build server...
+2026.05.06 14:09:18 INFO  Found a Bloop server running
+2026.05.06 14:09:19 INFO  tracing is disabled for protocol BSP, to enable tracing of incoming and outgoing JSON messages create an empty file at C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0\project\.metals\bsp.trace.json or C:\Users\youse\AppData\Local\scalameta\metals\cache\bsp.trace.json
+2026.05.06 14:09:19 INFO  time: Connected to build server in 0.58s
+2026.05.06 14:09:19 INFO  Connected to Build server: Bloop v2.0.19
+2026.05.06 14:09:20 INFO  time: Imported build in 0.24s
+2026.05.06 14:09:44 INFO  compiling scalation (578 scala sources)
+2026.05.06 14:09:50 WARN  Using H2 2.4.240 which is newer than the version Flyway has been verified with. The latest verified version of H2 is 2.3.232.
+2026.05.06 14:10:04 INFO  time: indexed workspace in 44s
+2026.05.06 14:10:32 INFO  time: code lens generation in 17s
+2026.05.06 14:10:55 INFO  time: compiled scalation in 1m10s
+2026.05.06 14:10:55 INFO  compiling scalation (578 scala sources)
+2026.05.06 14:11:18 INFO  time: compiled scalation in 23s
+2026.05.06 14:11:18 INFO  compiling scalation (578 scala sources)
+2026.05.06 14:11:39 INFO  time: compiled scalation in 20s
+2026.05.06 14:11:39 INFO  compiling scalation (578 scala sources)
+2026.05.06 14:11:59 INFO  time: compiled scalation in 18s
+2026.05.06 14:13:19 INFO  compiling scalation (578 scala sources)
+2026.05.06 14:14:08 INFO  time: compiled scalation in 49s
+2026.05.06 14:14:08 INFO  compiling scalation (578 scala sources)
+2026.05.06 14:14:43 INFO  time: compiled scalation in 34s
+exception caught when loading class module-info: java.lang.AssertionError: assertion failed: attempt to parse java.lang.Object from classfile
+2026.05.06 14:30:36 INFO  Shutting down server
+2026.05.06 14:30:36 INFO  Memory monitor stopped
+2026.05.06 14:30:36 INFO  shutting down Metals
+2026.05.06 14:30:37 INFO  Shut down connection with build server.
+2026.05.06 14:30:37 INFO  Shut down connection with build server.
+2026.05.06 14:30:37 INFO  Exiting server

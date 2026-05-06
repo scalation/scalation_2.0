@@ -13,6 +13,7 @@ package modeling
 package classifying
 
 import scala.collection.mutable.{LinkedHashMap, Map}
+import scala.math.sqrt
 import scala.Double.NaN
 
 import scalation.mathstat._
@@ -21,7 +22,7 @@ import Probability.centropy
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `QoFC` enum defines the Quality of Fit (QoF) measures for classifiers.
- *  @param name  the name of ther QoF measure/metric
+ *  @param name  the name of the QoF measure/metric
  */
 enum QoFC (val name: String):
 
@@ -36,16 +37,18 @@ enum QoFC (val name: String):
     case kappa  extends QoFC ("kappa")                      // index  7 - Cohen's kappa
     case cent   extends QoFC ("cent")                       // index  8 - cross entropy
     case acc    extends QoFC ("acc")                        // index  9 - accuracy
+    case mcc    extends QoFC ("mcc")                        // index 10 - Matthews Correlation Coefficient
 
-    case p_m    extends QoFC ("p_m")                        // index 10 - mean micro-precision
-    case r_m    extends QoFC ("r_m")                        // index 11 - mean micro-recall
-    case s_m    extends QoFC ("s_m")                        // index 12 - mean micro-specificity
-    case f1_m   extends QoFC ("f1_m")                       // index 13 - mean micro-F1-measure
+    case p_m    extends QoFC ("p_m")                        // index 11 - mean micro-precision
+    case r_m    extends QoFC ("r_m")                        // index 12 - mean micro-recall
+    case s_m    extends QoFC ("s_m")                        // index 13 - mean micro-specificity
+    case f1_m   extends QoFC ("f1_m")                       // index 14 - mean micro-F1-measure
 
-    case p      extends QoFC ("p")                          // index 14 - precision (for k = 2)
-    case r      extends QoFC ("r")                          // index 15 - recall/sensitivity (for k = 2)
-    case s      extends QoFC ("s")                          // index 16 - specificity (for k = 2)
-    case f1     extends QoFC ("f1")                         // index 17 - F1-measure (for k = 2)
+    case p      extends QoFC ("p")                          // index 15 - precision (for k = 2)
+    case r      extends QoFC ("r")                          // index 16 - recall/sensitivity (for k = 2)
+    case s      extends QoFC ("s")                          // index 17 - specificity (for k = 2)
+    case f1     extends QoFC ("f1")                         // index 18 - F1-measure (for k = 2)
+    case gmean  extends QoFC ("gmean")                      // index 19 - geometric mean (of recall and specificity)
 
 end QoFC
 
@@ -59,7 +62,7 @@ object FitC:
 
     val MIN_FOLDS = 3                                          // minimum number of folds for cross-validation
 
-    // indices for Vecror Quality of Fit (QoF) micro-measures
+    // indices for Vector Quality of Fit (QoF) micro-measures
 
     val index_p_v   =  0                                       // index  0 - micro-precision vector
     val index_r_v   =  1                                       // index  1 - micro-recall vector
@@ -91,6 +94,7 @@ help: Quality of Fit (QoF) measures:
     kappa =  Cohen's kappa, adjusted accuracy that accounts for agreement by chance
     cent  =  cross entropy to measure agreement between y and yp
     acc   =  accuracy, the fraction of predictions that are correct 
+    mcc   =  Matthews Correlation Coefficient, correlation between actual and predicted classes
 
     p     =  precision, the fraction classified as true that are actually true
     r     =  recall/sensitivity, the fraction of the actually true that are classified as true
@@ -106,6 +110,7 @@ help: Quality of Fit (QoF) measures:
     r_v   =  micro-recall vector, recall for every class
     s_v   =  micro-specificity vector, specificity for every class
     f1_v  =  micro-F1-measure vector, F1-measure for every class
+    gmean =  geometric mean (of recall and specificity)
         """
     end help
 
@@ -216,7 +221,7 @@ trait FitC (k: Int = 2)
     private val sv    = new VectorD (cmat.dim)                       // micro-specificity vector
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Clear the total cummulative confusion matrix.
+    /** Clear the total cumulative confusion matrix.
      */
     def clearConfusion (): Unit = tcmat.setAll (0)
 
@@ -286,7 +291,7 @@ trait FitC (k: Int = 2)
     end confusion
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Contract the actual class y_ vector versus the predicted class yp vector.
+    /** Contrast the actual class y_ vector versus the predicted class yp vector.
      *  @param y_  the actual class values/labels for full (y) or test (y_e) dataset
      *  @param yp  the predicted class values/labels
      */
@@ -323,16 +328,16 @@ trait FitC (k: Int = 2)
      *  @param p1  the first parameter
      *  @param p2  the second parameter
      */
-    def pseudo_rSq: Double =  1.0 - sse / sst
+    def pseudo_rSq: Double = 1.0 - sse / sst
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the confusion matrix for k = 2 as a tuple (tn, fp, fn, tp).
-     *  @param con  the confusion matrix (defaults to cmat)
+     *  @param cm  the confusion matrix (defaults to cmat)
      */
-    def tn_fp_fn_tp (con: MatrixI = cmat): (Double, Double, Double, Double) =
+    def tn_fp_fn_tp (cm: MatrixI = cmat): (Double, Double, Double, Double) =
         if k == 2 then
-            (con(0, 0) /* tn */, con(0, 1) /* fp */,
-             con(1, 0) /* fn */, con(1, 1) /* tp */)
+            (cm(0, 0) /* tn */, cm(0, 1) /* fp */,
+             cm(1, 0) /* fn */, cm(1, 1) /* tp */)
         else (NaN, NaN, NaN, NaN)
     end tn_fp_fn_tp
 
@@ -342,6 +347,28 @@ trait FitC (k: Int = 2)
      *  diagonal of the confusion matrix.
      */
     def accuracy: Double = cmat.trace / cmat.sum.toDouble
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the multi-class Matthews Correlation Coefficient (R_K statistic).
+     *  @param cm  the passed-in confusion matrix (defaults to cmat)
+     */
+    def mcc (cm: MatrixI = cmat): Double = 
+        val s = cm.sum                                               // total samples
+        val c = cm.trace                                             // total correct predictions (sum of diagonal)
+    
+        // compute row sums (actuals/trues) and column sums (predictions)
+        val t = cm.sumVr                                             // sum for each row
+        val p = cm.sumV                                              // sum for each column
+
+        // calculate numerator and denominator: multi-class generalization of the Matthews Correlation Coefficient
+        val dot_t_p = t dot p
+        val dot_p_p = p dot p
+        val dot_t_t = t dot t
+
+        val numer = (c * s) - dot_t_p
+        val denom = sqrt ((s * s - dot_p_p) * (s * s - dot_t_t))
+        if denom == 0.0 then 0.0 else numer / denom
+    end mcc
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute the mean ignoring NaN (Not-a-Number).
@@ -365,6 +392,13 @@ trait FitC (k: Int = 2)
     /** Compute the micro-F1-measure vector, i.e., the harmonic mean of the precision and recall.
      */
     def f1v: VectorD = (pv * rv * 2.0) / (pv + rv)
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the Geometric Mean (G-Mean) of recall and specificity.
+     *  @param r  the recall
+     *  @param s  the specificity
+     */
+    def gmean (r: Double, s: Double): Double = sqrt (r * s)
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute Cohen's kappa coefficient that measures agreement between
@@ -393,9 +427,9 @@ trait FitC (k: Int = 2)
         val (p, r, s) = (pv.last, rv.last, sv.last)                       // ordinary precision, recall and specificity
 
         VectorD (rSq, p_rSq, sst, sse, mse0, rmse, mae,                   // general QoF measures
-                 kappa, cent, accuracy,                                   // QoF measures for classification 
+                 kappa, cent, accuracy, mcc (),                           // QoF measures for classification 
                  mean (pv), mean (rv), mean (sv), mean (f1v),             // means of precision, recall, specificity and F1
-                 p, r, s, f1_measure (p, r))                              // most meaningful when k = 2
+                 p, r, s, f1_measure (p, r), gmean (r, s))                // most meaningful when k = 2
     end fit
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

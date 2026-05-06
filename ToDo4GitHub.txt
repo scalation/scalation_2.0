@@ -1,0 +1,8 @@
+Follow these steps before uploading to GitHub. docs should be updated so "scaladoc" button in GitHub shows documents 
+
+sbt clean
+Remove-Item -Recurse -Force target\scala-3.7.2, target\scala-3.8.3 -ErrorAction SilentlyContinue
+sbt compile doc
+
+Remove-Item -Recurse -Force docs -ErrorAction SilentlyContinue
+Copy-Item -Recurse target\scala-3.8.3\api docs

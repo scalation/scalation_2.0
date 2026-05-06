@@ -622,7 +622,7 @@ end aRX_SRTest6
  *  Forecasting COVID-19 using Train-n-Test Split (TnT) with Rolling Validation.
  *  Test forecasts (h = 1 to hh steps ahead forecasts).
  *  This version performs FEATURE SELECTION  (training-set, testing-set).
- *  > runMain scalation.modeling.forecasting.aRX_QuadTest7
+ *  > runMain scalation.modeling.forecasting.aRX_SRTest7
  */
 @main def aRX_SRTest7 (): Unit =
 
