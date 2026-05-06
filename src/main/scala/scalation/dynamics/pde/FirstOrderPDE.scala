@@ -292,6 +292,5 @@ end firstOrderPDETest3
     println (s"solution M  = $u2")                             // solve for t = 1, 2, ... sec
     println (s"difference  = ${u1 - u2}")
 
-
 end firstOrderPDETest4
 

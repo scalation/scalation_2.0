@@ -6,6 +6,8 @@
  *  @see     LICENSE (MIT style license file).
  *
  *  @note    Model: Auto-Regressive on lagged y (ARY_D) using OLS - Direct Forecasting
+ *
+ *  @see `scalation.modeling.forecasting.ARY` for recursive forecasting version
  */
 
 package scalation
@@ -41,7 +43,7 @@ class ARY_D (x: MatrixD, y: MatrixD, hh: Int, fname: Array [String],
              tRng: Range = null, hparam: HyperParameter = hp,
              bakcast: Boolean = false,
              tForms: TransformMap = Map ("tForm_y" -> null))
-      extends Forecaster_D (x, y, hh, fname, tRng, hparam, bakcast):
+      extends Forecaster_D (x, y, hh, fname, tRng, hparam, bakcast):      // provides `reg` field
 
     private val debug = debugf ("ARY_D", true)                            // debug function
     private val p     = hparam("p").toInt                                 // use the last p values (p lags)

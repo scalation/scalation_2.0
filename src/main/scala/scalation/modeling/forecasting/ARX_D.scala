@@ -7,7 +7,6 @@
  *
  *  @note    Model: Auto-Regressive on lagged y and xe (ARX_D) using OLS - Direct Forecasting
  *
- *  @see `scalation.modeling.neuralnet.RidgeRegressionMV`
  *  @see `scalation.modeling.forecasting.ARX` for recursive forecasting version
  */
 
@@ -47,7 +46,7 @@ class ARX_D (x: MatrixD, y: MatrixD, hh: Int, n_exo: Int, fname: Array [String],
              tRng: Range = null, hparam: HyperParameter = hp,
              bakcast: Boolean = false,
              tForms: TransformMap = Map ("tForm_y" -> null))
-      extends Forecaster_D (x, y, hh, fname, tRng, hparam, bakcast):
+      extends Forecaster_D (x, y, hh, fname, tRng, hparam, bakcast):      // provides `reg` field
 
     private   val debug = debugf ("ARX_D", false)                         // debug function
     protected val p     = hparam("p").toInt                               // use the last p endogenous values (p lags)
