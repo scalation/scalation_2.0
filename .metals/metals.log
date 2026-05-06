@@ -460,3 +460,10 @@ INFO: Unsupported notification method: $/setTrace
 2026.05.06 14:14:08 INFO  time: compiled scalation in 49s
 2026.05.06 14:14:08 INFO  compiling scalation (578 scala sources)
 2026.05.06 14:14:43 INFO  time: compiled scalation in 34s
+exception caught when loading class module-info: java.lang.AssertionError: assertion failed: attempt to parse java.lang.Object from classfile
+2026.05.06 14:30:36 INFO  Shutting down server
+2026.05.06 14:30:36 INFO  Memory monitor stopped
+2026.05.06 14:30:36 INFO  shutting down Metals
+2026.05.06 14:30:37 INFO  Shut down connection with build server.
+2026.05.06 14:30:37 INFO  Shut down connection with build server.
+2026.05.06 14:30:37 INFO  Exiting server
