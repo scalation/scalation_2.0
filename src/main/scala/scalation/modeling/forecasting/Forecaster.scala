@@ -49,10 +49,10 @@ trait Forecast
     /** Given a time series y_, train the forecasting function y_ = f(lags (y_)) + e,
      *  where f(lags (y_)) is a function of the lagged values of y_,
      *  by fitting its parameters.
-     *  @param x_null  the data/input matrix (ignored, pass null)
-     *  @param y_      the testing/full response/output vector (e.g., full y)
+     *  @param x_  the data/input matrix (for models with no x, pass null)
+     *  @param y_  the testing/full response/output vector (e.g., full y)
      */
-    def train (x_null: MatrixD, y_ : VectorD): Unit = {}
+    def train (x_ : MatrixD, y_ : VectorD): Unit
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** The standard signature for prediction does not apply to time series.
@@ -74,15 +74,16 @@ end Forecast
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `Forecaster` abstract class provides a common framework for several forecasters.
  *  Note, the train method must be called first followed by test.
- *  @param y        the response vector (time series data)
- *  @param hh       the maximum forecasting horizon (h = 1 to hh)
- *  @param tRng     the time range, if relevant (index as time may suffice)
- *  @param hparam   the hyper-parameters for models extending this abstract class
- *  @param bakcast  whether a backcasted value is prepended to the time series (defaults to false)
+ *  @param y             the response vector (time series data)
+ *  @param hh            the maximum forecasting horizon (h = 1 to hh)
+ *  @param tRng          the time range, if relevant (index as time may suffice)
+ *  @param hparam        the hyper-parameters for models extending this abstract class
+ *  @param bakcast       whether a backcasted value is prepended to the time series (defaults to false)
+ *  @param hasIntercept  whether the model has an intercept (defaults to true)
  */
 abstract class Forecaster (y: VectorD, hh: Int, tRng: Range = null, hparam: HyperParameter = null,
-                           bakcast: Boolean = false)
-      extends Diagnoser (dfr = 1, df = y.dim - 1)                          // dfr and df are updated later per model
+                           bakcast: Boolean = false, hasIntercept: Boolean = true)
+      extends Diagnoser (dfr = 1, df = y.dim - 1, hasIntercept)            // dfr and df MUST be updated later per model
          with ForecastMatrix (y, hh, tRng)
          with Forecast:
 
@@ -129,62 +130,112 @@ abstract class Forecaster (y: VectorD, hh: Int, tRng: Range = null, hparam: Hype
         val yy = if bakcast then y_(1 until y_.dim)                       // align the actual values
                  else y_
         val yp = predictAll (yy)                                          // make all predictions
+        debug ("test", s"y_.dim, ${y_.dim}, yf.dims = ${yf.dims}")
 
-        println (s"yy.dim = ${yy.dim}, yp.dim = ${yp.dim}")
 //      Forecaster.differ (yy, yfh)                                       // uncomment for debugging
         assert (yy.dim == yp.dim)                                         // make sure the vector sizes agree
 
         if DO_PLOT then
             new Plot (null, yy, yp, s"test: Plot of yy, yp for $modelName vs. t", true)
-        mod_resetDF (yy.dim - skip)                                       // reset the degrees of freedom
-//      println (s"test: yy = $yy,\n yp = $yp")
+        mod_resetDF (yy.dim - getSkip)                                    // reset the degrees of freedom
         (yp, diagnose (yy, yp))                                           // return predicted and QoF vectors
     end test
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Models need to provide a means for updating the Degrees of Freedom (DF).
+    /** Models need to provide a means for updating the Degrees of Freedom (DF):
+     *  dfr (degrees of freedom taken by regression/model), df (degrees of freedom left for error).
+     *  @note: Need the correct size taking into account whether initial rows were skipped.
+     *  @param size  the size of dataset (full, train, or test)
+     *
+    override def mod_resetDF (size: Int): Unit =
+        // Calculate true statistical model df handling the edge cases
+        val dfr = if hasIntercept then (if parameter.size <= 1 then 0.0 else (parameter.size - 1).toDouble)
+                  else parameter.size.toDouble
+
+        // Compute error df: size minus parameters (including the intercept parameter if present)
+        val df  = (size - parameter.size).toDouble
+        
+        debug ("mod_resetDF", s"dfr = $dfr, df = $df")
+        resetDF (dfr, df)
+    end mod_resetDF
+     */
+
+   //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Reset the Degrees of Freedom (DF) from the number of slope parameters k:
+     *  dfr = k (never counting the intercept) and df = size - k - 1 when the model
+     *  has an intercept (an explicit column, or one recovered from the training
+     *  means by a centered regression), size - k otherwise, so that dfr + df is
+     *  m - 1 with an intercept and m without, as `Fit` assumes for R^2-bar, F, AIC, BIC.
+     *  @param size  the number of rows diagnosed (after any skipped initial rows)
+     *  @param k     the number of slope parameters (excluding any intercept)
+     */
+    protected final def resetDF_k (size: Int, k: Int): Unit =
+        val dfr = k.toDouble
+        val df0 = size - k - (if hasIntercept then 1 else 0)
+        if df0 <= 0 then flaw ("resetDF_k", s"error DF = $df0 <= 0 (size = $size, k = $k): clamped to 1, DF-based QoF unreliable")
+        val df  = max (1, df0).toDouble
+        debug ("resetDF_k", s"hasIntercept = $hasIntercept, dfr = $dfr, df = $df")
+        resetDF (dfr, df)
+    end resetDF_k
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Models need to provide a means for updating the Degrees of Freedom (DF):
+     *  dfr (degrees of freedom taken by regression/model), df (degrees of freedom left for error).
+     *  Here `parameter` is the model's own b, which INCLUDES the constant/intercept
+     *  term when the model has one (e.g., δ +: φ), so the slopes are one fewer.
+     *  Models whose `parameter` holds the slopes only must override (@see `Forecaster_Reg`).
+     *  @note: Need the correct size taking into account whether initial rows were skipped.
      *  @param size  the size of dataset (full, train, or test)
      */
     override def mod_resetDF (size: Int): Unit =
-        val dfr = max (1, parameter.size - 1)                              // degrees of freedom for regression/model
-        debug ("mod_resetDF", s"dfr = $dfr, df = ${size-dfr}")
-        resetDF (dfr, size - dfr) 
+        val k = if hasIntercept then max0 (parameter.size - 1) else parameter.size
+        resetDF_k (size, k)
     end mod_resetDF
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Train and test the forecasting model y_ = f(y-past) + e and report its QoF
+    /** Train and test the forecasting model y_ = f(x_) + e and report its QoF
      *  and plot its predictions.  Return the predictions and QoF.
-     *  @param y_  the training/full response/output vector (defaults to full y)
-     *  @param yy  the testing/full response/output vector (defaults to full y)
+     *  Internal shared generic version.
+     *  @param x_  the training/full data/input matrix
+     *  @param y_  the training/full response/output vector
+     *  @param xx  the testing/full data/input matrix
+     *  @param yy  the testing/full response/output vector
      */
-    def trainNtest (y_ : VectorD = yb)(yy: VectorD = yb): (VectorD, VectorD) =
-        train (null, y_)                                                  // train the model on training set
-        val (yp, qof) = test (null, yy)                                   // test the model on testing set
-        println (report (qof))                                            // report on Quality of Fit (QoF)
-        (yp, qof)
-    end trainNtest
+    inline protected def trainNtest_ (x_ : MatrixD, y_ : VectorD | MatrixD)
+                                     (xx: MatrixD, yy: VectorD | MatrixD): (VectorD, VectorD) =
+        (y_, yy) match
+        case (yVec: VectorD, yyVec: VectorD) =>
+            train (x_, yVec)
+            val (yp, qof) = test (xx, yyVec)
+            if DO_REPORT then println (report (qof))
+            (yp, qof)
+
+        case (yMat: MatrixD, yyMat: MatrixD) =>              // direct pattern match/cast to Forecaster_D FIX: needs _D?ZZZZ
+            this match
+            case fD: Forecaster_D =>
+                fD.train (x_, yMat)
+                val (yp, qof) = fD.test (xx, yyMat)
+                if DO_REPORT then println (report (qof))
+                (yp, qof)
+            case _ =>
+                throw new IllegalStateException ("Matrix targets are only supported by Forecaster_D subclasses.")
+
+        case _ => 
+            throw new IllegalArgumentException ("Target variables must match types.")
+    end trainNtest_
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Test FORECASTS of a forecasting model y_ = f(lags (y_)) + e
-     *  and RETURN (1) aligned actual values, (2) its forecasts and (3) QoF vector.
-     *  Testing may be in-sample (on the training set) or out-of-sample (on the testing set)
-     *  as determined by the parameters passed in.  Note: must call train and forecastAll
-     *  before testF.
-     *  @param h   the forecasting horizon, number of steps ahead to produce forecasts
-     *  @param y_  the testing/full response/output vector
-     *
-    def testF (h: Int, y_ : VectorD): (VectorD, VectorD, VectorD) =
-        val yfh = yf(?, h)(0 until y_.dim-h)                              // column h of the forecast matrix
-        val yy  = y_(h until y_.dim)                                      // align the actual values
-        println (s"yy.dim = ${yy.dim}, yfh.dim = ${yfh.dim}")
-//      Forecaster.differ (yy, yfh)                                       // uncomment for debugging
-        assert (yy.dim == yfh.dim)                                        // make sure the vector sizes agree
-
-        new Plot (null, yy, yfh, s"testF: yy, yfh vs. t for $modelName @h = $h", lines = true)
-        mod_resetDF (yy.dim)                                              // reset the degrees of freedom
-        (yy, yfh, diagnose (yy, yfh))                                     // return actual, forecasted and QoF vectors
-    end testF
+    /** Train and test the forecasting model y_ = f(x_) + e and report its QoF
+     *  and plot its predictions.  Return the predictions and QoF.
+     *  @param x_  the training/full data/input matrix (defaults to full x, may be null)
+     *  @param y_  the training/full response/output vector (defaults to full y)
+     *  @param xx  the testing/full data/input matrix (defaults to full x)
+     *  @param yy  the testing/full response/output vector (defaults to full y)
      */
+    def trainNtest (x_ : MatrixD = getX, y_ : VectorD = yb)
+                   (xx: MatrixD = getX, yy: VectorD = yb): (VectorD, VectorD) =
+        trainNtest_ (x_, y_)(xx, yy)
+    end trainNtest
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the hyper-parameters.
@@ -201,7 +252,7 @@ abstract class Forecaster (y: VectorD, hh: Int, tRng: Range = null, hparam: Hype
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the vector of residuals/errors.
      */
-    def residual: VectorD = { if e == null then flaw ("residual", "must call test method first"); e }
+//  def residual: VectorD = { if e == null then flaw ("residual", "must call test method first"); e }
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Predict a value for y_t using the 1-step ahead forecast.
@@ -226,10 +277,11 @@ abstract class Forecaster (y: VectorD, hh: Int, tRng: Range = null, hparam: Hype
             for t <- 1 until y_.dim do yf(t-1, 1) = predict (t, y_)           // use model to make predictions
             yf(?, 1)(0 until y_.dim-1)                                        // return yp: first horizon only
         else
-//          debug ("predictAll", s"y_.dim = ${y_.dim}, yf.dims = ${yf.dims}")
+            debug ("predictAll", s"y_.dim = ${y_.dim}, yf.dims = ${yf.dims}")
             yf(0, 1) = NO_DOUBLE                                              // no prior data to make predictions
-            for t <- 1 until yf.dim do yf(t, 1) = predict (t, y_)             // skip t = 0
-            yf(?, 1)
+//          for t <- 1 until yf.dim do yf(t, 1) = predict (t, y_)             // skip t = 0 (may crash)
+            for t <- 1 until y_.dim do yf(t, 1) = predict (t, y_)             // skip t = 0
+            yf(?, 1)                                                          // return yp: first horizon only
     end predictAll
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -257,7 +309,7 @@ abstract class Forecaster (y: VectorD, hh: Int, tRng: Range = null, hparam: Hype
      *  @param y_  the actual values to use in making forecasts
      */
     def forecastAll (y_ : VectorD = yb): MatrixD =
-        for h <- 2 to hh do forecastAt (h, y_)                            // forecast k-steps into the future
+        for h <- 2 to hh do forecastAt (h, y_)                            // forecast h-steps into the future
         yf                                                                // return matrix of forecasted values
     end forecastAll
 
@@ -334,8 +386,7 @@ abstract class Forecaster (y: VectorD, hh: Int, tRng: Range = null, hparam: Hype
      *  @param growing  whether the training grows as it roll or keeps a fixed size
      *  @param doPlot   whether to show the plots
      */
-    def rollValidate (rc: Int = 2, growing: Boolean = false, doPlot: Boolean = true): MatrixD =
-        val ftMat   = new MatrixD (hh, Fit.N_QoF)
+    def rollValidate (rc: Int = 5, growing: Boolean = false, doPlot: Boolean = false): MatrixD =
         banner (s"rollValidate: Evaluate ${modelName}'s QoF for horizons 1 to $hh:")
 
         val x       = getX                                                // some model use and input matrix, else null
@@ -346,17 +397,16 @@ abstract class Forecaster (y: VectorD, hh: Int, tRng: Range = null, hparam: Hype
         debug ("rollValidate", s"y.dim = ${y.dim}, train: tr_size = $tr_size; test: te_size = $te_size, rc = $rc")
 
         val yp = new VectorD (te_size)                                    // y-predicted over testing set (only for h=1)
-        for i <- 0 until te_size do                                       // iterate through testing set
-            val is = if growing then 0 else i
-            val t  = tr_size + i                                          // next time point to forecast
+        for i <- yp.indices do                                            // iterate through testing set
+            val (is, t) = (if growing then 0 else i, tr_size + i)         // start, next time point to forecast
             if i % rc == 0 then
                 val x_ = if x != null then x(is until t) else null
                 train (x_, y(is until t))                                 // retrain on sliding training set
-//          yp(i)  = predict (min (t+1, y.dim-1), y)                      // predict the next value (only for h=1)
+                debug ("rollValidate", s"retrain on i = $i, rc = $rc, b = $b")
+
             yp(i)  = predict (t, y)                                       // predict the next value (only for h=1)
             val yd = forecast (t, y)                                      // forecast the next hh-values, yf is updated
             debug ("rollValidate", s"yf(t, 0) = ${yf(t, 0)}, yp(i) = ${yp(i)}, yd = $yd")
-//          assert (yp(i) =~ yd(0))                                       // make sure h=1 forecasts agree with predictions
         end for
 
         val (t, yy) = align (tr_size, y)                                  // align vectors
@@ -370,28 +420,20 @@ abstract class Forecaster (y: VectorD, hh: Int, tRng: Range = null, hparam: Hype
 
             if doPlot then
                 new Plot (t, yy_, yfh, s"rollValidate: Plot yy_, yfh vs. t for $modelName @h = $h", lines = true)
-            mod_resetDF (te_size - h)                                     // reset degrees of freedom
-            val qof    = diagnose (yy_, yfh)
-            ftMat(h-1) = qof
-//          println (FitM.fitMap (qof, qoF_names))
         end for
-        if DO_REPORT then
-            println ("fitMap     qof = ")
-            println (Fit.showFitMap (ftMat.ᵀ))
-        yf
+        yf                                                                // return forecast matrix
     end rollValidate
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Perform In-Sample Testing, i.e., train and test on the same FULL data set.
      *  Return the prediction and the Quality of Fit.
-     *  @param skip    the number of initial time points to skip (due to insufficient past)
      *  @param showYf  whether to show the forecast matrix
      */
-    override def inSample_Test (skip: Int = 2, showYf: Boolean = false): (VectorD, VectorD) =
+    override def inSample_Test (showYf: Boolean = false): (VectorD, VectorD) =
         banner (s"In-Sample Test: $modelName")
         val (yp, qof) = trainNtest ()()                                   // train on full and test on full 
         forecastAll ()                                                    // forecast over all horizons
-        setSkip (skip)                                                    // diagnose: skip the first 'skip' rows
+        banner (s"diagnoseAll: $modelName")
         diagnoseAll (getY, getYf)                                         // compute metrics for all horizons
         if showYf then
             println (s"Final In-Sample Forecast Matrix yf = ${getYf}")
@@ -401,16 +443,18 @@ abstract class Forecaster (y: VectorD, hh: Int, tRng: Range = null, hparam: Hype
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Perform Train-n-Test (TnT) Testing, i.e., train and test with rolling validation.
-     *  @param skip    the number of initial time points to skip (due to insufficient past)
+     *  @note:  In order for forecasts to be compared with the whole test set (for h = 1)
+     *  the last p values from the training set are utilized as the test set.
      *  @param rc      the retraining cycles (how often to retrain the model)
      *  @param showYf  whether to show the forecast matrix
      */
-    def tnT_Test (skip: Int = 0, rc: Int = 2, showYf: Boolean = false): Unit =
+    def tnT_Test (rc: Int = 5, showYf: Boolean = false): Unit =
         banner (s"TnT Test: $modelName")
         trainNtest ()()                                                   // initial training updated by `rollValidate`
-        setSkip (skip)                                                    // diagnose: skip the first 'skip' rows
+        setSkip ()                                                        // diagnose: don't skip any rows
         rollValidate (rc)                                                 // TnT with Rolling Validation
-        diagnoseAll (getY,getYf, Forecaster.teRng (y.dim))                // only diagnose on the testing set
+        banner (s"diagnoseAll: $modelName")
+        diagnoseAll (getY, getYf, Forecaster.teRng (y.dim))               // only diagnose on the testing set
         if showYf then
             println (s"Final TnT Forecast Matrix yf = ${getYf}")
 //          println (s"Final TnT Forecast Matrix yf = ${getYf.shiftDiag}")
@@ -440,12 +484,13 @@ object Forecaster:
      *  @param b   the parameter/coefficient vector (e.g., φ for AR)
      *  @param y_  the actual time series values to use in making predictions
      *  @param t   the time point FROM WHICH to make prediction
-     */
+     *
     def rdot (b: VectorD, y_ : VectorD, t: Int): Double =
         var sum = 0.0
         for j <- b.indices do sum += b(j) * y_(max0 (t-j))             // add b_j y_t-j
         sum
     end rdot
+     */
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute a reverse dot product of the parameter vector b and a row of
@@ -455,7 +500,7 @@ object Forecaster:
      *  @param yf  the forecast matrix (time x horizons)
      *  @param r   the starting row in the forecast matrix (time)
      *  @param c   the starting column in the forecast matrix (horizon)
-     */
+     *
     def rdot (b: VectorD, yf: MatrixD, r: Int, c: Int): Double =
         var sum = 0.0
         for j <- b.indices do
@@ -464,6 +509,7 @@ object Forecaster:
                     else          b(j) * yf(max0 (r+k), 0))            // move up in column 0 (actual values)
         sum
     end rdot
+     */
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Point out the differences between two vectors/time series.

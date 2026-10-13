@@ -12,7 +12,6 @@ package modeling
 package forecasting
 
 import scalation.mathstat._
-import Example_Covid.loadData_y
 import Example_LakeLevels.y
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -32,8 +31,9 @@ import Example_LakeLevels.y
 class SimpleMovingAverage2 (y: VectorD, hh: Int, tRng: Range = null,
                            hparam: HyperParameter = SimpleMovingAverage2.hp,
                            bakcast: Boolean = false)
-  extends Forecaster (y, hh, tRng, hparam, bakcast)
-    with NoSubModels:
+      extends Forecaster (y, hh, tRng, hparam, bakcast)
+         with NoTrainModel
+         with NoSubModels:
 
     private val flaw = flawf ("SimpleMovingAverage2")                    // flaw function
     private val q    = hparam("q").toInt                                // take mean of last q values
@@ -181,6 +181,7 @@ end simpleMovingAverage2Test
 
 end simpleMovingAverage2Test2
 
+import Example_Covid.{clip, loadData_y}
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `simpleMovingAverage2Test3` main function tests the `SimpleMovingAverage2` class on real data:
@@ -190,13 +191,11 @@ end simpleMovingAverage2Test2
  */
 @main def simpleMovingAverage2Test3 (): Unit =
 
-    val yy = loadData_y ()
-//  val y  = yy                                                           // full
-    val y  = yy(0 until 116)                                              // clip the flat end
-    val hh = 6                                                            // maximum forecasting horizon
+    val (_, y) = clip ((null, loadData_y ()))
+    val hh     = 6                                                        // maximum forecasting horizon
 //  SimpleMovingAverage2.hp("q") = 3.0
 
-    val mod = new SimpleMovingAverage2 (y, hh)                             // create model for time series data
+    val mod = new SimpleMovingAverage2 (y, hh)                            // create model for time series data
     banner (s"In-ST Forecasts: ${mod.modelName} on COVID-19 Dataset")
     mod.trainNtest ()()                                                   // train and test on full dataset
 
@@ -215,12 +214,10 @@ end simpleMovingAverage2Test3
  */
 @main def simpleMovingAverage2Test4 (): Unit =
 
-    val yy = loadData_y ()
-//  val y  = yy                                                           // full
-    val y  = yy(0 until 116)                                              // clip the flat end
-    val hh = 6                                                            // maximum forecasting horizon
+    val (_, y) = clip ((null, loadData_y ()))
+    val hh     = 6                                                        // maximum forecasting horizon
 
-    val mod = new SimpleMovingAverage2 (y, hh)                             // create model for time series data
+    val mod = new SimpleMovingAverage2 (y, hh)                            // create model for time series data
     banner (s"TnT Forecasts: ${mod.modelName} on COVID-19 Dataset")
     mod.trainNtest ()()
 

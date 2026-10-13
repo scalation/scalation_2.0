@@ -148,7 +148,7 @@ import Tabular._
     val q6 = π("cname")(customer) - π("cname")(π("cname, bname")(customer ⋈ ("ccity == bcity", branch)) - π("cname, bname")(deposit))
     q6.show ()
 
-//    val q7 = π("cname")(π("cname, bname")(customer ⋈ deposit) ÷ π("cname, bname")(customer ⋈ ("ccity == bcity", branch)))
+//  val q7 = π("cname")(π("cname, bname")(customer ⋈ deposit) ÷ π("cname, bname")(customer ⋈ ("ccity == bcity", branch)))
     val q7a = π("cname, bname")(customer ⋈ deposit)
     val q7b = π("cname, bname")(customer ⋈ ("ccity == bcity", branch))
     val q7  = q7a ÷ q7b
@@ -165,6 +165,27 @@ import Tabular._
     val lb = σ("bcity == 'Athens'")(branch) ⋈ loan
     val q9 = π("cname")(σ("bname != bname2")(db ⋈ ("cname == cname", lb)))
     q9.show ()
+
+    banner ("Q10")
+
+//  val q10 = π("cname")(σ("ccity == 'Athens' && bname == 'Alps'")(customer ⋈ deposit))   // FIX - fails
+    val q10 = π("cname")(σ("ccity == 'Athens'")(σ("bname == 'Alps'")(customer ⋈ deposit)))
+    q10.show ()
+/*
+    val q10a = (customer ⋈ deposit)
+    q10a.show ()
+    val q10b = σ("bname == 'Alps'")(customer ⋈ deposit)
+    q10b.show ()
+    val q10c = σ("ccity == 'Athens'")(σ("bname == 'Alps'")(customer ⋈ deposit))
+    q10c.show ()
+    val q10d = π("cname")(σ("ccity == 'Athens'")(σ("bname == 'Alps'")(customer ⋈ deposit)))
+    q10d.show ()
+*/
+
+    banner ("Q11")
+
+    val q11 = π("bname")(deposit ⋈ loan)
+    q11.show ()
 
 end bankDB
 

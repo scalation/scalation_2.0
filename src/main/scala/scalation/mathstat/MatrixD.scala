@@ -105,6 +105,30 @@ class MatrixD (val dim:  Int,
      */
     val indices2 = 0 until dim2
 
+    /** The column names (defaults to Array ("0", "1", ...)
+     */
+    private var _colNames: Array [String] = indices2.map (_.toString).toArray
+
+    /** A Map from column names to column numbers/indices
+     */
+    private var colMap: Map [String, Int] = _colNames.zipWithIndex.toMap
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Getter method for _colNames.
+     */
+    inline def colNames: Array [String] = _colNames
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Setter method for _colNames.
+     *  @param cn  the new column names to use (e.g., from the headers in a .csv file)
+     */
+    def colNames_= (cn: Array [String]): Unit =
+        if cn.length != dim2 then flaw ("colNames_=", s"column name length ${cn.length} != dim2 = $dim2")
+        else
+            _colNames = cn
+            colMap    = cn.zipWithIndex.toMap
+    end colNames_=
+
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the row and column dimensions of this matrix.
      */
@@ -258,6 +282,20 @@ class MatrixD (val dim:  Int,
      */
     inline def apply (@unused all: Char, j: Int): VectorD =
         val v_ = v                                             // local access is faster
+        val a  = Array.ofDim [Double] (dim)
+        cfor (0, dim) { i => a(i) = v_(i)(j) }
+        new VectorD (dim, a)
+    end apply
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the j-th COLUMN of this matrix as an independent vector.
+     *  usage: x(?, 2)
+     *  @param all  use the all rows indicator ?
+     *  @param jn   the column name
+     */
+    inline def apply (@unused all: Char, jn: String): VectorD =
+        val v_ = v                                             // local access is faster
+        val j  = colMap(jn)                                    // map column name jn to column index j
         val a  = Array.ofDim [Double] (dim)
         cfor (0, dim) { i => a(i) = v_(i)(j) }
         new VectorD (dim, a)
@@ -1584,8 +1622,9 @@ class MatrixD (val dim:  Int,
      *  VectorD (for j <- indices2 yield apply(?, j).max)
      */
     def max: VectorD =
-        val a = Array.ofDim [Double] (dim2)
-        cfor (0, dim2) { j => a(j) = apply(?, j).max }
+        val a  = Array.ofDim [Double] (dim2)
+        val vt = transpose                                   // transpose to access rows, not columns
+        cfor (0, dim2) { j => a(j) = vt(j).max }
         new VectorD (a.size, a)
     end max
 
@@ -1604,8 +1643,9 @@ class MatrixD (val dim:  Int,
      *  VectorD (for j <- indices2 yield apply(?, j).min)
      */
     def min: VectorD = 
-        val a = Array.ofDim [Double] (dim2)
-        cfor (0, dim2) { j => a(j) = apply(?, j).min }
+        val a  = Array.ofDim [Double] (dim2)
+        val vt = transpose                                   // transpose to access rows, not columns
+        cfor (0, dim2) { j => a(j) = vt(j).min }
         new VectorD (a.size, a)
     end min
 
@@ -1636,8 +1676,9 @@ class MatrixD (val dim:  Int,
      *  @see en.wikipedia.org/wiki/Matrix_norm
      */
     def norm1: Double = 
-        val a = Array.ofDim [Double] (dim2)
-        cfor (0, dim2) { j => a(j) = apply(?, j).norm1 }
+        val a  = Array.ofDim [Double] (dim2)
+        val vt = transpose                                   // transpose to access rows, not columns
+        cfor (0, dim2) { j => a(j) = vt(j).norm1 }
         a.max
     end norm1
 
@@ -1672,7 +1713,8 @@ class MatrixD (val dim:  Int,
      */
     def mean: VectorD = 
         val a = Array.ofDim [Double] (dim2)
-        cfor (0, dim2) { j => a(j) = apply(?, j).mean }
+        val vt = transpose                                   // transpose to access rows, not columns
+        cfor (0, dim2) { j => a(j) = vt(j).mean }
         new VectorD (a.size, a)
     end mean
 
@@ -1691,7 +1733,8 @@ class MatrixD (val dim:  Int,
      */
     def variance: VectorD =
         val a = Array.ofDim [Double] (dim2)
-        cfor (0, dim2) { j => a(j) = apply(?, j).variance }
+        val vt = transpose                                   // transpose to access rows, not columns
+        cfor (0, dim2) { j => a(j) = vt(j).variance }
         new VectorD (a.size, a)
     end variance 
 
@@ -2570,4 +2613,24 @@ end matrixDTest6
     println (s"c *++ x   = ${c convf x}")                // *++    full convolution, with reversal
 
 end matrixDTest7
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `matrixDTest8` main function tests the `MatrixD` class.  Test the `colNames` 
+ *  getter and setter methods,
+ *  > runMain scalation.mathstat.matrixDTest8
+ */
+@main def matrixDTest8 (): Unit =
+
+    import scala.runtime.ScalaRunTime.stringOf
+
+    val fileName = "covid_19_weekly.csv"
+
+    val (data, header) = MatrixD.loadH (fileName, 1)             // load data: skip first row (header) + trim first column
+    data.colNames      = header                                  // assign header names to colNames
+    println (data.dims)                                          // check the matrix dimensions
+    println (stringOf (header))                                  // print the header
+    for hn <- header do println (data(?, hn))                    // print each column extracted via header name (hn)
+
+end matrixDTest8
 

@@ -337,6 +337,34 @@ end median3
 
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `RangeOps` object provides extension methods for adding/subtracting ranges and integers.
+ */
+object RangeOps:
+
+    extension (r: Range)
+
+        //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+        /** Add a range and an integer, r + i to create a new range.
+         *  @usage:  (2 to 4) + 3 = (5 to 7)
+         *  @param i  the amount to add to the range start and end
+         */
+        def + (i: Int): Range = (r.start + i) to (r.end + i) by r.step
+        def - (i: Int): Range = (r.start - i) to (r.end - i) by r.step
+
+    extension (i: Int)
+
+        //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+        /** Add an integer and a range, i + r to create a new range.
+         *  @usage:  3 + (2 to 4) = (5 to 7)
+         *  @param r  the range to add
+         */
+        inline def + (r: Range): Range = (i + r.start) to (i + r.end) by r.step
+        inline def - (r: Range): Range = (i - r.end) to (i - r.start) by r.step
+
+end RangeOps
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `cforTest` main function tests the cfor loops that are faster replacements for Scala's
  *  for-comprehension.
  *  Run this code for performance results.  Note, due to JIT, reordering the code may change

@@ -18,8 +18,6 @@ import scala.annotation.unused
 
 import VectorDOps._
 
-type VecMat = VectorD | MatrixD
-
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `⚬` extension method performs function composition f ⚬ g.
  *  The composition f ⚬ g = f (g (.)) maps A -g-> B -f-> R.
@@ -35,24 +33,6 @@ extension [A, B, R] (f: B => R)
 
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `mu_sig` and `min_max` extend the methods defined for vectors and matrices
- *  to work for types that are either `VectorD` or `MatrixD`.
- *  @param x  the argument that is either a `VectorD` or `MatrixD`.
- */
-extension (x: VecMat)
-
-    def mu_sig: VecMat =
-        x match
-            case xV: VectorD => xV.mu_sig
-            case xM: MatrixD => xM.mu_sig
-
-    def min_max: VecMat =
-        x match
-            case xV: VectorD => xV.min_max
-            case xM: MatrixD => xM.min_max
-
-
-//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `Transform` object defines hyper-parameters for Transforms.
  */
 object Transform:
@@ -65,22 +45,24 @@ object Transform:
     hp += ("c",  -1.0,  -1.0)                          // the reciprocal power
     hp += ("f",   0.1,   0.1)                          // the frequency for cos, sin
     hp += ("l",   0.4,   0.4)                          // the Box-Cox lambda (l)
+    hp += ("mx",  5.0,   5.0)                          // the maximum for the vectors (or multiples there of)
     hp += ("p",   1.5,   1.5)                          // the real power
     hp += ("q",   0.67,  0.67)                         // the rational power
     hp += ("r",   0.5,   0.5)                          // the root
     hp += ("s",   0.0,   0.0)                          // the amount of shift
     hp += ("ss",  1.0,   1.0)                          // the amount of shift for log
 
-    val a  = hp("a").toDouble
-    val an = hp("an").toDouble
-    val c  = hp("c").toDouble
-    val f  = hp("f").toDouble
-    val l  = hp("l").toDouble
-    val p  = hp("p").toDouble
-    val q  = hp("q").toDouble
-    val r  = hp("r").toDouble
-    val s  = hp("s").toDouble
-    val ss = hp("ss").toDouble
+    def a: Double  = hp("a").toDouble
+    def an: Double = hp("an").toDouble
+    def c: Double  = hp("c").toDouble
+    def f: Double  = hp("f").toDouble
+    def l: Double  = hp("l").toDouble
+    def mx: Double = hp("mx").toDouble
+    def p: Double  = hp("p").toDouble
+    def q: Double  = hp("q").toDouble
+    def r: Double  = hp("r").toDouble
+    def s: Double  = hp("s").toDouble
+    def ss: Double = hp("ss").toDouble
 
 end Transform
 
@@ -113,6 +95,14 @@ enum TransformT (val name: String, val form: VecMat => Transform, val wlu: Trans
     case PowR   extends TransformT ("PowRForm",                                                 // x -> (x + s)↑q
                                     x => PowRForm (x.asInstanceOf [VectorD]),
                                     new TransformS ((s, q), (0.0, 0.1), (10.0, 0.9)))           // PowRForm rational q in [0.1, 0.9]
+
+    case DQuad  extends TransformT ("DQuadForm",                                                // x -> x^2-
+                                    x => DQuadForm (x.asInstanceOf [VectorD]),
+                                    new TransformS ((0.0, mx), (0.0, -1E9), (0.0, 1E9)))        // DQuadForm dampens quad (mx for max) 
+
+    case DIQuad extends TransformT ("DIQuadForm",                                               // x -> x^-2+
+                                    x => DIQuadForm (x.asInstanceOf [VectorD]),
+                                    new TransformS ((0.0, mx), (0.0, -1E9), (0.0, 1E9)))        // DIQuadForm dampens inverse quad (mx for max) 
 
     case Boxcox extends TransformT ("BoxcoxForm",                                               // x -> (x^l - 1) / l
                                     x => BoxcoxForm (x.asInstanceOf [VectorD]),
@@ -340,6 +330,42 @@ class PowRForm (w: VectorD = VectorD (s, q)) extends Transform (w):
     override def df (x: VectorD): MatrixD = MatrixD (((x + b_(0)) ↑ (r - 1)) * r.toDouble,
                                                      f(x) * (x + b_(0)).log).ᵀ
 end PowRForm
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `DQuadForm` class applies a mx = b_(1) dampened quadratic-transformation.
+ *  Currently b_(0) usually shift s is currently unused.
+ *
+ *       x -> f(y) = y * |y| / sqrt(1 + k * y^2)     where k = 1 / mx^2
+ *
+ *  @param w  the transform argument vector (w -> b)
+ */
+class DQuadForm (w: VectorD = VectorD (0.0, mx)) extends Transform (w):
+
+    def f  (x: MatrixD): MatrixD = x.mmap (DampenedQuad.f (_, b_(1)))
+    def fi (y: MatrixD): MatrixD = y.mmap (DampenedQuad.fi (_, b_(1)))
+    override def df (x: VectorD): MatrixD =
+        MatrixD (new VectorD (x.dim),                   // df/db_(0) = 0  (b_(0) = s is unused by f)
+                 DampenedQuad.df_mx (x, b_(1))).ᵀ       // df/db_(1) = df/dmx
+end DQuadForm
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `DQuadForm` class applies a mx = b_(1) dampened inverse quadratic-transformation.
+ *  Currently b_(0) usually shift s is currently unused.
+ *
+ *       x -> f(y) = y * |y| / sqrt(1 + k * y^2)     where k = 1 / mx^2
+ *
+ *  @param w  the transform argument vector (w -> b)
+ */
+class DIQuadForm (w: VectorD = VectorD (0.0, mx)) extends Transform (w):
+
+    def f  (x: MatrixD): MatrixD = x.mmap (DampenedIQuad.f (_, b_(1)))
+    def fi (y: MatrixD): MatrixD = y.mmap (DampenedIQuad.fi (_, b_(1)))
+    override def df (x: VectorD): MatrixD =
+        MatrixD (new VectorD (x.dim),                   // df/db_(0) = 0  (b_(0) = s is unused by f)
+                 DampenedIQuad.df_mx (x, b_(1))).ᵀ       // df/db_(1) = df/dmx
+end DIQuadForm
 
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -572,6 +598,11 @@ end transformTest
 
     banner ("PowRForm Transformation: x↑.67")
     form = PowR.form (PowR.wlu.w)
+    form.testM (x)
+    println (s"df: ${form.df (x)}")
+
+    banner ("DQuadForm Transformation: x↑2-")
+    form = DQuad.form (DQuad.wlu.w)
     form.testM (x)
     println (s"df: ${form.df (x)}")
 

@@ -12,6 +12,8 @@ package scalation
 package modeling
 package forecasting
 
+import scala.runtime.ScalaRunTime.stringOf
+
 import scalation.mathstat._
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -19,7 +21,8 @@ import scalation.mathstat._
  *  (AR) models.  AR models are often used for forecasting.
  *  Given time series data stored in vector y, its next value y_t = combination of last p values.
  *
- *      y_t = b dot [1, y_t-1, ..., y_t-p) + e_t
+ *      y_t = δ +  b ∙ [ y_t-p, ... y_t-2, y_t-1 ] + e_t
+ *      y_t = δ + b_0 y_t-p + ... + b_p-2 y_t-2 + b_p-1 y_t-1 + e_t
  *
  *  where y_t is the value of y at time t and e_t is the residual/error term.
  *  @param y         the response vector (time series data) 
@@ -27,7 +30,7 @@ import scalation.mathstat._
  *  @param tRng      the time range, if relevant (time index may suffice)
  *  @param hparam    the hyper-parameters (defaults to AR.hp)
  *  @param bakcast   whether a backcasted value is prepended to the time series (defaults to false)
- *  @param adjusted  whether in `Correlogram` when calculating auto-covarainces/auto-correlations
+ *  @param adjusted  whether in `Correlogram` when calculating auto-covariances/auto-correlations
  *                   to adjust to account for the number of elements in the sum Σ (or use dim-1)
  *                   @see `VectorD.acov`
  *  @oaram tForm     the transformation applied
@@ -40,74 +43,79 @@ class AR (y: VectorD, hh: Int, tRng: Range = null,
          with Correlogram (y, adjusted)
          with NoSubModels:
 
-    private   val flaw = flawf ("AR")                                   // flaw function
-    protected val p    = hparam("p").toInt                              // use the last p values
-    protected var δ    = NO_DOUBLE                                      // drift/intercept/constant term
+    private   val flaw = flawf ("AR")                                  // flaw function
+    protected val p    = hparam("p").toInt                             // use the last p values
+    protected var δ    = NO_DOUBLE                                     // drift/intercept/constant term
 
     _modelName = s"AR_$p"
-    yForm      = tForm                                                  // defined in `Fit` via hierarchy
+    yForm      = tForm                                                 // defined in `Fit` via hierarchy
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Train/fit an `AR` model to the times-series data in vector y_.
      *  Estimate the coefficient vector b (φ) for a p-th order Auto-Regressive AR(p) model.
      *  Uses Durbin-Levinson Algorithm (in `Correlogram`) to determine the coefficients.
-     *  The b (φ) vector is p-th row of psi matrix (ignoring the first (0th) column).
+     *  The b (φ) vector is p-th row of psi matrix (ignoring the first (0t)ŷ.
      *  @param x_null  the data/input matrix (ignored, pass null)
      *  @param y_      the training/full response vector (e.g., full y)
      */
     override def train (x_null: MatrixD, y_ : VectorD): Unit =
-        makeCorrelogram (y_)                                            // correlogram computes psi matrix
-        b = psiM(p)(1 until p+1).reverse                                // coefficients = p-th row, columns 1, 2, ... p
-        δ = statsF.mu * (1 - b.sum)                                     // compute drift/intercept
+        makeCorrelogram (y_)                                           // correlogram computes psi matrix
+        b = psiM(p)(1 until p+1).reverse                               // coefficients = p-th row, columns 1, 2, ... p
+        δ = statsF.mu * (1 - b.sum)                                    // compute drift/intercept
     end train
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Return the parameter vector for the AR(p) model.
+    /** Return the parameter vector for the AR(p) model (drift δ, b = φ).
      */
     override def parameter: VectorD = δ +: b
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Predict a value for y_t using the 1-step ahead forecast.
+     *  @note: order of variables is set to be compatible with `ARY`.
      *
-     *      y_t = δ +  b_0 y_t-1 + b_1 y_t-2 + ... + b_p-1 y_t-p
+     *      ŷ_t = δ + b ∙ [ y_t-p, ... y_t-2, y_t-1 ]
+     *      ŷ_t = δ + b_0 y_t-p + ... + b_p-2 y_t-2 + b_p-1 y_t-1
      *
      *  @param t   the time point being predicted
      *  @param y_  the actual values to use in making predictions
      */
     override def predict (t: Int, y_ : VectorD): Double =
-//      δ + rdot (b, y_, t-1)                                          // old way
-        val x = y_.prior (p, t)                                        // x = [ y_t-p, ... y_t-1 ]
-        δ + (b dot x)
+        val x = y_.lag (p, t)                                          // x = [ y_t-p, ... y_t-2, y_t-1 ]
+        δ + b ∙ x                                                      // drift + AR terms, b = φ
     end predict
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Forge a vector from va;ues in the FORECAST MATRIX yf. 
+    /** Forge a x-vector from old enough actual lagged y-values and use previously forecasted
+     *  values from the FORECAST MATRIX yf for the rest. 
+     *
+     *  h = 2: ŷ_t+1 form x = [ y_t-p, ... y_t-3, y-2, ŷ_t-1 ] 
+     *  h = 3: ŷ_t+2 form x = [ y_t-p, ... y_t-3, ŷ-2, ŷ_t-1 ] 
+     *
      *  @patam yf  the forecast matrix
      *  @param t   the time point from which to make forecasts
      *  @param h   the forecasting horizon
      */
     def forge (yf: MatrixD, t: Int, h: Int): VectorD =
-        val x_act   = yf(?, 0).prior (max0 (p-h+1), t)                 // get actual lagged y-values (endogenous)
+        val x_act   = yf(?, 0).lag (max0 (p-h+1), t)                   // get actual lagged y-values (endogenous)
         val x_fcast = yf(t)(1 until h)                                 // get forecasted y-values
-        x_act ++ x_fcast
+        x_act ++ x_fcast                                               // x-vector from old actual and forecasted values
     end forge
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Produce a vector of size hh, h = 1 to hh-steps ahead forecasts for the model,
      *  i.e., forecast the following time points:  t+1, ..., t+h.
-     *  Intended to work with rolling validation (analog of predict method).
+     *  Intended to work with ROLLING VALIDATION (analog of predict method).
      *  @param t   the time point from which to make forecasts
      *  @param y_  the actual values to use in making predictions
      */
     override def forecast (t: Int, y_ : VectorD = yb): VectorD =
-        val yh = new VectorD (hh)                                       // hold forecasts for each horizon
+        val yh = new VectorD (hh)                                      // hold forecasts for each horizon
         for h <- 1 to hh do
-//          val pred = δ + rdot (b, yf, t, h-1)                         // slide in prior forecasted values
-            val x = forge (yf, t, h)
-            val pred = δ + (b dot x)
-            yf(t, h) = pred                                             // record in forecast matrix
-            yh(h-1)  = pred                                             // record forecasts for each horizon
-        yh                                                              // return forecasts for all horizons
+            val x = forge (yf, t, h)                                   // get actual and forecasted values
+            val pred = δ + b ∙ x                                       // make forecast prediction
+            yf(t, h) = pred                                            // record in forecast matrix
+            yh(h-1)  = pred                                            // record forecasts for each horizon
+        yh                                                             // return forecasts for all horizons
     end forecast
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -121,12 +129,44 @@ class AR (y: VectorD, hh: Int, tRng: Range = null,
     override def forecastAt (h: Int, y_ : VectorD = yb): VectorD =
         if h < 2 then flaw ("forecastAt", s"horizon h = $h must be at least 2")
 
-        for t <- y_.indices do                                          // make forecasts over all time points for horizon h
-//          yf(t, h) = δ + rdot (b, yf, t, h-1)                         // record in forecast matrix (old way)
+        for t <- y_.indices do                                         // make forecasts over all time points for horizon h
             val x = forge (yf, t, h)
-            yf(t, h) = δ + (b dot x)                                    // record in forecast matrix
-        yf(?, h)                                                        // return the h-step ahead forecast vector
+            yf(t, h) = δ + b ∙ x                                       // record in forecast matrix
+        yf(?, h)                                                       // return the h-step ahead forecast vector
     end forecastAt
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Produce a QoF SUMMARY for a model with diagnostics for each predictor x_j
+     *  and the overall Quality of Fit (QoF).
+     *  FIX - numbers look wrong
+     *  @param qof    the Quality of Fit vector (x_ in regular summary)
+     *  @param fname  the array of feature/variable names
+     *  @param b      the parameters/coefficients for the model
+     *  @param vifs   the Variance Inflation Factors (VIFs)
+     */
+    def summary_ (qof: VectorD, fname: Array [String] = null,
+                  b: VectorD = parameter,
+                  vifs: VectorD = null): String =
+
+        val (_sse, _rse, _rSq, _rSqBar) = (qof(QoF.sse.ordinal), qof(QoF.rse.ordinal), qof(QoF.rSq.ordinal), qof(QoF.rSqBar.ordinal))
+
+        val stdErr = stdErrAR (p + 1, _sse, df)                        // standard errors of coefficients
+
+        val stats  = (sumCoeff (b, stdErr, vifs), fmt(_rse), fmt(_rSq), fmt(_rSqBar))
+
+        (if fname != null then "fname = " + stringOf (fname) else "") +
+        s"""
+SUMMARY
+    Parameters/Coefficients:
+    Var      Estimate    Std. Error \t t value \t Pr(>|t|) \t VIF
+----------------------------------------------------------------------------------
+${stats._1}
+    Residual standard error: ${stats._2} on $df degrees of freedom
+    Multiple R-squared:  ${stats._3},   Adjusted R-squared:  ${stats._4}
+    F-statistic: $fStat_ on $dfr and $df DF,  p-value: $p_fS_
+----------------------------------------------------------------------------------
+        """
+    end summary_
 
 end AR
 
@@ -137,7 +177,7 @@ end AR
  */
 object AR:
 
-    /** Base hyper-parameter specification for the `AR`, ARMA, ARIMA, `SARIMA` and  `SARIMAX` classes
+    /** Base hyper-parameter specification for the `AR`, ARMA, ARIMA, `SARIMA` and `ARX*` classes
      */
     val hp = new HyperParameter
     hp += ("p", 1, 1)                               // number of Auto-Regressive (AR) parameters
@@ -147,8 +187,11 @@ object AR:
     hp += ("D", 1, 1)                               // number of Seasonal Differences to take
     hp += ("Q", 1, 1)                               // number of Seasonal Moving-Average (MA) parameters
     hp += ("s", 7, 7)                               // length of the Seasonal Period
-    hp += ("a", 1, 1)                               // the first lag for the eXogenous variables
-    hp += ("b", 2, 2)                               // the last lag for the eXogenous variables
+
+    hp += ("px", 1, 1)                              // number of lags for the eXogenous variables
+    hp += ("spec", 1, 1)                            // trend terms: 0 - implicit constant via centering, 1 - linear, 2 - quadratic, 3 - cubic
+    hp += ("crx", 0, 0)                             // 0 - no ENDO-EXO cross terms, 1 - include ENDO-EXO cross terms
+    hp += ("nneg", 1, 1)                            // 0 - unrestricted, 1 - predictions must be non-negative
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Create a `AR` object.
@@ -157,7 +200,7 @@ object AR:
      *  @param tRng    the time range, if relevant (time index may suffice)
      *  @param hparam  the hyper-parameters
      *  @param bakcast   whether a backcasted value is prepended to the time series (defaults to false)
-     *  @param adjusted  whether in `Correlogram` when calculating auto-covarainces/auto-correlations
+     *  @param adjusted  whether in `Correlogram` when calculating auto-covariances/auto-correlations
      *                   to adjust to account for the number of elements in the sum Σ (or use dim-1)
      *                   @see `VectorD.acov`
      */
@@ -189,7 +232,6 @@ object AR:
 
 end AR
 
-import Example_Covid.loadData_y
 import Example_LakeLevels.y
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -229,12 +271,13 @@ end aRTest
     banner (s"TnT Forecasts: ${mod.modelName} on LakeLevels Dataset")
     mod.trainNtest ()()                                                   // train and test on full dataset
 
-    mod.setSkip (0)                                                       // can use values from training set to not skip any in test
+    mod.setSkip ()                                                        // can use values from training set to not skip any in test
     mod.rollValidate ()                                                   // TnT with Rolling Validation
     println (s"Final TnT Forecast Matrix yf = ${mod.getYf}")
 
 end aRTest2
 
+import Example_Covid.{clip, loadData_y}
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `aRTest3` main function tests the `AR` class on real data:
@@ -244,23 +287,16 @@ end aRTest2
  */
 @main def aRTest3 (): Unit =
 
-    val yy = loadData_y ()
-//  val y  = yy                                                           // full
-    val y  = yy(0 until 116)                                              // clip the flat end
-    val hh = 6                                                            // maximum forecasting horizon
+    val (_, y) = clip ((null, loadData_y ()))
+    val hh     = 6                                                        // maximum forecasting horizon
 
     for p <- 1 to 5 do
         AR.hp("p") = p                                                    // number of AR terms
         val mod = new AR (y, hh)                                          // create model for time series data
 //      val mod = new AR (y, hh, adjusted = false)                        // use conventional rho estimation
         banner (s"In-ST Forecasts: ${mod.modelName} on COVID-19 Dataset")
-        mod.trainNtest ()()                                               // train and test on full dataset
-
-//      mod.setSkip (p)                                                   // full AR-formula available when t >= p
-        mod.forecastAll ()                                                // forecast h-steps ahead (h = 1 to hh) for all y
-        mod.diagnoseAll (y, mod.getYf)
-//      println (s"Final In-ST Forecast Matrix yf = ${mod.getYf}")
-//      println (s"Final In-ST Forecast Matrix yf = ${mod.getYf.shiftDiag}")
+        val qof = mod.inSample_Test ()._2                                 // In-sample Testing
+        println (mod.summary_ (qof))                                      // statistical summary of fit
     end for
 
 end aRTest3
@@ -274,21 +310,14 @@ end aRTest3
  */
 @main def aRTest4 (): Unit =
 
-    val yy = loadData_y ()
-//  val y  = yy                                                           // full
-    val y  = yy(0 until 116)                                              // clip the flat end
-    val hh = 6                                                            // maximum forecasting horizon
+    val (_, y) = clip ((null, loadData_y ()))
+    val hh     = 6                                                        // maximum forecasting horizon
 
     for p <- 1 to 5 do
         AR.hp("p") = p                                                    // number of AR terms
         val mod = new AR (y, hh)                                          // create model for time series data
         banner (s"TnT Forecasts: ${mod.modelName} on COVID-19 Dataset")
-//      mod.setSkip (p)                                                   // may wish to skip until all p past values are available
-        mod.trainNtest ()()
-
-        mod.setSkip (0)                                                   // can use values from training set to not skip any in test
-        mod.rollValidate ()                                               // TnT with Rolling Validation
-        println (s"Final TnT Forecast Matrix yf = ${mod.getYf}")
+        mod.tnT_Test ()                                                   // Train and Test with Rolling Validation
     end for
 
 end aRTest4

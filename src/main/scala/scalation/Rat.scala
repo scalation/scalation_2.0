@@ -689,6 +689,7 @@ end Rat
     println ("c / d     = " + (c / d))
     println ("c ~^ 2L   = " + (c ~^ 2L))
     println ("a ~^ b    = " + (a ~^ b))
+    println ("(-2.0)↑c  = " + (2 ↑ c))
     println ("c.abs     = " + c.abs)
     println ("a.sqrt    = " + a.sqrt)
     println ("c < d     = " + (c < d))

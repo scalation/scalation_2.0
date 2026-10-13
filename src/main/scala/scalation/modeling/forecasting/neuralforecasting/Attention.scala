@@ -402,7 +402,8 @@ end patch
  */
 @main def attentionTest5 (): Unit =
 
-    import Example_Covid.y
+    import Example_Covid.{clip, loadData_y}
+    val (_, y) = clip ((null, loadData_y ()))
 
     val ps = 4
     val x  = patch (y, 4)

@@ -310,10 +310,7 @@ end regressionMVTest3
     banner ("Feature Selection Technique: Forward")
     val (cols, rSq) = mod.forwardSelAll ()                       // R^2, R^2 bar, smape, R^2 cv
 //  val (cols, rSq) = mod.backwardElimAll ()                     // R^2, R^2 bar, smape, R^2 cv
-    val k = cols.size
-    println (s"k = $k, n = ${ox.dim2}")
-    new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for ${mod.modelName}", lines = true)
-    println (s"rSq = $rSq")
+    mod.reportSelection (cols, rSq)
 
 end regressionMVTest4
 
@@ -343,10 +340,7 @@ end regressionMVTest4
     for tech <- SelectionTech.values do
         banner (s"Feature Selection Technique: $tech")
         val (cols, rSq) = mod.selectFeatures (tech)              // R^2, R^2 bar, smape, R^2 cv
-        val k = cols.size
-        println (s"k = $k, n = ${ox.dim2}")
-        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for ${mod.modelName} with $tech", lines = true)
-        println (s"$tech: rSq = $rSq")
+        mod.reportSelection (cols, rSq)
     end for
 
 end regressionMVTest5

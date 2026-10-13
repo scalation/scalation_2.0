@@ -267,7 +267,7 @@ import Perceptron.hp
 
     println (s"xy = $xy")
     val (x, y) = (xy.not(?, 3), xy(?, 3))                           // input matrix, output/response vector
-    val sst = (y - y.mean).normSq                                   // sum of squares total
+    val sst    = y.center.normSq                                    // sum of squares total
     println (s"sst = $sst")
 
     val η   = 2.0 
@@ -420,12 +420,9 @@ end perceptronTest3
 //  println (mod.summary ())                                        // parameter/coefficient statistics
 
     banner ("Feature Selection Technique: Forward")
-    val (cols, rSq) = mod.forwardSelAll ()                          // R^2, R^2 bar, R^2 cv
-//  val (cols, rSq) = mod.backwardElimAll ()                        // R^2, R^2 bar, R^2 cv
-    val k = cols.size
-    println (s"k = $k, n = ${x.dim2}")
-    new PlotM (null, rSq, Regression.metrics, "R^2 vs n for Perceptron", lines = true)
-    println (s"rSq = $rSq")
+    val (cols, rSq) = mod.forwardSelAll ()                          // R^2, R^2 bar, sMAPE, R^2 cv
+//  val (cols, rSq) = mod.backwardElimAll ()                        // R^2, R^2 bar, sMAPE, R^2 cv
+    mod.reportSelection (cols, rSq)
 
 end perceptronTest4
 
@@ -453,11 +450,8 @@ end perceptronTest4
 
     for tech <- SelectionTech.values do
         banner (s"Feature Selection Technique: $tech")
-        val (cols, rSq) = mod.selectFeatures (tech)                   // R^2, R^2 bar, R^2 cv
-        val k = cols.size
-        println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Perceptron with $tech", lines = true)
-        println (s"$tech: rSq = $rSq")
+        val (cols, rSq) = mod.selectFeatures (tech)                   // R^2, R^2 bar, sMAPE, R^2 cv
+        mod.reportSelection (cols, rSq)
     end for
 
 end perceptronTest5
@@ -484,7 +478,7 @@ end perceptronTest5
                               1.0,  1.0,  1.0,  0.5)
     val x   = xy.not (?, 3)                                         // matrix for predictor variables
     val y   = xy(?, 3)                                              // vector for response variable
-    val sst = (y - y.mean).normSq                                   // sum of squares total
+    val sst = y.center.normSq                                       // sum of squares total
 
     val mod = new Regression (x, y)
     mod.inSample_Test ()                                            // train and test the model

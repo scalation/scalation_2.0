@@ -46,7 +46,7 @@ object LBFGS_B:
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Create an `LBFGS_B` object with a given dimensionality and default lower
-     *  and upper bounds of -1 and 1, respectively.
+     *  and upper bounds of -2 and 2, respectively.
      *  @param f        the objective function to be minimized
      *  @param n        the dimensionality of the search space
      *  @param g        the constraint function to be satisfied, if any
@@ -59,7 +59,7 @@ object LBFGS_B:
                ineq: Boolean = true, exactLS: Boolean = false,
                l_u_ : Bounds = null): LBFGS_B =
     
-        val l_u = if l_u_ == null then (VectorD.fill (n)(-1), VectorD.fill (n)(1))
+        val l_u = if l_u_ == null then (VectorD.fill (n)(-2), VectorD.fill (n)(2))
                   else l_u_
         new LBFGS_B (f, g, ineq, exactLS, l_u)
     end apply
@@ -70,7 +70,7 @@ object LBFGS_B:
      *  @param lo  scalar lower bounds for all input parameters
      *  @param up  scalar upper bounds for all input parameters
      */
-    inline def makeBounds (n: Int, lo: Double, up: Double): Bounds =
+    def makeBounds (n: Int, lo: Double, up: Double): Bounds =
         (VectorD.fill (n)(lo),
          VectorD.fill (n)(up))
     end makeBounds
@@ -109,7 +109,10 @@ class LBFGS_B (f: FunctionV2S, g: FunctionV2S = null,
     private var ww, mm: MatrixD = null                            // workspace matrices
     private var theta           = 0.0                             // a scaling parameter
     private var dim             = 0                               // dimension of the input vector
-    private var hs              = 5                               // history size, number of historical vectors to store
+    private var hs              = 10                              // history size, number of historical vectors to store, try 3 to 10 (HP)
+
+    calculus.Differential.resetH (6E-6)                           // use larger step size for computing diffentials
+                                                                  // @see `calculus.Differential
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Sort pairs (k, v) according to v into ascending order.
@@ -360,9 +363,9 @@ class LBFGS_B (f: FunctionV2S, g: FunctionV2S = null,
         val initStep = max (1.0e-12, min (alphaInit, 1.0))
         val lsPrms = LBFGSLineSearchPrms (defaultStep   = initStep,
                                           minStep       = 1.0e-15,
-                                          maxStep       = 1.0,
+                                          maxStep       = 1.0e8,             // maximum step size, try 1 to 1e8 (HP)
                                           ftol          = 1.0e-4,
-                                          gtol          = 1.0e-2,
+                                          gtol          = 0.9,               // gradient tolerance, try .01 to .90 (HP)
                                           xtol          = 1.0e-15,
                                           maxLineSearch = 20)
 
@@ -440,8 +443,8 @@ class LBFGS_B (f: FunctionV2S, g: FunctionV2S = null,
         var (x, gr)  = (x0, ∇ (fg)(x0))
         var fv       = fg(x)
         var mgn      = 0.0
-        var count    = 0
-        val countMax = 10
+        var count    = 0                                        // count the number of times the opt is stuck
+        val countMax = 20                                       // limit on the the number of times, try 10 - 20 (HP)
 
         breakable {
             for k <- 1 to MAX_IT do

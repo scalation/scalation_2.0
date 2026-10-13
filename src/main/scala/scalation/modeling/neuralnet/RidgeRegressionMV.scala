@@ -9,8 +9,6 @@
  *                  Multi-variate Multiple Linear Regression
  */
 
-// FIX: use cholesky. QR does not work
-
 package scalation
 package modeling
 package neuralnet
@@ -47,7 +45,7 @@ import scalation.mathstat._
  *                     (augment with a first column of ones to include intercept in model)
  *  @param y       the response/output m-by-ny matrix
  *  @param fname_  the feature/variable names (defaults to null)
- *  @param hparam  the hyper-parameters (defaults to Regression.hp)
+ *  @param hparam  the hyper-parameters (defaults to RidgeRegression.hp)
  *  @param xℱ      the transformation applied to x (e.g., Center or Norm)
  *  @param yℱ      the transformation applied to y (e.g., Center)
  */
@@ -67,29 +65,45 @@ class RidgeRegressionMV (x: MatrixD, y: MatrixD, fname_ : Array [String] = null,
 //                          if hparam("lambda") <= 0.0 then findLambda._1
 //                          else hparam ("lambda").toDouble
 
-    _modelName = "RidgeRegressionMV_${lambda}"
+    _modelName = s"RidgeRegressionMV_${lambda}"
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Create a solver for the Normal Equations using the selected factorization algorithm.
      *  @param x_  the matrix to be used by the solver
      */
     private def solver (x_ : MatrixD): Factorization =
+        def xtx_λ: MatrixD =                                             // only normal-equation branches need X'X
+            val xtx_ = x_.ᵀ * x_
+            for i <- xtx_.indices do xtx_(i, i) += lambda                // add lambda to the diagonal
+            xtx_
 
-        val xtx  = x_.transpose * x_                                     // pre-compute X.t * X
+        algorithm match                                                  // select the factorization technique
+            case "Fac_QR" => val eyn = MatrixD.eye (x_.dim2, x_.dim2)    // SQUARE n-by-n identity
+                             Fac_QR (x_ ++ (eyn * sqrt (lambda)))        // augmented (m+n)-by-n system
+//          case "Fac_SVD"      => new Fac_SVD (x_)                      // Singular Value Decomposition - FIX
+            case "Fac_Cholesky" => new Fac_Cholesky (xtx_λ)              // Cholesky Factorization
+            case "Fac_LU"       => new Fac_LU (xtx_λ)                    // LU Factorization
+            case _              => new Fac_Inverse (xtx_λ)               // Inverse Factorization
+            end match
+    end solver
+
+/*
+    private def solver (x_ : MatrixD): Factorization =
+        val xtx  = x_.ᵀ * x_                                             // pre-compute X.t * X
         val ey   = MatrixD.eye (x_.dim, x_.dim2)                         // identity matrix
         val xtx_ = xtx.copy                                              // copy xtx (X.t * X)
         for i <- xtx_.indices do xtx_(i, i) += lambda                    // add lambda to the diagonal
 
         algorithm match                                                  // select the factorization technique
-            case "Fac_QR" => val xx = x_ ++ (ey * sqrt(lambda))
-                             println (s"xx.dim ${xx.dim}")
-                             Fac_QR(xx)                                  // QR/LQ Factorization
+            case "Fac_QR" => val xx = x_ ++ (ey * sqrt (lambda))
+                             Fac_QR (xx)                                 // QR/LQ Factorization
 //          case "Fac_SVD"      => new Fac_SVD (x_)                      // Singular Value Decomposition - FIX
-            case "Fac_Cholesky" => new Fac_Cholesky(xtx_)                // Cholesky Factorization
-            case "Fac_LU"       => new Fac_LU(xtx_)                      // LU Factorization
-            case _              => new Fac_Inverse(xtx_)                 // Inverse Factorization
+            case "Fac_Cholesky" => new Fac_Cholesky (xtx_)               // Cholesky Factorization
+            case "Fac_LU"       => new Fac_LU (xtx_)                     // LU Factorization
+            case _              => new Fac_Inverse (xtx_)                // Inverse Factorization
             end match
     end solver
+*/
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Train the predictor by fitting the parameter vector (b-vector) in the
@@ -108,9 +122,9 @@ class RidgeRegressionMV (x: MatrixD, y: MatrixD, fname_ : Array [String] = null,
             val yk  = y_(?, k)
 //          println (s"yk = ${yk.dim}")
             bb(0).w(?, k) = fac match                                    // RECORD the parameters/coefficients (@see `PredictorMV`)
-            case fac: Fac_QR  => fac.solve (yk)
-            case fac: Fac_SVD => fac.solve (yk)
-            case _            => fac.solve (x_.transpose * yk)
+            case fac: Fac_QR  => fac.solve (yk ++ new VectorD (x_.dim2))  // pad with n zeros (matches √λ·I_n rows)
+//          case fac: Fac_SVD => fac.solve (yk)
+            case _            => fac.solve (x_.ᵀ * yk)
 
             if bb(0).w(0, k).isNaN then flaw ("train", s"parameters bb(0).w = ${bb(0).w}")
         end for
@@ -153,7 +167,8 @@ class RidgeRegressionMV (x: MatrixD, y: MatrixD, fname_ : Array [String] = null,
      */
     override def predict (z: VectorD): VectorD =
         val zz = if xℱ == null then z else xℱ.f(MatrixD (z))(0)
-        if yℱ == null then bb(0).w dot zz else yℱ.fi(MatrixD (bb(0).w dot zz))(0)
+        val zz_ = if yℱ == null then bb(0).w dot zz else yℱ.fi(MatrixD (bb(0).w dot zz))(0)
+        zz_
     end predict
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -197,13 +212,11 @@ end RidgeRegressionMV
  */
 object RidgeRegressionMV extends RegularizedMV:
 
-    val hp = RidgeRegression.hp
-
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Create a Ridge RegressionMV object from a combined data-response matrix.
      *  @param xy      the combined data-response matrix (predictors and response)
      *  @param fname   the feature/variable names (defaults to null)
-     *  @param hparam  the hyper-parameters (defaults to Regression.hp)
+     *  @param hparam  the hyper-parameters (defaults to RidgeRegression.hp)
      *  @param col     the first designated response column (defaults to next to last column)
      */
     def apply (xy: MatrixD, fname: Array [String] = null,
@@ -237,7 +250,7 @@ object RidgeRegressionMV extends RegularizedMV:
      *                     (augment with a first column of ones to include intercept in model)
      *  @param y       the response/output matrix
      *  @param fname   the feature/variable names (use null for default)
-     *  @param hparam  the hyper-parameters (defaults to Regression.hp)
+     *  @param hparam  the hyper-parameters (defaults to RidgeRegression.hp)
      */
     def rescale (x: MatrixD, y: MatrixD, fname: Array [String] = null,
                  hparam: HyperParameter = RidgeRegression.hp): RidgeRegressionMV =
@@ -436,11 +449,7 @@ end ridgeRegressionMVTest4
     banner ("Feature Selection Technique: Forward")
     val (cols, rSq) = mod.forwardSelAll ()                       // R^2, R^2 bar, smape, R^2 cv
 //  val (cols, rSq) = mod.backwardElimAll ()                     // R^2, R^2 bar, smape, R^2 cv
-    val k = cols.size
-    println (s"k = $k, n = ${ox.dim2}")
-    new PlotM (null, rSq, Array ("R^2", "R^2 bar", "smape", "R^2 cv"),
-               s"R^2 vs n for ${mod.modelName}", lines = true)
-    println (s"rSq = $rSq")
+    mod.reportSelection (cols, rSq)
 
 end ridgeRegressionMVTest5
 
@@ -470,11 +479,7 @@ end ridgeRegressionMVTest5
     for tech <- SelectionTech.values do
         banner (s"Feature Selection Technique: $tech")
         val (cols, rSq) = mod.selectFeatures (tech)              // R^2, R^2 bar, smape, R^2 cv
-        val k = cols.size
-        println (s"k = $k, n = ${ox.dim2}")
-        new PlotM (null, rSq, Array ("R^2", "R^2 bar", "smape", "R^2 cv"),
-                   s"R^2 vs n for ${mod.modelName} with $tech", lines = true)
-        println (s"$tech: rSq = $rSq")
+        mod.reportSelection (cols, rSq)
     end for
 
 end ridgeRegressionMVTest6

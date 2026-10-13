@@ -20,7 +20,7 @@ package modeling
 package neuralnet
 
 import scalation.mathstat._
-import scalation.modeling.forecasting.MakeMatrix4TS
+import scalation.modeling.forecasting.AR
 
 import ActivationFun._
 import Initializer._
@@ -46,7 +46,7 @@ import CoFilter_1D.conv
 class CNN_1D (x: MatrixD, y: MatrixD, fname_ : Array [String] = null,
               nf: Int = 1, nc: Int = 3,
               pool: Int = 1, poolFun: (VectorD, Int) => VectorD = CoFilter_1D.pool_a,
-              hparam: HyperParameter = Optimizer.hp ++ MakeMatrix4TS.hp,
+              hparam: HyperParameter = Optimizer.hp ++ AR.hp,
               f: AFF = f_reLU, f1: AFF = f_reLU,
               val itran: FunctionM2M = null)
       extends PredictorMV (x, y, fname_, hparam)
@@ -244,7 +244,7 @@ object CNN_1D extends Scaling:
     def rescale (x: MatrixD, y: MatrixD, fname: Array [String] = null,
                  nf: Int = 1, nc: Int = 3,
                  pool: Int = 1, poolFun: (VectorD, Int) => VectorD = CoFilter_1D.pool,
-                 hparam: HyperParameter = Optimizer.hp ++ MakeMatrix4TS.hp,
+                 hparam: HyperParameter = Optimizer.hp ++ AR.hp,
                  f: AFF = f_reLU, f1: AFF = f_reLU): CNN_1D =
         var itran: FunctionM2M = null                                   // inverse transform -> original scale
 
@@ -275,7 +275,7 @@ object CNN_1D extends Scaling:
     def buildNrescale (xe: MatrixD, y: VectorD, fname: Array [String] = null,
                        nf: Int = 1, nc: Int = 3,
                        pool: Int = 1, poolFun: (VectorD, Int) => VectorD = CoFilter_1D.pool,
-                       hparam: HyperParameter = Optimizer.hp ++ MakeMatrix4TS.hp,
+                       hparam: HyperParameter = Optimizer.hp ++ AR.hp,
                        f: AFF = f_reLU, f1: AFF = f_reLU): CNN_1D =
            val xy = forecasting.ARX.buildMatrix (xe, y, hparam, false)
            println (s" buildNrescale: xy.dims = ${xy.dims}, y.dim = ${y.dim}")
@@ -399,7 +399,7 @@ end cNN_1DTest
  */
 @main def cNN_1DTest2 (): Unit =
 
-    val hp = Optimizer.hp ++ MakeMatrix4TS.hp
+    val hp = Optimizer.hp ++ AR.hp
 
     val x = MatrixD ((2, 5), 1, 2, 3, 4, 5,
                              6, 7, 8, 9, 10)
@@ -441,7 +441,7 @@ end cNN_1DTest2
     import Example_AutoMPG._
     banner ("CNN_1D vs. Regession - Example_AutoMPG")
 
-    val hp = Optimizer.hp ++ MakeMatrix4TS.hp
+    val hp = Optimizer.hp ++ AR.hp
 
     banner ("Regression")
     val reg = Regression (oxy)()
@@ -474,7 +474,7 @@ end cNN_1DTest3
     import forecasting.Example_Covid._
     banner ("CNN_1D Example_Covid")
 
-    val hp = Optimizer.hp ++ MakeMatrix4TS.hp
+    val hp = Optimizer.hp ++ AR.hp
 
 //  val exo_vars  = NO_EXO
     val exo_vars  = Array ("icu_patients")

@@ -16,7 +16,6 @@ package forecasting
 
 import scalation.mathstat._
 
-import Example_Covid.loadData_y
 import Example_LakeLevels.y
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -68,6 +67,7 @@ end SGFilter
 
 end sGFilterTest
 
+import Example_Covid.{clip, loadData_y}
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `sGFilterTest2` main function tests the `SGFilter` class on real data:
@@ -76,9 +76,7 @@ end sGFilterTest
  */
 @main def sGFilterTest2 (): Unit =
 
-    val yy = loadData_y ()
-//  val y  = yy                                                           // full
-    val y  = yy(0 until 116)                                              // clip the flat end
+    val (_, y) = clip ((null, loadData_y ()))
 
     val filter = new SGFilter (y)                                         // create smoother for time series data
     val ys     = filter.smooth ()

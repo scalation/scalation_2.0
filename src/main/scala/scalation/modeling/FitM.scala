@@ -76,11 +76,11 @@ trait FitM:
         if m < 2       then flaw ("diagnose", s"requires at least 2 responses to evaluate m = $m")
         if yp.dim != m then flaw ("diagnose", s"yp.dim = ${yp.dim} != y.dim = $m")
 
-        val mu = y.mean                                      // Mean of y (may be zero)
+//      val mu = y.mean                                      // Mean of y (may be zero)
         val e  = y - yp                                      // residual/error vector
         sse    = e.normSq                                    // Sum of Squares for Error
         if w == null then
-            sst = (y - mu).normSq                            // Sum of Squares Total (ssr + sse)
+            sst = y.center.normSq                            // Sum of Squares Total (ssr + sse)
             ssr = sst - sse                                  // Sum of Squares Regression
         else
             ssr = (w * (yp - (w * yp / w.sum).sum)~^2).sum

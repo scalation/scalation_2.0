@@ -87,7 +87,7 @@ class Baseline (y: VectorD, mtype: String)
     val _smape = 200 * (e.abs / (y_.abs + yp.abs)).mean        // symmetric Mean Absolute Percentage Error (sMAPE)
                                                                // diagnose calls smapeF that handles y_i = yp_i = 0
     
-    banner ("CBaseline: ompare self-diagnosis (_) with with call to `diagnose` from `FitM`")
+    banner ("CBaseline: ompare self-diagnosis (_) with call to `diagnose` from `FitM`")
     val _qof = VectorD (_rSq, _sst, _sse, _sde, _mse0, _rmse, _mae, _smape, _m)
     println (s"_qof = ${FitM.fitMap (_qof)}")
 

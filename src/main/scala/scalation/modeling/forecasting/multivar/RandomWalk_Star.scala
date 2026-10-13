@@ -31,6 +31,7 @@ class RandomWalk_Star (y: MatrixD, hh: Int, fname: Array [String] = null, tRng: 
       extends Diagnoser (dfr = 1, df = y.dim - 1)
          with ForecastTensor (y, hh, tRng)
          with Forecast
+         with NoTrainModel
          with NoSubModels:
 
     private val debug = debugf ("RandomWalk_Star", true)                  // debug function
@@ -40,9 +41,10 @@ class RandomWalk_Star (y: MatrixD, hh: Int, fname: Array [String] = null, tRng: 
 
     private val mod = (for j <- y.indices2 yield new RandomWalk (y(?, j), hh, tRng, hparam)).toArray
 
+    def mod_resetDF (size: Int): Unit = ???                               // where to put this method
     def getY: VectorD = y(?, 0)
     def hparameter: HyperParameter = hparam
-    def inSample_Test (skip: Int, showYp: Boolean): (VectorD, VectorD) = ???
+    def inSample_Test (showYp: Boolean): (VectorD, VectorD) = ???
     def parameter: VectorD | MatrixD = ???
     def test (x_ : MatrixD, y_ : VectorD): (VectorD, VectorD) = ???
     def validate (rando: Boolean, ratio: Double) (idx: IndexedSeq [Int]):
@@ -61,7 +63,7 @@ class RandomWalk_Star (y: MatrixD, hh: Int, fname: Array [String] = null, tRng: 
      */
     def trainNtest (y_ : MatrixD = y)(yy: MatrixD = y): Unit =
         for k <- mod.indices do
-            mod(k).trainNtest (y_(?, k))(yy(?, k))
+            mod(k).trainNtest (null, y_(?, k))(null, yy(?, k))
     end trainNtest
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

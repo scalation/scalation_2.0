@@ -1,0 +1,246 @@
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** @author  John Miller
+ *  @version 2.0
+ *  @date    Sun May 31 17:40:09 EDT 2026
+ *  @see     LICENSE (MIT style license file).
+ *
+ *  @note    Symbolic Expression Engine Including Macro Definition
+ *
+ *  Supports lagged variables/vectors: fx"y(-1) - y(-2) + (x_r(-1) * 2.0)"`
+ */
+
+/*==========================================================================
+   Complete EBNF Grammar Specification for Unicode Math Formula Language
+
+(* Top-Level Entry Point *)
+Expression     ::= LogicalOr ;
+
+(* Bounded Plus / Logical OR Tier (Lowest Priority) *)
+LogicalOr      ::= Relational ( "⊕" Relational )* ;
+
+(* Relational & Indicator Operators Tier *)
+Relational     ::= Additive ( ( "==" | "!=" | "≠" | "<" | "<=" | "≤" | ">" | ">=" | "≥" ) Additive )* ;
+
+(* Additive Operators Tier *)
+Additive       ::= Multiplicative ( ( "+" | "-" ) Multiplicative )* ;
+
+(* Multiplicative Tier (· Unifies Standard Multiplication and Logical AND) *)
+Multiplicative ::= Exponent ( ( "*" | "×" | "·" | "/" | "÷" ) Exponent )* ;
+
+(* Exponentiation Tier (Right-Associative) *)
+Exponent       ::= Primary [ "^" Exponent ] ;
+
+(* Primary Expressions (Highest Precedence) *)
+Primary        ::= Number 
+
+                 | FunctionCall
+                 | Identifier 
+                 | "(" Expression ")" 
+
+                 | "[" Expression "]" ;   (* The Iverson Bracket / Indicator Variable *)
+
+(* Function Syntax *)
+FunctionCall   ::= FuncName "(" [ Arguments ] ")" ;
+Arguments      ::= Expression ( "," Expression )* ;
+
+(* Lexical Terminals & Character Sets *)
+FuncName       ::= "Σ" | "∏" | "Δ" | IdentPattern ;
+Identifier     ::= !ReservedSymbols IdentPattern ;
+
+(* Patterns and Exclusions *)
+IdentPattern   ::= [a-zA-Z_\p{IsGreek}][a-zA-Z0-9_\p{IsGreek}]* ;
+ReservedSymbols::= "Σ" | "∏" | "Δ" ;
+Number         ::= [0-9]+ ( "." [0-9]+ )? ;
+
+============================================================================ */
+
+package scalation
+package mathstat
+
+import scala.collection.mutable.ListBuffer
+//import scala.util.matching.Regex
+
+object SymExprParser:
+
+    // =========================================================================
+    // 1. Lexical Analyzer (Lexer)
+    // =========================================================================
+
+    private enum LexToken:
+        case Num(value: String)
+        case Ident(name: String)
+        case Op(sym: String)
+        case LPar, RPar, LBrack, RBrack, Comma, EOF
+    end LexToken
+
+    private def lex(formula: String): Vector[LexToken] =
+        val tokens = ListBuffer[LexToken]()
+        var i = 0
+        val len = formula.length
+
+        // Captures identifiers supporting Latin text, Greek unicode blocks, and underscores
+        val identRegex = """^[a-zA-Z_\p{IsGreek}][a-zA-Z0-9_\p{IsGreek}]*""".r
+        val numRegex     = """^[0-9]+(\.[0-9]+)?""".r
+
+        while i < len do
+            val c = formula(i)
+            if c.isWhitespace then
+                i += 1
+            else if c == '(' then { tokens += LexToken.LPar; i += 1 }
+            else if c == ')' then { tokens += LexToken.RPar; i += 1 }
+            else if c == '[' then { tokens += LexToken.LBrack; i += 1 }
+            else if c == ']' then { tokens += LexToken.RBrack; i += 1 }
+            else if c == ',' then { tokens += LexToken.Comma; i += 1 }
+            else if formula.startsWith("==", i) then { tokens += LexToken.Op("=="); i += 2 }
+            else if formula.startsWith("!=", i) then { tokens += LexToken.Op("!="); i += 2 }
+            else if formula.startsWith("<=", i) then { tokens += LexToken.Op("<="); i += 2 }
+            else if formula.startsWith(">=", i) then { tokens += LexToken.Op(">="); i += 2 }
+            else if "≠≤≥⊕+−*×·/÷^<>" .contains(c) then { tokens += LexToken.Op(c.toString); i += 1 }
+            else if c == '-' then { tokens += LexToken.Op("-"); i += 1 } // Standard ASCII hyphen
+            else
+                val remaining = formula.substring(i)
+                numRegex.findFirstIn(remaining) match
+                    case Some(numStr) =>
+                        tokens += LexToken.Num(numStr)
+                        i += numStr.length
+                    case None =>
+                        identRegex.findFirstIn(remaining) match
+                            case Some(idStr) =>
+                                tokens += LexToken.Ident(idStr)
+                                i += idStr.length
+                            case None =>
+                                // Support standalone Greek functions not caught by combined word patterns
+                                if "Σ∏Δ".contains(c) then
+                                    tokens += LexToken.Ident(c.toString)
+                                    i += 1
+                                else
+                                    throw new IllegalArgumentException(s"Lexical error: Unexpected character '$c' at position $i")
+        
+        tokens += LexToken.EOF
+        tokens.toVector
+    end lex
+
+    // =========================================================================
+    // 2. Recursive Descent Parser (Emits Postfix RPN Directly)
+    // =========================================================================
+
+    def parse (formula: String): Vector [Token] =
+        val lexed = lex(formula)
+        var cursor = 0
+        val output = ListBuffer[Token]()
+
+        def peek: LexToken = lexed(cursor)
+        def consume(): LexToken = { val t = peek; cursor += 1; t }
+
+        def matchOp(ops: String*): Option[String] = peek match
+            case LexToken.Op(sym) if ops.contains(sym) => Some(consume().asInstanceOf[LexToken.Op].sym)
+            case _ => None
+
+        // Expression ::= LogicalOr ;
+        def parseExpression(): Unit = parseLogicalOr()
+
+        // LogicalOr ::= Relational ( "⊕" Relational )* ;
+        def parseLogicalOr(): Unit =
+            parseRelational()
+            var loop = true
+            while loop do
+                matchOp("⊕") match
+                    case Some(op) => parseRelational(); output += Token.Op(op)
+                    case None         => loop = false
+
+        // Relational ::= Additive ( ( "==" | "!=" | "≠" | "<" | "<=" | "≤" | ">" | ">=" | "≥" ) Additive )* ;
+        def parseRelational(): Unit =
+            parseAdditive()
+            var loop = true
+            val relOps = Seq("==", "!=", "≠", "<", "<=", "≤", ">", ">=", "≥")
+            while loop do
+                matchOp(relOps*) match
+                    case Some(op) => parseAdditive(); output += Token.Op(op)
+                    case None         => loop = false
+
+        // Additive ::= Multiplicative ( ( "+" | "-" ) Multiplicative )* ;
+        def parseAdditive(): Unit =
+            parseMultiplicative()
+            var loop = true
+            while loop do
+                matchOp("+", "-", "−") match
+                    case Some(op) => parseMultiplicative(); output += Token.Op(op)
+                    case None         => loop = false
+
+        // Multiplicative ::= Exponent ( ( "*" | "×" | "·" | "/" | "÷" ) Exponent )* ;
+        def parseMultiplicative(): Unit =
+            parseExponent()
+            var loop = true
+            while loop do
+                matchOp("*", "×", "·", "/", "÷") match
+                    case Some(op) => parseExponent(); output += Token.Op(op)
+                    case None         => loop = false
+
+        // Exponent ::= Primary [ "^" Exponent ] ; (Right-Associative)
+        def parseExponent(): Unit =
+            parsePrimary()
+            matchOp("^") match
+                case Some(op) => parseExponent(); output += Token.Op(op)
+                case None         => ()
+
+        // Primary ::= Number | FunctionCall | Identifier | "(" Expression ")" | "[" Expression "]"
+        def parsePrimary(): Unit = peek match
+            case LexToken.Num(v) =>
+                consume()
+                output += Token.Const("", v.toDouble)
+
+            case LexToken.Ident(name) =>
+                consume()
+                peek match
+                    case LexToken.LPar =>
+                        // FunctionCall ::= FuncName "(" [ Arguments ] ")"
+                        consume() // consume LPar
+                        var argCount = 0
+                        if peek != LexToken.RPar then
+                            parseExpression()
+                            argCount += 1
+                            while peek == LexToken.Comma do
+                                consume() // consume Comma
+                                parseExpression()
+                                argCount += 1
+                        if consume() != LexToken.RPar then
+                            throw new IllegalArgumentException("Parser error: Expected closing parenthesis ')'")
+                        
+                        // Emit a special operator token with metadata detailing multi-argument calls
+                        output += Token.Op(s"$name#$argCount")
+                    case _ =>
+                        // Standard Identifier (Variables / Coefficients)
+                        // If named like y_t_1 or containing a signature, format it down to your lag properties
+                        if name.startsWith("y_minus_") || name.contains("ₜ₋") then
+                            // Hook your explicit time-series lag parser mappings here if needed
+                            output += Token.Var(name, 0)
+                        else
+                            output += Token.Var(name, 0)
+
+            case LexToken.LPar =>
+                consume()
+                parseExpression()
+                if consume() != LexToken.RPar then 
+                    throw new IllegalArgumentException("Parser error: Mismatched parentheses '('")
+
+            case LexToken.LBrack =>
+                // [ Expression ] -> Evaluates interior condition and casts to 1.0 or 0.0 (Iverson Bracket)
+                consume()
+                parseExpression()
+                if consume() != LexToken.RBrack then 
+                    throw new IllegalArgumentException("Parser error: Mismatched Iverson bracket '['")
+                output += Token.Op("iverson") // Custom structural operator hook
+
+            case other =>
+                throw new IllegalArgumentException(s"Parser error: Unexpected token $other")
+
+        // Begin AST compilation pass
+        parseExpression()
+        if peek != LexToken.EOF then 
+            throw new IllegalArgumentException("Parser error: Hanging unparsed trailing tokens remaining")
+        output.toVector
+    end parse
+
+end SymExprParser
+

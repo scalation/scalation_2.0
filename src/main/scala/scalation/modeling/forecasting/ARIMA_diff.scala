@@ -188,8 +188,10 @@ end aRIMA_diffTest
  */
 @main def aRIMA_diffTest2 (): Unit =
 
-    import Example_Covid.y
+    import Example_Covid.{clip, loadData_y}
+    val (_, y) = clip ((null, loadData_y ()))
     import AR.hp
+
     val tf = new TestFit (y.dim)
     val hh = 6
 
@@ -229,7 +231,8 @@ end aRIMA_diffTest2
  */
 @main def aRIMA_diffTest3 (): Unit =
 
-    import Example_Covid.y                                          // position: level of the time series
+    import Example_Covid.{clip, loadData_y}
+    val (_, y) = clip ((null, loadData_y ()))
 
     val v  = diff (y)                                               // velocity: first difference on y (size of v one less than y)
 

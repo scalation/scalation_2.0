@@ -1,0 +1,175 @@
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** @author  John Miller
+ *  @version 2.0
+ *  @date    Wed Sep 16 13:28:38 EDT 2026
+ *  @see     LICENSE (MIT style license file).
+ *
+ *  @note    Levenberg-Marquardt Algorithm for Nonlinear Least Squares (NLS)
+ *           AI Assisted Code
+ */
+
+package scalation
+package optimization
+package nonlinear_ls
+
+import scala.math.{abs, log, pow}
+
+import scalation.mathstat._
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `LevenbergMarquardt` class implements a specialized Nonlinear Least Squares (NLS) 
+ *  optimizer using the Levenberg-Marquardt (LM) algorithm.
+ * 
+ *  Unlike general-purpose scalar minimizers (e.g., Quasi-Newton/L-BFGS), this solver 
+ *  explicitly leverages the mathematical structure of a vector residual function and its 
+ *  corresponding structural Jacobian matrix. It computes an instantaneous Gauss-Newton 
+ *  Hessian proxy (J^T * J), avoiding the multi-iteration estimation delays of generic 
+ *  numerical solvers.
+ * 
+ *  It functions as a dynamic trust-region algorithm, utilizing a damping factor (mu) 
+ *  to seamlessly interpolate between rapid Gauss-Newton steps (when error decreases) 
+ *  and robust Gradient Descent steps (to gracefully jump over local discontinuities 
+ *  or parameter cliffs).
+ *
+ *  @param maxIters   the maximum number of optimization iterations allowed.
+ *  @param tolerance  the convergence threshold for the parameter updates (delta) and gradient norm.
+ */
+class LevenbergMarquardt (maxIters: Int = 100, tolerance: Double = 1e-6)
+      extends NonLinearLS:
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Solves the NLS problem by minimizing the sum of squared errors.
+     *  @param bInit      The initial parameter vector guess
+     *  @param residual   The functional mapping from parameters to raw error array
+     *  @param jacobian   The functional mapping from parameters to the Jacobian Matrix
+     */
+    def solve (bInit: VectorD, 
+               residual: VectorD => VectorD, 
+               jacobian: VectorD => MatrixD): VectorD =
+        
+        var b      = bInit
+        var mu     = 1e-4
+        val factor = 10.0
+        
+        var r    = residual (b)
+        var sse  = r dot r
+        var iter = 0
+        var converged = false
+        
+        while iter < maxIters && ! converged do
+            val J   = jacobian (b)
+            val JT  = J.transpose
+            val JTJ = JT * J
+
+            // The descent gradient direction simplifies natively to positive (J^T * r)
+            val gradient = JT * r
+            if gradient.norm < tolerance then
+                println (s"converged (iter = $iter): gradient.norm = ${gradient.norm} drops below threshold")
+                converged = true
+            else
+                val dampedHessian = JTJ.copy
+                for i <- 0 until dampedHessian.dim do
+                    dampedHessian(i, i) += mu * (if JTJ(i, i) == 0 then 1.0 else JTJ(i, i))
+
+                // Execute QR Matrix Factorization for robust numerical handling
+                val fac   = new Fac_QR (dampedHessian)
+                val delta = fac.solve (gradient)
+
+                // Propose parameter adjustment step
+                val bTest = b + delta
+                val rTest = residual (bTest)
+                val sseTest = rTest dot rTest
+                
+                // Check performance criteria
+                if sseTest < sse then
+                    b = bTest
+                    r = rTest
+
+                    // Convergence check: True convergence happens if error reduction drops below threshold
+                    if abs (sse - sseTest) / (sse + 1e-10) < tolerance || delta.norm < tolerance then 
+                        println (s"converged (iter = $iter): sse = $sse, sseTest = $sseTest error reduction drops below threshold")
+                        converged = true
+
+                    sse = sseTest
+                    mu /= factor
+                else
+                    // Reject step: increase dampening factor to steer toward gradient descent footing
+                    mu *= factor
+                
+                    // If damping blows up past reasonable limits, optimization has stalled out
+                    if mu > 1e10 then
+                        println (s"converged (iter = $iter): blew up with mu = $mu")
+                        converged = true
+                end if
+            iter += 1
+        end while
+        b
+    end solve
+
+end LevenbergMarquardt
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `levenbergMarquardtTest` main function tests the LevenbergMarquardt` class.
+ *  > runMain scalation.optimization.nonlinear_ls.levenbergMarquardtTest
+ */
+@main def levenbergMarquardtTest (): Unit =
+
+    banner ("Testing ScalaTion 2 Nonlinear Least Squares Package")
+
+    // Generate clean mock data following a pure power law: y = 2.5 * x^1.5
+    // This replicates the target mathematical formulas found in OLS/SR benchmarks.
+    val x_data = VectorD (1.0, 2.0, 3.0, 4.0, 5.0)
+    val y_data = VectorD (2.5, 7.071, 12.990, 20.0, 27.951)
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Define the structural Residual Vector function (y_pred - y_true)
+     *  Parameter layout: 
+     *  b(0) = beta (linear coefficient multiplier)
+     *  b(1) = lambda (exponent/power factor)
+     */
+    def residualF (b: VectorD): VectorD =
+        val predictions = x_data.map (x => b(0) * pow (x, b(1)))
+        y_data - predictions                                    // the unsummed error vector array
+    end residualF
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Define the analytical Jacobian Matrix function
+     *  It maps the current parameter state to an (N x K) matrix of partial derivatives.
+     */
+    def jacobianF (b: VectorD): MatrixD =
+        val J = new MatrixD (x_data.dim, b.dim)
+        for i <- 0 until x_data.dim do
+            val x   = x_data(i)
+            J(i, 0) = -pow(x, b(1))                              // partial wrt beta: d/d(beta) [beta * x^lambda] = x^lambda
+            J(i, 1) = -b(0) * pow (x, b(1)) * log (x)            // partial wrt lambda: d/d(lambda) [beta * x^lambda] = beta * x^lambda * ln(x)
+        J
+    end jacobianF
+
+    // Initialize your custom Levenberg-Marquardt solver instance
+    val lmSolver = new LevenbergMarquardt (maxIters = 150, tolerance = 1e-5)
+
+    // Provide a rough initial parameter guess (beta = 1.0, lambda = 1.0)
+    val bInit = VectorD (1.0, 1.0)
+
+    println (s"Initial Parameter Guess : beta = ${bInit(0)}, lambda = ${bInit(1)}")
+    println ("Running optimization iterations...")
+
+    // Execute the structural solver
+    val bOpt = lmSolver.solve (bInit, residualF, jacobianF)
+
+    // Verify the final optimized outputs
+    println ("\n====================== RESULTS ==========================")
+    println (f"Target Formula   : y = 2.50 * x^1.50")
+    println (f"Optimized Formula: y = ${bOpt(0)}%.2f * x^${bOpt(1)}%.2f")
+    println ("=========================================================")
+    
+    // Check if the parameter matrix converged close to the true benchmarks
+    if abs (bOpt(0) - 2.5) < 1e-2 && abs (bOpt(1) - 1.5) < 1e-2 then
+        banner ("SUCCESS: The structural parameters converged cleanly!")
+    else
+        banner ("FAILURE: Optimization stalled or converged to an incorrect local minimum.")
+
+end levenbergMarquardtTest
+

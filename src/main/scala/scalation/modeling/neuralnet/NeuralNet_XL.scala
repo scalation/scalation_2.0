@@ -427,10 +427,7 @@ end neuralNet_XLTest3
     banner ("Feature Selection Technique: Forward")
     val (cols, rSq) = mod.forwardSelAll ()                       // R^2, R^2 bar, smape, R^2 cv
 //  val (cols, rSq) = mod.backwardElimAll ()                     // R^2, R^2 bar, smape, R^2 cv
-    val k = cols.size
-    println (s"k = $k, n = ${x.dim2}")
-    new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for ${mod.modelName}", lines = true)
-    println (s"rSq = $rSq")
+    mod.reportSelection (cols, rSq)
 
 end neuralNet_XLTest4
 
@@ -462,10 +459,7 @@ end neuralNet_XLTest4
     for tech <- SelectionTech.values do
         banner (s"Feature Selection Technique: $tech")
         val (cols, rSq) = mod.selectFeatures (tech)              // R^2, R^2 bar, smape, R^2 cv
-        val k = cols.size
-        println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for ${mod.modelName} with $tech", lines = true)
-        println (s"$tech: rSq = $rSq")
+        mod.reportSelection (cols, rSq)
     end for
 
 end neuralNet_XLTest5

@@ -72,7 +72,6 @@ class DTW (y: VectorD, q: Int = 2)(ty: VectorT =  VectorT.range (0, y.dim)):
 
 end DTW
 
-import Example_Covid.loadData_yy
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `dTWTest` main function tests the `DTW` class on real data.
@@ -80,12 +79,12 @@ import Example_Covid.loadData_yy
  */
 @main def dTWTest (): Unit =
 
+    import Example_Covid.{clip, loadData_yy}
+
     val vars = Array ("new_deaths", "icu_patients")
-    val yy = loadData_yy (vars)
-//  val y  = yy                                                           // full
-    val y  = yy(0 until 116)                                              // clip the flat end
-    val y0 = y(?, 0)                                                      // column 0
-    val y1 = y(?, 1)                                                      // column 1
+    val (yy, _) = clip ((loadData_yy (vars), null))
+    val y0 = yy(?, 0)                                                     // column 0
+    val y1 = yy(?, 1)                                                     // column 1
 
     val warp = DTW (y0)()                                                 // apply DTW to columns 0 and 1
     val score = warp.dtw_score (y1) 

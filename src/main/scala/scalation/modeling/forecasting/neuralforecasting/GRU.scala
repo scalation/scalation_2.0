@@ -386,11 +386,11 @@ end gRUTest2
     import Example_LakeLevels.y
     import MakeMatrix4TS._
     val hh  = 2                                                       // forecasting horizon - FIX - currently lags == hh
-    hp("p") = 2                                                       // number of lags to include
+    AR.hp("p") = 2                                                    // number of lags to include
 
     val y_s = scaleV (extreme (y), (-2.0, 2.0))(y)                    // rescale y to active domain of sigmoid, tanh
 
-    val x  = ARY.buildMatrix (y_s, hp)                                // column for each lag
+    val x  = ARY.buildMatrix (y_s, AR.hp)                             // column for each lag
     val yy = makeMatrix4Y (y_s, hh)
 
     println (s"x.dims = ${x.dims}, yy.dims = ${yy.dims}")

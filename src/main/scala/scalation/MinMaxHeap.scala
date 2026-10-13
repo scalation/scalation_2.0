@@ -265,12 +265,24 @@ class MinMaxHeap [T] (val cap: Int, heap_ : Array [T] = null)
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Print the elements in the min-max heap in order (min to max).
+     *  @param sep  the separation character to use between elements (defaults to ' ')
+     *              could try '\t' for tab or '\n' for newline
      */
+    def printInOrder (sep: Char = ' '): Unit =
+        print ("MinMaxHeap: [")
+        val arr = heap.sorted                                        // make a sorted array
+        for i <- arr.indices do
+            if i > 0 then print (",")
+            print (s"$sep${arr(i)}")
+        println (" ]")
+    end printInOrder
+/*
     def printInOrder (): Unit =
-        val cp = copy ()
         print ("MinMaxHeap: ")
+        val cp = copy ()
         while ! cp.isEmpty do println (cp.dequeue ())
     end printInOrder
+*/
 
     //--------------------------------------------------------------------------
     // --- private search helper methods
@@ -352,6 +364,7 @@ end MinMaxHeap
     for i <- 1 to cap do
         pq.enqueue (i * i)
         println (pq)
+    pq.printInOrder ()
 //  println ("Insert 20"); pq.insert (20)                  // causes overflow
     println ("Insert 20"); pq.enqueue (20)                 // new element replaces the max
     println (pq)

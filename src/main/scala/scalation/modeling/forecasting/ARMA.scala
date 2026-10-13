@@ -242,7 +242,10 @@ class ARMA (y: VectorD, hh: Int, tRng: Range = null,
         g(0)  = 1.0
         for i <- 0 until q if i + 1 < r_dim do g(i + 1) = thetas(i)
         val q_mat = outer (g, g) * sig2_proc
-
+/*
+        val q_mat = new MatrixD (r_dim, r_dim)   // turns ARMA(p, q) into ARMA(p, 0)
+        q_mat(0, 0) = sig2_proc
+*/
         // Observation model: observe the first state element.
         val h_mat = new MatrixD (1, r_dim)
         h_mat(0, 0) = 1.0
@@ -306,7 +309,7 @@ class ARMA (y: VectorD, hh: Int, tRng: Range = null,
 
 end ARMA
 
-import Example_Covid.loadData_y
+import Example_Covid.{clip, loadData_y}
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** Rolling-origin validation driver for the standalone Kalman-filter ARMA
@@ -323,15 +326,14 @@ import Example_Covid.loadData_y
     // Configuration
     // --------------------------------------------------------------------------
     val p_max      = 5          // maximum AR order to evaluate
-    val q_max      = 0          // maximum MA order to evaluate
+    val q_max      = 2          // maximum MA order to evaluate
     val hh         = 6          // maximum forecast horizon
     val train_size = 92         // length of training window
 
     // --------------------------------------------------------------------------
     // Load and split data
     // --------------------------------------------------------------------------
-    val yy      = loadData_y ()
-    val y       = yy(0 until 116)
+    val (_, y)  = clip ((null, loadData_y ()))
     val y_train = y(0 until train_size)
 
     println (s"Data Split: Total=${y.dim}, Train=$train_size, Test=${y.dim - train_size}")
@@ -339,7 +341,7 @@ import Example_Covid.loadData_y
     // --------------------------------------------------------------------------
     // Evaluate all requested (p, q) configurations
     // --------------------------------------------------------------------------
-    for p <- 5 to p_max; q <- 0 to q_max do
+    for p <- 5 to p_max; q <- 2 to q_max do
 
         // ----------------------------------------------------------------------
         // 1. Fit model on training data only
@@ -407,7 +409,7 @@ import Example_Covid.loadData_y
             val df  = yActual.dim - dfm
 
             val diagnoser = new RollingDiagnoser (dfm, df)
-            diagnoser.setSkip (0)
+            diagnoser.setSkip ()                                    // don't skip any rows
 
             val stats = diagnoser.diagnose (yActual, yPred)
 

@@ -15,7 +15,6 @@ package modeling
 package forecasting
 
 import scala.collection.mutable.{LinkedHashSet => LSET}
-import scala.runtime.ScalaRunTime.stringOf
 
 import scalation.mathstat._
 
@@ -41,21 +40,21 @@ import TransformT._
  *  @param n_exo    the number of exogenous variables
  *  @param fname    the feature/variable names
  *  @param tRng     the time range, if relevant (time index may suffice)
- *  @param hparam   the hyper-parameters (defaults to `MakeMatrix4TS.hp`)
+ *  @param hparam   the hyper-parameters (defaults to `AR.hp`)
  *  @param bakcast  whether a backcasted value is prepended to the time series (defaults to false)
  *  @param tForms   the map of transformations applied
  */
 class ARX_SR_D (x: MatrixD, y: MatrixD, hh: Int, n_exo: Int, fname: Array [String],
-                tRng: Range = null, hparam: HyperParameter = hp,
+                tRng: Range = null, hparam: HyperParameter = AR.hp,
                 bakcast: Boolean = false,
                 tForms: TransformMap = Map ("tForm_y" -> null))
       extends ARX_D (x, y, hh, n_exo, fname, tRng, hparam, bakcast, tForms):
 
-    private val debug = debugf ("ARX_SR_D", true)                          // debug function
+    private val debug = debugf ("ARX_SR_D", true)                         // debug function
 
     _modelName = s"ARX_SR_D_${p}_${q}_$n_exo"
 
-    debug ("init", s"$modelName with with $n_exo exogenous variables and additional term spec = $spec")
+    debug ("init", s"$modelName with $n_exo exogenous variables and additional trend spec = $spec")
     debug ("init", s"[ x | y ] = ${x ++^ y}")
 
 end ARX_SR_D
@@ -69,35 +68,35 @@ object ARX_SR_D extends MakeMatrix4TS:
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Create an `ARX_SR_D` object by building an input matrix xy and then calling the
      *  `ARX_SR_D` constructor.
-     *  @caveat:  only the first set of transformations is applied for `fExo_enab`
-     *  @param xe          the matrix of exogenous variable values
-     *  @param y           the endogenous/response vector (main time series data)
-     *  @param hh          the maximum forecasting horizon (h = 1 to hh)
-     *  @param fname_      the feature/variable names
-     *  @param tRng        the time range, if relevant (time index may suffice)
-     *  @param hparam      the hyper-parameters
-     *  @param fEndo_enab  the set of transforms to be used for the endogenous
-     *  @param fExo_enab   the array containing the sets of transforms to be used for the exogenous 
-     *  @param bakcast     whether a backcasted value is prepended to the time series (defaults to false)
+     *  @caveat:  only the first set of transformations is applied for `fExo`
+     *  @param xe       the matrix of exogenous variable values
+     *  @param y        the endogenous/response vector (main time series data)
+     *  @param hh       the maximum forecasting horizon (h = 1 to hh)
+     *  @param fname_   the feature/variable names
+     *  @param tRng     the time range, if relevant (time index may suffice)
+     *  @param hparam   the hyper-parameters
+     *  @param fEndo    the set of transforms to be used for the endogenous
+     *  @param fExo     the array containing the sets of transforms to be used for the exogenous 
+     *  @param bakcast  whether a backcasted value is prepended to the time series (defaults to false)
      */
     def apply (xe: MatrixD, y: VectorD, hh: Int, fname_ : Array [String] = null,
-               tRng: Range = null, hparam: HyperParameter = hp,
-               fEndo_enab: LSET [TransformT] = LSET (Pow),
-               fExo_enab: Array [LSET [TransformT]] = Array (LSET (Pow), LSET (Pow)),
+               tRng: Range = null, hparam: HyperParameter = AR.hp,
+               fEndo: LSET [Transform] = LSET (PowForm ()),
+               fExo: Array [LSET [Transform]] = Array (),
                bakcast: Boolean = false): ARX_SR_D =
 
-        val (n_fExo, n_xe) = (fExo_enab.length, xe.dim2)
-        require (n_fExo == n_xe, s"Length of fExo_enab $n_fExo must = number of exogenous variables $n_xe")
+//      val (n_fExo, n_xe) = (fExo.length, xe.dim2)
+//      require (n_fExo == n_xe, s"Length of fExo $n_fExo must = number of exogenous variables $n_xe")
 
-        val (fEndo, fExo) = ARX_SR.getTransforms (fEndo_enab, fExo_enab)
+//      val (fEndo, fExo) = ARX_SR.getTransforms (fEndo, fExo)
 
         var xe_bfil: MatrixD = null
-        if xe.dim2 > 0 and hparam("q").toInt > 0 then
+        if xe.dim2 > 0 and hparam("px").toInt > 0 then
             xe_bfil = new MatrixD (xe.dim, xe.dim2)
             for j <- xe.indices2 do xe_bfil(?, j) = backfill (xe(?, j))    // backfill each exogenous variable
 
-        val fEndo_size = fEndo_enab.size
-        val fExo_sizeArr: Array [Int] = fExo_enab.map (_.size)
+        val fEndo_size = fEndo.size
+        val fExo_sizeArr: Array [Int] = fExo.map (_.size)
 
         val tForms = Map ("tForm_y" -> null, "fEndo" -> fEndo)
         val xy     = ARX_SR.buildMatrix (xe_bfil, y, hparam, fEndo, fExo, bakcast)
@@ -109,26 +108,26 @@ object ARX_SR_D extends MakeMatrix4TS:
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Create an `ARX_SR_D` object by building an input matrix xy and then calling the
      *  `ARX_SR_D` constructor, with rescaling of endogneous and exogenous variable values.
-     *  @caveat:  only the first set of transformations is applied for `fExo_enab`
-     *  @param xe          the matrix of exogenous variable values
-     *  @param y           the endogenous/response vector (main time series data)
-     *  @param hh          the maximum forecasting horizon (h = 1 to hh)
-     *  @param fname_      the feature/variable names
-     *  @param tRng        the time range, if relevant (time index may suffice)
-     *  @param hparam      the hyper-parameters
-     *  @param fEndo_enab  the set of transforms to be used for the endogenous
-     *  @param fExo_enab   the array containing the sets of transforms to be used for the exogenous 
-     *  @param bakcast     whether a backcasted value is prepended to the time series (defaults to false)
-     *  @param tFormT      the transform for rescaling endogenous and exogenous
+     *  @caveat:  only the first set of transformations is applied for `fExo`
+     *  @param xe       the matrix of exogenous variable values
+     *  @param y        the endogenous/response vector (main time series data)
+     *  @param hh       the maximum forecasting horizon (h = 1 to hh)
+     *  @param fname_   the feature/variable names
+     *  @param tRng     the time range, if relevant (time index may suffice)
+     *  @param hparam   the hyper-parameters
+     *  @param fEndo    the set of transforms to be used for the endogenous
+     *  @param fExo     the array containing the sets of transforms to be used for the exogenous 
+     *  @param bakcast  whether a backcasted value is prepended to the time series (defaults to false)
+     *  @param tForm    the transform for rescaling endogenous and exogenous
      */
     def rescale (xe: MatrixD, y: VectorD, hh: Int, fname_ : Array [String] = null,
-                 tRng: Range = null, hparam: HyperParameter = hp,
-                 fEndo_enab: LSET [TransformT] = LSET (Pow),
-                 fExo_enab: Array [LSET [TransformT]] = Array (LSET (Pow), LSET (Pow)),
+                 tRng: Range = null, hparam: HyperParameter = AR.hp,
+                 fEndo: LSET [Transform] = LSET (PowForm ()),
+                 fExo: Array [LSET [Transform]] = Array (),
                  bakcast: Boolean = false,
                  tFormT: TransformT = MinMax): ARX_SR_D =
 
-        require (fExo_enab.length == xe.dim2, s"Length of fExo_enab must be the same as the number of exogenous variables")
+        require (fExo.length == xe.dim2, s"Length of fExo must be the same as the number of exogenous variables")
 
         if tFormT.name == "NormForm" then hparam("nneg") = 0
 
@@ -139,17 +138,16 @@ object ARX_SR_D extends MakeMatrix4TS:
         val y_scl   = tForm_y.f(y)
 
         var xe_bfil: MatrixD = null
-        if xe.dim2 > 0 and hparam("q").toInt > 0 then
+        if xe.dim2 > 0 and hparam("px").toInt > 0 then
             xe_bfil = new MatrixD (xe.dim, xe.dim2)
             for j <- xe.indices2 do xe_bfil(?, j) = backfill (xe(?, j))     // backfill each exogenous variable
             if tFormScale != null then
                 val tForm_exo = tFormScale (xe_bfil(0 until tr_size))
                 xe_bfil       = tForm_exo.f (xe_bfil)                       // rescale the backfilled exogenous variable
 
-        val fEndo_size = fEndo_enab.size
-        val fExo_sizeArr: Array [Int] = fExo_enab.map (_.size)
+        val fEndo_size = fEndo.size
+        val fExo_sizeArr: Array [Int] = fExo.map (_.size)
 
-        val (fEndo, fExo) = ARX_SR.getTransforms (fEndo_enab, fExo_enab)
         val tForms = Map ("tForm_y" -> tForm_y, "fEndo" -> fEndo)
         val xy     = ARX_SR.buildMatrix (xe_bfil, y_scl, hparam, fEndo, fExo, bakcast)
         val fname  = if fname_ == null then formNames (xe.dim2, hparam, fEndo_size, fExo_sizeArr) else fname_
@@ -170,6 +168,45 @@ object ARX_SR_D extends MakeMatrix4TS:
 
 end ARX_SR_D
 
+import Example_LakeLevels.y
+import AR.hp
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `aRX_SR_DTest` main function tests the `ARX_SR_D` class on real data:
+ *  Forecasting Lake Levels using In-Sample Testing (In-ST).
+ *  Test forecasts (h = 1 to hh steps ahead forecasts).
+ *  @see cran.r-project.org/web/packages/fpp/fpp.pdf
+ *  > runMain scalation.modeling.forecasting.aRX_SR_DTest
+ */
+@main def aRX_SR_DTest (): Unit =
+
+    val hh = 3                                                          // maximum forecasting horizon
+
+    val mod = ARX_SR_D (EMPTY_EXO, y, hh)                               // create model for time series data
+    banner (s"In-ST Forecasts: ${mod.modelName} on LakeLevels Dataset")
+    mod.inSample_Test ()                                                // In-sample Testing
+    println (mod.summary ())                                            // statistical summary of fit
+
+end aRX_SR_DTest
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `aRX_SR_DTest2` main function tests the `ARX_SR_D` class on real data:
+ *  Forecasting Lake Levels using Train-n-Test Split (TnT) with Rolling Validation.
+ *  Test forecasts (h = 1 to hh steps ahead forecasts).
+ *  @see cran.r-project.org/web/packages/fpp/fpp.pdf
+ *  > runMain scalation.modeling.forecasting.aRX_SR_DTest2
+ */
+@main def aRX_SR_DTest2 (): Unit =
+
+    val hh = 3                                                          // maximum forecasting horizon
+
+    val mod = ARX_SR_D (EMPTY_EXO, y, hh)                               // create model for time series data
+    banner (s"TnT Forecasts: ${mod.modelName} on LakeLevels Dataset")
+    mod.tnT_Test ()                                                     // Train and Test with Rolling Validation
+
+end aRX_SR_DTest2
+
 import Example_Covid._
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -180,29 +217,27 @@ import Example_Covid._
  */
 @main def aRX_SR_DTest3 (): Unit =
 
-//  val exo_vars  = NO_EXO
-    val exo_vars  = Array ("icu_patients")
-//  val exo_vars  = Array ("icu_patients", "hosp_patients", "new_tests", "people_vaccinated")
-    val (xxe, yy) = loadData (exo_vars, response)
-    println (s"xxe.dims = ${xxe.dims}, yy.dim = ${yy.dim}")
+    val (xe, y) = clip (loadData (Example_Covid.NO_EXO))
+//  val (xe, y) = clip (loadData (BEST_EXO))
+    val hh      = 6                                                     // maximum forecasting horizon
+//  hp("crx")   = 1                                                     // 1 => add cross terms
+    val mx = y.max * 0.2
+    Transform.hp("mx") = mx                                             // maximum value in time series
+//  Transform.hp("p") = 1.8                                             // the power to use in Pow
+    Transform.hp("p") = 0.2                                             // the power to use in Pow
+    RidgeRegression.hp("lambda") = 1.0                                  // regularization/shrinkage parameter
 
-//  val xe = xxe                                                        // full
-    val xe = xxe(0 until 116)                                           // clip the flat end
-//  val y  = yy                                                         // full
-    val y  = yy(0 until 116)                                            // clip the flat end
-    val hh = 6                                                          // maximum forecasting horizon
-    hp("lwave") = 20                                                    // wavelength (distance between peaks)
-//  hp("cross") = 1                                                     // 1 => add cross terms
-    Transform.hp("p") = 1.5                                             // the power to use in Pow
+    val fEn: LSET [Transform] = LSET (PowForm (), DQuadForm ())         // endo Transform set
+//  val fEn: LSET [Transform] = LSET (DQuadForm ())                     // endo Transform set
+//  val fEn: LSET [Transform] = LSET (PowForm ())                       // endo Transform set
+//  val fEx = Array (LSET (Pow.form (y)))                               // exo Transforms sets (one per exo var)
 
-    val fEn = LSET (Pow)
-    val fEx = Array (LSET (Pow), LSET (Pow))
-
-    for p <- 6 to 6; q <- 4 to 4; s <- 1 to 1 do                        // number of lags (endo, exo); trend
-        hp("p")    = p                                                  // endo lags
-        hp("q")    = q                                                  // exo lags
-        hp("spec") = s                                                  // trend specification: 0, 1, 2, 3, 4
-        val mod = ARX_SR_D (xe, y, hh, fEndo_enab = fEn, fExo_enab = fEx)   // create model for time series data
+    for p <- 1 to 5; q <- 0 to 0; s <- 0 to 0 do
+        hp.set (("p", p), ("px", q), ("spec", s))                       // # endo lags, # exo lags, trend specification: 0, 1, 2, 3
+        val mod = ARX_SR_D (xe, y, hh, fEndo = fEn)                     // create model for time series data
+//      val mod = ARX_SR_D.rescale (xe, y, hh, fEndo = fEn, tFormT = Log1p)
+//      val mod = ARX_SR_D (xe, y, hh, fEndo = fEn, fExo = fEx)         // create model for time series data, with exo
+        banner (s"In-ST Forecasts: ${mod.modelName} on COVID-19 Dataset")
         mod.inSample_Test ()                                            // In-sample Testing
         println (mod.summary ())                                        // statistical summary of fit
     end for
@@ -218,37 +253,38 @@ end aRX_SR_DTest3
  */
 @main def aRX_SR_DTest4 (): Unit =
 
-    val exo_vars  = Array ("icu_patients")
-//  val exo_vars  = Array ("icu_patients", "hosp_patients", "new_tests", "people_vaccinated")
-    val (xxe, yy) = loadData (exo_vars, response)
-    println (s"xxe.dims = ${xxe.dims}, yy.dim = ${yy.dim}")
+    val (xe, y) = clip (loadData (Example_Covid.NO_EXO))
+//  val (xe, y) = clip (loadData (BEST_EXO))
+    val hh      = 6                                                     // maximum forecasting horizon
+//  hp("crx") = 1                                                       // 1 => add cross terms
+    val mx = y.max * 0.6
+    Transform.hp("mx") = mx                                             // maximum value in time series
+//  Transform.hp("p") = 1.8                                             // the power to use in Pow
+    Transform.hp("p") = 0.2                                             // the power to use in Pow
+    RidgeRegression.hp("lambda") = 1.0                                  // regularization/shrinkage parameter
 
-//  val xe = xxe                                                        // full
-    val xe = xxe(0 until 116)                                           // clip the flat end
-//  val y  = yy                                                         // full
-    val y  = yy(0 until 116)                                            // clip the flat end
-    val hh = 6                                                          // maximum forecasting horizon
-    hp("lwave") = 20                                                    // wavelength (distance between peaks)
-//  hp("cross") = 1                                                     // 1 => add cross terms
-    Transform.hp("p") = 1.5                                             // the power to use in Pow
+    val fEn: LSET [Transform] = LSET (PowForm (), DQuadForm ())         // endo Transform set
+//  val fEn: LSET [Transform] = LSET (PowForm ())                       // endo Transform set
+//  val fEn: LSET [Transform] = LSET (DQuadForm ())                     // endo Transform set
+//  val fEn: LSET [Transform] = LSET (DIQuadForm ())                    // endo Transform set
+//  val fEx: Array [LSET [Transform]] = Array (LSET (DQuadForm ()))     // exo Transform sets (one per exo var)
 
-    val fEn = LSET (Pow)
-    val fEx = Array (LSET (Pow))
+    import SelectionTech._
+//  val tech = Forward
+    val tech = Backward
+//  val tech = Beam
 
-    for p <- 6 to 6; q <- 4 to 4; s <- 1 to 1 do                        // number of lags (endo, exo); trend
-        hp("p")    = p                                                  // endo lags
-        hp("q")    = q                                                  // exo lags
-        hp("spec") = s                                                  // trend specification: 0, 1, 2, 3, 4
-        val mod = ARX_SR_D (xe, y, hh, fEndo_enab = fEn, fExo_enab = fEx)   // create model for time series data
+    for p <- 1 to 5; q <- 0 to 0; s <- 0 to 0 do
+        hp.set (("p", p), ("px", q), ("spec", s))                       // # endo lags, # exo lags, trend specification: 0, 1, 2, 3
+        val mod = ARX_SR_D (xe, y, hh, fEndo = fEn)                     // create model for time series data
+//      val mod = ARX_SR_D.rescale (xe, y, hh, fEndo = fEn, tFormT = Log1p)
+//      val mod = ARX_SR_D (xe, y, hh, fEndo = fEn, fExo = fEx)         // create model for time series data, with exo
         banner (s"TnT Forecasts: ${mod.modelName} on COVID-19 Dataset")
-        mod.trainNtest_x ()()                                           // use customized trainNtest_x
-        println (mod.summary ())                                        // statistical summary of fit
+        mod.tnT_Test ()                                                 // Train and Test with Rolling Validation
 
-        mod.setSkip (0)
-        mod.rollValidate ()                                             // TnT with Rolling Validation
-        println (s"After Roll TnT Forecast Matrix yf = ${mod.getYf}")
-        mod.diagnoseAll (mod.getY, mod.getYf, Forecaster.teRng (y.dim))   // only diagnose on the testing set
-//      println (s"Final TnT Forecast Matrix yf = ${mod.getYf}")
+        banner (s"feature selection for each horizon using $tech")
+        val (colsArr, rSqArr) = mod.selectFeaturesPerH (tech, "none", first = 0)
+        mod.reportSelection (colsArr, rSqArr, inSample = false)         // k, features, trace per horizon; TnT of the hh models
     end for
 
 end aRX_SR_DTest4
@@ -258,40 +294,30 @@ end aRX_SR_DTest4
 /** The `aRX_SR_DTest5` main function tests the `ARX_SR_D` class on real data:
  *  Forecasting COVID-19 using In-Sample Testing (In-ST).
  *  Test forecasts (h = 1 to hh steps ahead forecasts).
- *  This version performs feature selection.
+ *  This version performs Feature Selection.
  *  > runMain scalation.modeling.forecasting.aRX_SR_DTest5
  */
 @main def aRX_SR_DTest5 (): Unit =
 
-    val exo_vars  = Array ("icu_patients", "positive_rate")
-//  val exo_vars  = Array ("icu_patients", "hosp_patients", "new_tests", "people_vaccinated")
-    val (xxe, yy) = loadData (exo_vars, response)
-    println (s"xxe.dims = ${xxe.dims}, yy.dim = ${yy.dim}")
-
-//  val xe  = xxe                                                       // full
-    val xe  = xxe(0 until 116)                                          // clip the flat end
-//  val y   = yy                                                        // full
-    val y   = yy(0 until 116)                                           // clip the flat end
-    val hh  = 6                                                         // maximum forecasting horizon
-    val p   = 10 
-    hp("p") = p                                                         // endo lags
-    hp("q") = 5                                                         // exo lags
-    hp("spec")  = 2                                                     // trend specification: 0, 1, 2, 3, 4
-    hp("lwave") = 20                                                    // wavelength (distance between peaks)
-//  hp("cross") = 1                                                     // 1 => add cross terms
+    val (xe, y) = clip (loadData (BEST2_EXO))
+    val hh      = 6                                                     // maximum forecasting horizon
+    hp("p")     = 10                                                    // endo lags
+    hp("px")    = 5                                                     // exo lags
+    hp("spec")  = 2                                                     // trend specification: 0, 1, 2, 3
+//  hp("crx")   = 1                                                     // 1 => add cross terms
     Transform.hp("p") = 1.5                                             // the power to use in Pow
     RidgeRegression.hp("lambda") = 1.0                                  // regularization/shrinkage parameter
     FeatureSelection.fullset_FS = true                                  // use full dataset for FS
 
-    val fEn = LSET (Pow)                                                // functions to apply to endo lags
-    val fEx = Array (LSET (Pow), LSET (Pow))                            // functions to apply to exo lags
+    val fEn = LSET (Pow.form (y))                                       // functions to apply to endo lags
+    val fEx = Array (LSET (Pow.form (y)), LSET (Pow.form (y)))          // functions to apply to exo lags
 
-    val mod = ARX_SR_D (xe, y, hh, fEndo_enab = fEn, fExo_enab = fEx)   // create model for time series data
+//  val mod = ARX_SR_D (xe, y, hh, fEndo = fEn, fExo = fEx)             // create model for time series data
+    val mod = ARX_SR_D.rescale (xe, y, hh, fEndo = fEn, fExo = fEx, tFormT = Log1p)  // create model for time series data
     banner (s"In-ST Forecasts: ${mod.modelName} on COVID-19 Dataset")
-    mod.trainNtest_x ()()                                               // train and test on full dataset
+    mod.inSample_Test ()                                                // In-sample Testing
     println (mod.summary ())                                            // statistical summary of fit
 
-//  mod.setSkip (p)                                                     // full AR-formula available when t >= p
     mod.forecastAll ()                                                  // forecast h-steps ahead (h = 1 to hh) for all y
     mod.diagnoseAll (mod.getY, mod.getYf)                               // QoF for each horizon
 //  println (s"Final In-ST Forecast Matrix yf = ${mod.getYf}")
@@ -304,15 +330,8 @@ end aRX_SR_DTest4
 //  for tech <- values if tech == Stepwise do                           // try a particular one
     for tech <- values if tech == Beam do                               // try a particular one
         banner (s"Feature Selection Technique: $tech")
-        val (cols, rSq, modForc) = mod.selectFeaturesAtH (tech, "none")    // R^2, R^2 bar, sMAPE, sMAPEC
-        val k = cols.size
-        println (s"k = $k")
-
-        println (s"best model: ${stringOf (modForc.getFname)}")         // feature names for best model
-
-        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for ${modForc.modelName}", lines = true)
-        banner (s"Feature Selection Key Metrics using $tech")
-        for r_ <- rSq do println (s"$tech: rSq = $r_")
+        val (colsArr, rSqArr) = mod.selectFeatures (tech, "none", h = 1)   // R^2, R^2 bar, sMAPE, sMAPEC
+        mod.reportSelection (colsArr, rSqArr, tnt = false)              // In-ST of the selected multi-horizon model
 
 //      val imp = mod.importance (cols.toArray, rSq)
 //      println (s"feature importance imp = $imp")

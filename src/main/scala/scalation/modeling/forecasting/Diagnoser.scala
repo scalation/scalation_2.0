@@ -12,22 +12,27 @@ package scalation
 package modeling
 package forecasting
 
+import scala.math.max
+
 import scalation.mathstat._
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `Diagnoser` trait provides methods to determine basic Quality of Fit QoF measures
  *  for time series where forecasting at early time points may not be feasible.
- *  @param dfr  the degrees of freedom for regression/model (0 or more)
- *  @param df   the degrees of freedom for error
+ *  @param dfr           the degrees of freedom for regression/model (0 or more)
+ *  @param df            the degrees of freedom for error
+ *  @param hasIntercept  whether the model has an intercept (defaults to true)
  */
-abstract class Diagnoser (dfr: Double, df: Double)
-         extends Fit (dfr, df):
+abstract class Diagnoser (dfr: Double, df: Double,
+                          hasIntercept: Boolean = true)
+         extends Fit (dfr, df, hasIntercept):
 
-    // For In-Sample Testing (In-ST), can't forecast for t = 0 (no past data, unless backcasting)
-    // first value in time series may be atypical (but not an necessarily an outlier) => skip first 2
-    // For Train-and-Test (TnT), can use values from training set, so may set skip = 0
-    // Call `setSkip` to change from the DEFAULT value of 2
-    // When comparing different models, should use the same skip value for all models
+    // For -- In-Sample Testing (In-ST) -- can't forecast for t = 0 (no past data, unless backcasting).
+    // Typically, wish to use all p lags in the model.
+    // Call `setSkip` to change from the DEFAULT value of p
+    // When comparing different models, should use the same skip value for all models, e.g., p_max / 2
+
+    // For -- Train-and-Test (TnT) -- can use values from training set, so may set skip = 0
 
     // Setting skip to 'max (p, q+1)' is common for ARMA (p, q) models, e.g., the state space in
     // Kalman Filters need to hold p past values as well as the q past errors and the current error
@@ -35,23 +40,30 @@ abstract class Diagnoser (dfr: Double, df: Double)
     // For ARIMA using a Kalman Filter, it would be 'd + max(p, q+1)'.
     // Some software avoids this burn-in issue by using a diffuse Kalman filter
 
-    private   val debug = debugf ("Diagnoser", false)                      // debug function
-    protected var skip: Int = 2                                            // number of beginning elements to skip
+    private val debug = debugf ("Diagnoser", false)                        // debug function
+    private var skip: Int = max (1, AR.hp("p").toInt)                      // number of beginning elements to skip
+                                                                           // default for In-Sample is p (max lag)
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Get the current value of skip (the number of elements at the beginning to skip).
+     */
+    def getSkip: Int = skip
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Set the number of data points/elements to skip at the beginning of a time
      *  series for purposes of diagnosis or computing a loss function.
-     *  For In-Sample, the first value (time t = 0) is not forecastable without backcasting.
-     *  @param skip  skip this many elements at the beginning of the time series
+     *  For -- In-Sample Testing (In-ST) -- may set skip to less than the initialized value of p
+     *  For -- Train-and-Test (TnT) -- generally need not skip any values (set to 0)
+     *  @param skip  skip this many elements at the beginning of the time series (defaults to 0)
      */
-    def setSkip (skip_ : Int): Unit = skip = skip_
+    def setSkip (skip_ : Int = 0): Unit = skip = skip_
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Models need to provide a means for updating the Degrees of Freedom (DF).
      *  Note:  Degrees of Freedom are mainly relevant for full and train, not test.
      *  @param size  the size of dataset (full, train, or test sets)
      */
-    def mod_resetDF (size: Int): Unit = resetDF (dfr, size - dfr)
+//  def mod_resetDF (size: Int): Unit = resetDF (dfr, size - dfr)
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Diagnose the health of the model by computing the Quality of Fit (QoF) measures,

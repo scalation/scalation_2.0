@@ -36,7 +36,7 @@ trait Minimizer:
                                                          //   between machine epsilon and its square root
     protected val TOL     = 100.0 * EPSILON              // default tolerance level more relaxed
     protected val STEP    = 0.5                          // default initial step size
-    protected val MAX_IT  = 400                          // maximum number of major steps/iterations 
+    protected val MAX_IT  = 500                          // maximum number of major steps/iterations 
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** The objective function f plus a weighted penalty based on the constraint

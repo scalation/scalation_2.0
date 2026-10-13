@@ -14,11 +14,7 @@ package forecasting
 
 import scalation.mathstat._
 
-import Example_Covid.{loadData, response}
-
 import SelectionTech._
-import MakeMatrix4TS._
-import TransformT._
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** Report the results for the best models given by feature selection to have
@@ -47,18 +43,21 @@ def reportBest (mod: Forecaster_D, hh: Int, dir: String, toFile: Boolean = true,
     val normForm_y = TransformT.Norm.form (y_org(0 until tr_size)) 
     val t_rng   = 0 until tr_size 
     val (x_tr, y_tr) = (x(t_rng), y(t_rng)) 
-    val (_, qof0) = mod.trainNtest_x (x_tr, y_tr)(x_tr, y_tr)
+    val (_, qof0) = mod.trainNtest (x_tr, y_tr)(x_tr, y_tr)
     ew.println (mod.report (qof0))
-    mod.setSkip (0)
+    mod.setSkip ()                                                      // don't skip any rows
     mod.rollValidate ()                                            
     val ftMat0 = mod.diagnoseAll (mod.getY, mod.getYf, Forecaster.teRng (y.dim))  
 
     val qof = new MatrixD (1, hh+1)
     val header: Array [String] = (1 to hh).map (i => s"horizon_$i").toArray ++ Array ("mean")
 
-    val (cols, rSqs, mods, yf_pred, ftMat) = mod.featureSelection (fsType, cross, first, swap)
-    val yForm   = mod.getYForm
-    val yf_full = y_org +^: yForm.fi(yf_pred)
+    val (cols, rSqs)   = mod.selectFeaturesPerH (fsType, cross, first, swap)
+    val (mods, _, ftMat) = mod.reportSelection (cols, rSqs, inSample = false)   // TnT of the hh single-horizon models
+    val yf_pred = MatrixD (mods.toIndexedSeq.map (_.getYf(?, 1))).ᵀ     // column h-1 = the h-step forecasts
+    val yForm   = mod.getYForm                                          // null for an unscaled model
+    val yf_full = y_org +^: (if yForm == null then yf_pred else yForm.fi (yf_pred))
+
     val yf_test = yf_full(Model.trSize (y.dim) until y.dim)
     var yf_save = if ifTest then yf_test else yf_full
     if yf_save == null then yf_save = new MatrixD (1, 1)
@@ -111,22 +110,20 @@ end reportBest
  */
 @main def reportBestTest (): Unit =
 
-    val exo_vars  = Array ("icu_patients", "positive_rate")
-    val (xxe, yy) = loadData (exo_vars, response)
-    println (s"xxe.dims = ${xxe.dims}, yy.dim = ${yy.dim}")
-    RidgeRegression.hp("factorization") = "Fac_Cholesky"
+    import AR.hp
+    import Example_Covid.{BEST2_EXO, clip, loadData}
 
-    val xe = xxe(0 until 116)                                           // clip the flat end
-    val y  = yy(0 until 116)                                            // clip the flat end
-    val hh = 6                                                          // maximum forecasting horizon
-    hp("lwave") = 20                                                    // wavelength (distance between peaks)
-    hp("spec") = 1                                                      // trend specification: 0, 1, 2, 3, 4
+    val (xe, y) = clip (loadData (BEST2_EXO))
+    val hh      = 6                                                     // maximum forecasting horizon
+    hp("spec")  = 1                                                     // trend specification: 0, 1, 2, 3
     val (p, q, lmb) = (6, 4, 0.5)
-    hp("p")    = p                                                      // number of endo lags
-    hp("q")    = q                                                      // number of exo lags
-    RidgeRegression.hp("lambda") = lmb
+    hp("p")     = p                                                     // number of endo lags
+    hp("q")     = q                                                     // number of exo lags
+    RidgeRegression.hp("lambda") = lmb                                  // regularization/shrinkage parameter
+    RidgeRegression.hp("factorization") = "Fac_Cholesky"                // matrix factorization technique
 
-    val mod = ARX_D.rescale (xe, y, hh, tFormT = Log1p)                 // create model for time series data
+    val mod = ARX_D (xe, y, hh)                                         // create model for time series data
+//  val mod = ARX_D.rescale (xe, y, hh, tForm = Log1p.form (y))         // create model for time series data
     reportBest (mod, hh, "reportBestTest", true, false, SelectionTech.Backward)
 
 end reportBestTest

@@ -98,7 +98,7 @@ end Stationarity_KPSS
 import Stationarity_KPSS.coeffKpss
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `KPSS` class provides capabilities of performing KPSS test to determine
+/** The `Stationarity_KPSS` class provides capabilities of performing KPSS test to determine
  *  if a time series is stationary around a deterministic trend.
  *  This code is translated from the C++ code found in
  *  @see github.com/olmallet81/URT.

@@ -1,0 +1,46 @@
+
+\documentclass[11pt,a4paper]{article}
+
+% --- Preamble: Essential Packages ---
+\usepackage[utf8]{inputenc}         % Standard encoding
+\usepackage{booktabs}               % Professional table lines (\toprule, \midrule, \bottomrule)
+\usepackage{tabularx}               % Auto-wrapping tables with adjustable column widths
+\usepackage{amsmath, amssymb}       % Standard math fonts and symbols
+\usepackage{geometry}               % Adjust margins for wider tables
+\geometry{margin=1in}
+
+% FIXED: Added [1] to declare that this column type accepts exactly one argument
+\newcolumntype{Y}[1]{>{\raggedright\arraybackslash\hsize=#1\hsize}X}
+
+\begin{document}
+
+% --- Table Section ---
+\begin{table}[htbp]
+\centering
+\small % Reduces font size slightly to prevent tight line breaks and clipping
+\caption{Comparison of Equation Search and Generation Strategies in AI4Science}
+\label{tab:equation_strategies}
+\vspace{3mm} 
+\begin{tabularx}{\textwidth}{Y{0.9} Y{1.4} Y{0.8} Y{0.8} Y{1.1}}
+\toprule
+\textbf{Search Strategy} & \textbf{Mechanism} & \textbf{Discovery Speed} & \textbf{Complexity Limit} & \textbf{Best For} \\ 
+\midrule
+\textbf{Pathwise Matrix (FFX)} & Sparse deterministic linear regression over fixed libraries & Instantaneous (Seconds) & Low to Medium & Ultra-fast baselines, large datasets \\
+\addlinespace[0.8em]
+\textbf{Time-Delay Search (NARX-SR)} & Recurrent, lag-aware tree or orthogonal regressions & Fast to Medium (Minutes) & Medium to High & Time-series with feedback loops and historical memory \\
+\addlinespace[0.8em]
+\textbf{Physics Decomposition (AI Feynman)} & Structural breakdown via physics priors (symmetries, units) + NN fit & Slow (Hours) & High & Uncovering exact analytic laws of physics from raw data \\
+\addlinespace[0.8em]
+\textbf{Evolutionary Tree (PySR)} & Genetic mutations and crossover of operator trees & Slow to Medium (Mins/Hrs) & High & Open-ended scientific discovery \\
+\addlinespace[0.8em]
+\textbf{Sparse Dynamics (SINDy)} & Sequentially thresholded ridge regression & Fast & Medium & Physical systems (ODEs/PDEs) \\
+\addlinespace[0.8em]
+\textbf{Neural Generation (DSR)} & Token-by-token sequence generation via RL & Medium & Medium & Finding specific structural patterns \\
+\addlinespace[0.8em]
+\textbf{Agentic Loop (SR-Scientist)} & LLM code writing, execution, and optimization & Slow (Agent loops) & Very High & Noisy data needing domain knowledge \\ 
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\end{document}
+

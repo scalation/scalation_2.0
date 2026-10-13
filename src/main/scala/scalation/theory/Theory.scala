@@ -124,7 +124,7 @@ case class Theory ():
         else if mod.isInstanceOf [Forecaster_Reg & Fit] then
             val fmod = mod.asInstanceOf [Forecaster_Reg & Fit]
             println (s"fnames = ${stringOf (mod.getFname)}")
-            fmod.convertReg2Forc (LSET.from (idx.toArray))
+            fmod.getModel (LSET.from (idx.toArray))
         else
             mod                                                     // model does not yet support screening
     end screenFeatures
@@ -138,17 +138,19 @@ case class Theory ():
     def selectFeatures (mod: Model & FeatureSelection & Fit,
                         tech: SelectionTech = SelectionTech.Backward): Model & Fit =
         banner (s"Feature Selection Technique: $tech")
+
         if mod.taskType == TaskType.Predict then
             given qk: Int = QoF.rSqBar.ordinal
-            val rSq = mod.selectFeatures (tech, "many")._2          // R^2, R^2 bar, sMAPE, R^2 cv
+            val rSq = mod.selectFeatures (tech, "many")._2(0)       // R^2, R^2 bar, sMAPE, R^2 cv
             new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Regression with $tech", lines = true)
             mod.getBest.mod
+
         else if mod.isInstanceOf [Forecaster_Reg & Fit] then
             val fmod = mod.asInstanceOf [Forecaster_Reg & Fit]
             given qk: Int = QoF.smapeC.ordinal
-            val rSq = mod.selectFeatures (tech, "none")._2          // R^2, R^2 bar, sMAPE, NO R^2 cv
+            val rSq = mod.selectFeatures (tech, "none")._2(0)       // R^2, R^2 bar, sMAPE, NO R^2 cv
             new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Regression with $tech", lines = true)
-            fmod.convertReg2Forc (mod.getBest.mod_cols)
+            fmod.getModel (mod.getBest.mod_cols)
         else
             mod                                                     // model does not yet support feature selection
     end selectFeatures

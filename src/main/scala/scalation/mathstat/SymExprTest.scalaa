@@ -1,0 +1,60 @@
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** @author  John Miller
+ *  @version 2.0
+ *  @date    Sun May 31 17:40:09 EDT 2026
+ *  @see     LICENSE (MIT style license file).
+ *
+ *  @note    Test for Symbolic Expression Engine
+ *
+ *  Supports lagged variables/vectors: fx"y(-1) - y(-2) + (x_r(-1) * 2.0)"`
+ */
+
+package scalation
+package mathstat
+
+import Interpolators.{fm, fx}      // defined in SymExpr.scala
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `symExprTest` main function tests the symbolic expression code defined in `SymExpr`.
+ *  As a macro is used, any code that uses it must be in a file other than SymExpr.scala.
+ *  > runMain scalation.mathstat.symExprTest
+ */
+@main def symExprTest (): Unit =
+
+    val env = Environment (Map (
+        "y"   -> VectorD (10.0, 11.5, 12.0, 14.2),
+        "x_r" -> VectorD (1.1,  1.2,  1.5,  1.6)))
+
+    // Clean, conflict-proof mathematical literal syntax!
+    val myFormula: Expr = fx"y(-1) - y(-2) + (x_r(-1) * 2.0)"
+
+    given Int = 3
+    println (s"Result at t=3: ${env.run (myFormula)}")
+    println (s"All Slices: ${env.runAll (myFormula)}")
+
+end symExprTest
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `symExprTest2` main function tests the symbolic expression code defined in `SymExpr`.
+ *  As a macro is used, any code that uses it must be in a file other than SymExpr.scala.
+ *  > runMain scalation.mathstat.symExprTest2
+ */
+@main def symExprTest2 (): Unit =
+
+    val env = Environment (Map ( "y" -> VectorD (10.0, 11.5, 12.0, 14.2, 15.1, 16.0)))
+
+    // Define model structural parameters for fitting (using fm)
+    val myModel = fm"c + b1 * y(-1) + b2 * y(-2) + b3 * y(-3)"
+  
+    // Fit and capture the optimized parameter parameters map explicitly
+    val optimizedParameters = env.fit (myModel, targetVariable = "y")
+    println (s"Captured Model Weights: $optimizedParameters")
+
+    // Re-use the exact same expression blueprint for predictions (using fx style evaluation)
+    val trackingPredictions = env.runAll (myModel, optimizedParameters)
+    println (s"Historical Predictions Path: $trackingPredictions")
+
+end symExprTest2
+

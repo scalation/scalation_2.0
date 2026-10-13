@@ -381,13 +381,13 @@ import Example_AutoMPG._
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `regressionTest3` main function tests the `Regression` class using the AutoMPG
- *  dataset.  Assumes no missing values.  It test cross validation.
+ *  dataset.  Assumes no missing values.  It tests in-sample, validation, and cross-validation.
  *  > runMain scalation.modeling.regressionTest3
  */
 @main def regressionTest3 (): Unit =
 
-//  println (s"ox = $ox")                                        // data/input matrix
-//  println (s"y  = $y")                                         // response/output vector
+//  println (s"ox = $ox")                                        // data/input design matrix, ox has a ones column
+//  println (s"y  = $y")                                         // response/output vector, mpg
     println (s"ox_fname = ${stringOf (ox_fname)}")
 
     banner ("AutoMPG Regression")
@@ -397,7 +397,12 @@ import Example_AutoMPG._
     Predictor.makePredictionInt (mod, ox, y, mod.predict (ox))   // make and show PREDICTION INTERVALs
 
     banner ("AutoMPG Validation Test")
-    mod.validate ()()                                            // train-test split
+    mod.validate ()()                                            // 80-20% train-test split
+
+    banner ("AutoMPG Cross-Validation Test")                     // 5-fold cross-validation
+    val stats = mod.crossValidate ()
+    FitM.showQofStatTable (stats)
+
 /*
     // PREDICTION INTERVAL assuming Gaussian errors and using predictInt from `Fit`
 
@@ -415,10 +420,6 @@ import Example_AutoMPG._
     val qof_all_ = mod.diagnose_ (y, yp, l_u_)                   // compute metrics for both point and interval predictions
     mod.showQoF (qof_all_)                                       // show all the QoF metrics
     Predictor.plotPredictionInt (y, yp, l_u_, mod.modelName)     // plot ordered actual, predicted, lower, upper
-
-    banner ("AutoMPG Cross-Validation Test")
-    val stats = mod.crossValidate ()
-    FitM.showQofStatTable (stats)
 */
 end regressionTest3
  
@@ -426,6 +427,8 @@ end regressionTest3
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `regressionTest4` main function tests the `Regression` class using the AutoMPG
  *  dataset.  Assumes no missing values.  It tests forward selection.
+ *  @note: `fullset_FS` in `FeatureSelection` indicates whether to use the full dataset (true)
+ *  or the training set (false, the default) for Feature Selection.
  *  > runMain scalation.modeling.regressionTest4
  */
 @main def regressionTest4 (): Unit =
@@ -439,14 +442,10 @@ end regressionTest3
     mod.inSample_Test ()                                         // train and test the model
     println (mod.summary ())                                     // parameter/coefficient statistics
 
-
     banner ("Feature Selection Technique: Forward")
     val (cols, rSq) = mod.forwardSelAll ()                       // R^2, R^2 bar, sMAPE, R^2 cv
 //  val (cols, rSq) = mod.backwardElimAll ()                     // R^2, R^2 bar, sMAPE, R^2 cv
-    val k = cols.size
-    println (s"k = $k, n = ${x.dim2}")
-    new PlotM (null, rSq, Regression.metrics, "R^2 vs n for Regression", lines = true)
-    println (s"rSq = $rSq")
+    mod.reportSelection (cols, rSq)
 
 end regressionTest4
 
@@ -474,13 +473,11 @@ end regressionTest4
     for tech <- SelectionTech.values do
         banner (s"Feature Selection Technique: $tech")
         val (cols, rSq) = mod.selectFeatures (tech)              // R^2, R^2 bar, sMAPE, R^2 cv
-        val k = cols.size
-        println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Regression with $tech", lines = true)
-        banner ("Feature Importance")
-        println (s"$tech: rSq = $rSq")
-        val imp = mod.importance (cols.toArray, MatrixD (rSq))
-        for (c, r) <- imp do println (s"col = $c, \t ${ox_fname(c)}, \t importance = $r") 
+        mod.reportSelection (cols, rSq)
+
+//      banner ("Feature Importance")
+//      val imp = mod.importance (cols.toArray, MatrixD (rSq))
+//      for (c, r) <- imp do println (s"col = $c, \t ${ox_fname(c)}, \t importance = $r") 
     end for
 
 end regressionTest5
@@ -590,7 +587,7 @@ end regressionTest8
                              1, 4, 4)
     val y = VectorD (2, 3, 5, 4, 6)                              // y vector
 
-    val sst = (y - y.mean).normSq
+    val sst = y.center.normSq
     println (s"sst = $sst")
     val eta = 0.02
     val b = VectorD (0.2, 0.1, 0.2)
@@ -689,10 +686,7 @@ end regressionTest11
 
     banner ("Forward Selection Test")
     val (cols, rSq) = mod.forwardSelAll ()                       // R^2, R^2 bar, sMAPE, R^2 cv
-    val k = cols.size
-    val t = VectorD.range (1, k)                                 // instance index
-    new PlotM (t, rSq, Regression.metrics, "R^2 vs n for Regression", lines = true)
-    println (s"rSq = $rSq")
+    mod.reportSelection (cols, rSq)
 
 end regressionTest12
 

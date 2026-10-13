@@ -60,11 +60,11 @@ object SymbolicRegression:
 
     val powers  = LSET (-2.0, -1.5, -1.0, -0.5, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0)  // powers (x~^p) are doubles
 
-    val rpowers = LSET (Rat(-2), Rat(-5, 3), Rat(-4, 3),                  // powers (x↑r) are rational numbers
+    val rpowers = LSET (Rat(-2), Rat(-5, 3), Rat(-4, 3),                  // powers (x↑r) are rational numbers, @see `scalation.Rat`
                         Rat(-1), Rat(-2, 3), Rat(-1, 3),                  // these allow a negative base x in x↑r
                                  Rat(1, 3),  Rat(2, 3),                   // since the denominators are odd
-                        Rat(1),  Rat(4, 3),  Rat(5, 3),
-                        Rat(2),  Rat(7, 3),  Rat(8, 3),
+                        Rat(1),  Rat(4, 3),  Rat(5, 3),                   // e.g., (-2)↑(1/3) = -1.2599, (-2)↑(2/3) = 1.5874
+                        Rat(2),  Rat(7, 3),  Rat(8, 3),                   // (-a)^m/n = root_n((-a)^m) = root_n(-a)^m
                         Rat(3))
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -386,11 +386,8 @@ import Example_AutoMPG._
 
     for tech <- SelectionTech.values do 
         banner (s"Feature Selection Technique: $tech")
-        val (cols, rSq) = mod.selectFeatures (tech)                     // R^2, R^2 bar, R^2 cv
-        val k = cols.size
-        println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Symbolic Regression with $tech", lines = true)
-        println (s"$tech: rSq = $rSq")
+        val (cols, rSq) = mod.selectFeatures (tech)                     // R^2, R^2 bar, sMAPE, R^2 cv
+        mod.reportSelection (cols, rSq)
     end for
 
     FitM.showQofStatTable (mod.crossValidate ())                        // cross-validation for full model
@@ -425,11 +422,8 @@ end symbolicRegressionTest
 
     for tech <- SelectionTech.values do
         banner (s"Feature Selection Technique: $tech")
-        val (cols, rSq) = mod.selectFeatures (tech)                     // R^2, R^2 bar, R^2 cv
-        val k = cols.size
-        println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Quadratic Regression with $tech", lines = true)
-        println (s"$tech: rSq = $rSq")
+        val (cols, rSq) = mod.selectFeatures (tech)                     // R^2, R^2 bar, sMAPE, R^2 cv
+        mod.reportSelection (cols, rSq)
     end for
 */
 
@@ -456,11 +450,8 @@ end symbolicRegressionTest2
 
     for tech <- SelectionTech.values do 
         banner (s"Feature Selection Technique: $tech")
-        val (cols, rSq) = mod.selectFeatures (tech)                     // R^2, R^2 bar, R^2 cv
-        val k = cols.size
-        println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Quadratic X Regression with $tech", lines = true)
-        println (s"$tech: rSq = $rSq")
+        val (cols, rSq) = mod.selectFeatures (tech)                     // R^2, R^2 bar, sMAPE, R^2 cv
+        mod.reportSelection (cols, rSq)
     end for
 
 end symbolicRegressionTest3
@@ -485,11 +476,8 @@ end symbolicRegressionTest3
 
     for tech <- SelectionTech.values do 
         banner (s"Feature Selection Technique: $tech")
-        val (cols, rSq) = mod.selectFeatures (tech)                     // R^2, R^2 bar, R^2 cv
-        val k = cols.size
-        println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Cubic Regression with $tech", lines = true)
-        println (s"$tech: rSq = $rSq")
+        val (cols, rSq) = mod.selectFeatures (tech)                     // R^2, R^2 bar, sMAPE, R^2 cv
+        mod.reportSelection (cols, rSq)
     end for
 
 end symbolicRegressionTest4
@@ -515,11 +503,8 @@ end symbolicRegressionTest4
 
     for tech <- SelectionTech.values do 
         banner (s"Feature Selection Technique: $tech")
-        val (cols, rSq) = mod.selectFeatures (tech)                     // R^2, R^2 bar, R^2 cv
-        val k = cols.size
-        println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Cubic X Regression with $tech", lines = true)
-        println (s"$tech: rSq = $rSq")
+        val (cols, rSq) = mod.selectFeatures (tech)                     // R^2, R^2 bar, sMAPE, R^2 cv
+        mod.reportSelection (cols, rSq)
     end for
 
 end symbolicRegressionTest5
@@ -546,11 +531,8 @@ end symbolicRegressionTest5
 
     for tech <- SelectionTech.values do
         banner (s"Feature Selection Technique: $tech")
-        val (cols, rSq) = mod.selectFeatures (tech)                     // R^2, R^2 bar, R^2 cv
-        val k = cols.size
-        println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Cubic XX Regression with $tech", lines = true)
-        println (s"$tech: rSq = $rSq")
+        val (cols, rSq) = mod.selectFeatures (tech)                     // R^2, R^2 bar, sMAPE, R^2 cv
+        mod.reportSelection (cols, rSq)
     end for
 
 end symbolicRegressionTest6
@@ -582,11 +564,8 @@ end symbolicRegressionTest6
 
     for tech <- SelectionTech.values do
         banner (s"Feature Selection Technique: $tech")
-        val (cols, rSq) = mod.selectFeatures (tech)                     // R^2, R^2 bar, R^2 cv
-        val k = cols.size
-        println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Symbolic Regression with $tech", lines = true)
-        println (s"$tech: rSq = $rSq")
+        val (cols, rSq) = mod.selectFeatures (tech)                     // R^2, R^2 bar, sMAPE, R^2 cv
+        mod.reportSelection (cols, rSq)
     end for
 
 end symbolicRegressionTest7
@@ -696,11 +675,8 @@ end symbolicRegressionTest9
 
     for tech <- SelectionTech.values do
         banner (s"Feature Selection Technique: $tech")
-        val (cols, rSq) = mod.selectFeatures (tech)                     // R^2, R^2 bar, R^2 cv
-        val k = cols.size
-        println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Quadratic Regression with $tech", lines = true)
-        println (s"$tech: rSq = $rSq")
+        val (cols, rSq) = mod.selectFeatures (tech)                     // R^2, R^2 bar, sMAPE, R^2 cv
+        mod.reportSelection (cols, rSq)
     end for
 
 end symbolicRegressionTest10
@@ -745,11 +721,8 @@ end symbolicRegressionTest10
 //  val tech = SelectionTech.Stepwise
 
     banner (s"Feature Selection Technique: $tech")
-    val (cols, rSq) = mod.selectFeatures (tech)                         // R^2, R^2 bar, R^2 cv
-    val k = cols.size
-    println (s"k = $k, n = ${x.dim2}")
-    new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Quadratic Regression with $tech", lines = true)
-    println (s"$tech: rSq = $rSq")
+    val (cols, rSq) = mod.selectFeatures (tech)                         // R^2, R^2 bar, sMAPE, R^2 cv
+    mod.reportSelection (cols, rSq)
 
 //  end for
 
@@ -807,11 +780,8 @@ end symbolicRegressionTest11
 //  val tech = SelectionTech.Stepwise
 
     banner (s"Feature Selection Technique: $tech")
-    val (cols, rSq) = mod.selectFeatures (tech)                         // R^2, R^2 bar, R^2 cv
-    val k = cols.size
-    println (s"k = $k, n = ${x.dim2}")
-    new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Quadratic Regression with $tech", lines = true)
-    println (s"$tech: rSq = $rSq")
+    val (cols, rSq) = mod.selectFeatures (tech)                         // R^2, R^2 bar, sMAPE, R^2 cv
+    mod.reportSelection (cols, rSq)
 
 //  end for
 
@@ -913,11 +883,8 @@ end symbolicRegressionTest13
     banner (s"Best Full Model: ${best.mod.modelName}, qof = ${best.qof}")
 
     banner (s"Feature Selection Technique: Stepwise")
-    val (cols, rSq) = best.mod.selectFeatures (SelectionTech.Stepwise, "one")  // R^2, R^2 bar, R^2 cv
-    val k = cols.size
-    println (s"k = $k, n = ${x.dim2}")
-    new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Symbolic Regression with Stepwise", lines = true)
-    println (s"Stepwise: rSq = $rSq")
+    val (cols, rSq) = best.mod.selectFeatures (SelectionTech.Stepwise, "one")  // R^2, R^2 bar, sMAPE, R^2 cv
+    best.mod.reportSelection (cols, rSq)
 
 end symbolicRegressionTest14
 

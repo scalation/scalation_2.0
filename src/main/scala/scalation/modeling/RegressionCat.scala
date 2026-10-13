@@ -367,11 +367,8 @@ import Example_AutoMPG.{oxr, y, oxr_fname}
 
     for tech <- SelectionTech.values do
         banner (s"Feature Selection Technique: $tech")
-        val (cols, rSq) = mod.selectFeatures (tech)                   // R^2, R^2 bar, R^2 cv
-        val k = cols.size
-        println (s"k = $k, n = ${oxr.dim2}")
-        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Regression with $tech", lines = true)
-        println (s"$tech: rSq = $rSq")
+        val (cols, rSq) = mod.selectFeatures (tech)                   // R^2, R^2 bar, sMAPE, R^2 cv
+        mod.reportSelection (cols, rSq)
     end for
 
 end regressionCatTest4
@@ -406,11 +403,8 @@ end regressionCatTest4
 
     for tech <- SelectionTech.values do
         banner (s"Feature Selection Technique: $tech")
-        val (cols, rSq) = mod.selectFeatures (tech)                   // R^2, R^2 bar, R^2 cv
-        val k = cols.size
-        println (s"k = $k, n = ${oxr.dim2}")
-        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for RegressionCat with $tech", lines = true)
-        println (s"$tech: rSq = $rSq")
+        val (cols, rSq) = mod.selectFeatures (tech)                   // R^2, R^2 bar, sMAPE, R^2 cv
+        mod.reportSelection (cols, rSq)
     end for
 */
 

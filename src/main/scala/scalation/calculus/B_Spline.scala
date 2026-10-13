@@ -139,7 +139,6 @@ class B_Spline (ττ: VectorD, mMax: Int = 4, clamp: Boolean = true)
             else if k == 0 then                                     // evaluate order 1
                 for i <- 0 until nf do
                     N(i) = if (τ(i+j) < t || τ(i+j) =~ t) && (t < τ(i+j+1)) then 1.0 else 0.0
-                end for
             else if k > 0 then                                      // evaluate orders (k+1) <= k
                 for i <- 0 until nf do
                     val bs1 = N(i)
@@ -194,7 +193,6 @@ class B_Spline (ττ: VectorD, mMax: Int = 4, clamp: Boolean = true)
             else if k == 0 then                          // evaluate order 1
                 for i <- 0 until nf-1 do
                     N(i) = if (τ(i) < t || τ(i) =~ t) && (t < τ(i+1)) then 1.0 else 0.0
-                end for
             else if k > 0 then                           // evaluate orders (k+1) <= k
                 for i <- 0 until nf do
                     val bs1 = N(i)
@@ -304,8 +302,8 @@ end B_Spline
         val y2 = new VectorD (n)
 
         for i <- 0 until n do
-            y1(i) = bs.bf (m)(1)(t(i))                     // first "interesting" B-Spline
-            y2(i) = bs.bf (m)(2)(t(i))                     // next B-Spline
+            y1(i) = bs.bf (m)(1)(t(i))                       // first "interesting" B-Spline
+            y2(i) = bs.bf (m)(2)(t(i))                       // next B-Spline
         end for
         new Plot (t, y1, y2, "B-Spline order " + m)
     end for

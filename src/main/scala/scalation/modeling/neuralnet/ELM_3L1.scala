@@ -353,7 +353,6 @@ end eLM_3L1Test5
 
     import Example_AutoMPG._
 
-    val n = ox.dim2                                                 // number of parameters/variables
     banner ("ELM_3L1 feature selection - Example_AutoMPG")
 
     val f_ = f_tanh                                                 // try different activation functions
@@ -367,11 +366,7 @@ end eLM_3L1Test5
 
     banner ("Forward Selection Test")
     val (cols, rSq) = elm.forwardSelAll ()                          // R^2, R^2 bar, smape, R^2 cv
-    println (s"rSq = $rSq")
-    val k = cols.size
-    println (s"k = $k, n = $n")
-    val t = VectorD.range (1, k)                                    // instance index
-    new PlotM (t, rSq, Regression.metrics, "R^2 vs n for ELM_3L1", lines = true)
+    elm.reportSelection (cols, rSq)
 
 end eLM_3L1Test6
 

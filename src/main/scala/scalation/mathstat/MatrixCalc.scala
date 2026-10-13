@@ -101,7 +101,8 @@ end matrixCalc0
  */
 @main def matrixCalc2 (): Unit =
 
-    val csvFile = ".../...csv"
+//  val csvFile = ".../...csv"
+    val csvFile = ""
 
     val xx = MatrixD.load (csvFile, 1, 3, fullPath = true)                        // skip 1 row and 3 columns
     val n = xx.dim2 - 3                                                           // last column should be empty

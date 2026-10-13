@@ -57,7 +57,7 @@ import SimpleNN._
  */
 @main def simpleNN1 (): Unit =
 
-    val sst = (y - y.mean).normSq                               // sum of squares total
+    val sst = y.center.normSq                                   // sum of squares total
     val b   = VectorD (0.1, 0.2, 0.1)                           // initial weights/parameters (random in practice)
 
     val η = 0.1                                                 // learning rate (to be tuned)
@@ -104,7 +104,7 @@ end simpleNN1
  */
 @main def simpleNN2 (): Unit =
 
-    val sst = (y - y.mean).normSq                               // sum of squares total
+    val sst = y.center.normSq                                   // sum of squares total
     val b   = VectorD (0.1, 0.2, 0.1)                           // initial weights/parameters (random in practice)
 
     val η = 0.2                                                 // learning rate (to be tuned)
@@ -165,7 +165,7 @@ end simpleNN2
  */
 @main def simpleNN3 (): Unit =
 
-    val sst = (y - y.mean).normSq                               // sum of squares total
+    val sst = y.center.normSq                                   // sum of squares total
 
     val b = VectorD (0.1, 0.2, 0.1)                             // initial weights/parameters (random in practice)
 
@@ -225,7 +225,7 @@ end simpleNN3
 @main def simpleNN4 (): Unit =
 
     val (x, y) = (xy(?, 0 until 3), xy(?, 3 until 5))           // input matrix, output/response matrix
-    val sst    = (y - y.mean).normSq                            // sum of squares total
+    val sst    = y.center ().normSq                             // sum of squares total
 
     val b = MatrixD ((3, 2), 0.1, 0.1,
                              0.2, 0.1,
@@ -283,7 +283,7 @@ end simpleNN4
     import scalation.mathstat.MatrixDOps._                      // may clash with VectorDOps
 
     val (x, y) = (xy(?, 0 until 3), xy(?, 3 until 5))           // input matrix, output/response matrix
-    val sst    = (y - y.mean).normSq                            // sum of squares total
+    val sst    = y.center ().normSq                             // sum of squares total
 
     val b = MatrixD ((3, 2), 0.1, 0.1,
                              0.2, 0.1,
@@ -344,7 +344,7 @@ end simpleNN5
     import scalation.mathstat.MatrixDOps._                      // may clash with VectorDOps
 
     val (x, y) = (xy(?, 1 until 3), xy(?, 3 until 5))           // input matrix, output/response matrix
-    val sst    = (y - y.mean).normSq                            // sum of squares total
+    val sst    = y.center ().normSq                             // sum of squares total
 
     val a = MatrixD ((2, 3), 0.1, 0.1, 0.1,                     // parameter/weight matrix: input -> hidden
                              0.1, 0.1, 0.1)
@@ -438,7 +438,7 @@ end simpleNN6
     println (s"xx = $xx")
     println (s"yy = $yy")
 
-    val sst      = (yy - yy.mean).normSq                        // sum of squares total
+    val sst = yy.center ().normSq                                  // sum of squares total
     println (s"sst = $sst")
 
     val a = MatrixD ((2, 3),  0.2,  0.3,  0.2,                  // parameter/weight matrix: input -> hidden
@@ -554,7 +554,7 @@ end simpleNN7
 
     val n       = xy.dim2 - 1                                   // last column in xy
     val (xx, y) = (xy.not(?, n), xy(?, n))                      // (data/input matrix, response column)
-    val sst     = (y - y.mean).normSq                           // sum of squares total
+    val sst     = y.center.normSq                               // sum of squares total
     val yy      = MatrixD.fromVector (y)                        // turn the m-vector y into an m-by-1 matrix
 
     val a = MatrixD.fill (6, 3, 0.1)                            // parameter/weight matrix: input -> hidden

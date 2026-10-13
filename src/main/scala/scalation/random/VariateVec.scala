@@ -113,6 +113,8 @@ end ProbabilityVec
 case class NormalVec (mu: VectorD, cov: MatrixD, stream: Int = 0)
      extends VariateVec (stream):
 
+    def this (mu_ : Double, cov_ : MatrixD) = this (VectorD.fill (cov_.dim)(mu_), cov_)
+
     import Fac_LU.{det, inverse}
 
     private val normal = Normal (0.0, 1.0, stream)           // generator for standard normals

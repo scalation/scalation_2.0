@@ -6,23 +6,21 @@
  *  @see     LICENSE (MIT style license file).
  *
  *  @note    Line Search Optimizer
+ *
+ *  @see `scalation.ValueType.GOLDEN_R` Golden Ration = ((1.0 + sqrt (5.0)) / 2.0 = 1.618033988749895
  */
 
 package scalation
 package optimization
 
-import scala.math.{abs, sqrt}
+import scala.math.abs
 import scala.util.control.Breaks.{breakable, break}
 
 import scalation.mathstat._
 
-/** the golden ratio (1.618033988749895)
- */
-val G_RATIO = (1.0 + sqrt (5.0)) / 2.0
-
 /** the golden section number (0.6180339887498949)
  */
-val G_SECTION = G_RATIO / (1.0 + G_RATIO)
+val G_SECTION = GOLDEN_R / (1.0 + GOLDEN_R)
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `GoldenSectionLS` class performs a line search on 'f(x)' to find a minimal
@@ -101,7 +99,7 @@ class GoldenSectionLS (f: FunctionS2S, τ: Double = 1E-5)
                 debug ("lsearch", s"x1 = $x1, f1 = $f1, x2 = $x2, f2 = $f2, x3 = $x3, f3 = $f3")
                 if f1 > f2 && f2 < f3 then { matched = true; break () }     // found down-up pattern, e.g., 20, 10, 30
                 x2 = x3
-                x3 = x1 + G_RATIO * dist                    // increase upper bound
+                x3 = x1 + GOLDEN_R * dist                   // increase upper bound
             end for
         } // breakable
 
@@ -117,7 +115,7 @@ class GoldenSectionLS (f: FunctionS2S, τ: Double = 1E-5)
     /** Print the golden ratio and the golden section.
      */
     def printGolden (): Unit =
-        println ("GOLDEN_RATIO   = " + G_RATIO)
+        println ("GOLDEN_RATIO   = " + GOLDEN_R)
         println ("GOLDEN_SECTION = " + G_SECTION)
     end printGolden
 
@@ -134,8 +132,13 @@ end GoldenSectionLS
 //  def f (x: Double): Double = (x - 4.0) * (x - 4.0) + 1.0      // no expansion phase
     def f (x: Double): Double = (x - 40.0) * (x - 40.0) + 1.0    // requires expansion phase
     val solver = new GoldenSectionLS (f)
-    println ("\nProblem 1: (x - 4)^2 + 1") 
+//  println ("\nProblem 1: (x - 4)^2 + 1") 
+    println ("\nProblem 1: (x - 40)^2 + 1") 
     println ("optimal solution = " + solver.search (10.0))
+
+    println ("=" * 60)
+    println (s"GOLDEN_R  = $GOLDEN_R")
+    println (s"G_SECTION = $G_SECTION")
 
 end goldenSectionLSTest
 
@@ -143,7 +146,7 @@ end goldenSectionLSTest
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `goldenSectionLSTest2` main function is used to test the `goldenSectionLS` class
  *  on vector functions.
- *  > runMain scalation.optimization.goldenSectionLSTest
+ *  > runMain scalation.optimization.goldenSectionLSTest2
  */
 @main def goldenSectionLSTest2 (): Unit =
 
