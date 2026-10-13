@@ -279,7 +279,7 @@ end ridgeBridgeRegressionTest
 /** The `ridgeBridgeRegressionTest2` main function tests the `RidgeBridgeRegression` class using
  *  the AutoMPG dataset.  Assumes no missing values.
  *  It also combines feature selection with cross-validation and plots
- *  R^2, R^2 bar and R^2 cv vs. the instance index.
+ *  R^2, R^2 bar, sMAPE, and R^2 cv vs. the instance index.
  *  Note, since x0 is automatically included in feature selection, make it an important variable.
  *  > runMain scalation.modeling.ridgeBridgeRegressionTest2
  */
@@ -384,7 +384,7 @@ end ridgeBridgeRegressionTest4
 /** The `ridgeBridgeRegressionTest5` main function tests the `RidgeBridgeRegression` class using
  *  the AutoMPG dataset.  Assumes no missing values.
  *  It also combines feature selection with cross-validation and plots
- *  R^2, R^2 bar and R^2 cv vs. the instance index.
+ *  R^2, R^2 bar, sMAPE, and R^2 cv vs. the instance index.
  *  Note, since x0 is automatically included in feature selection, make it an important variable.
  *  > runMain scalation.modeling.ridgeBridgeRegressionTest5
  */
@@ -417,11 +417,8 @@ end ridgeBridgeRegressionTest4
 
     for tech <- SelectionTech.values do
         banner (s"Feature Selection Technique: $tech")
-        val (cols, rSq) = mod.selectFeatures (tech)                    // R^2, R^2 bar, R^2 cv
-        val k = cols.size
-        println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for RidgeBridgeRegression with $tech", lines = true)
-        println (s"$tech: rSq = $rSq")
+        val (cols, rSq) = mod.selectFeatures (tech)                    // R^2, R^2 bar, sMAPE, R^2 cv
+        mod.reportSelection (cols, rSq)
     end for
 */
 

@@ -329,13 +329,10 @@ import forecasting.Example_Covid.{loadData, NO_EXO, response}
 /*
     banner (s"Feature Selection Technique: Stepwise")
     val (cols, rSq) = mod.stepwiseSelAll (cross = false)               // R^2, R^2 bar, sMAPE, NA
-    val k = cols.size
-    println (s"k = $k, n = ${mod.getX.dim2}")
-    new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for RegressionTreeMT4TS with tech", lines = true)
+    mod.reportSelection (cols, rSq, tnt = false)
 //  println (mod.summary ())
 
     banner ("Feature Importance")
-    println (s"Stepwise: rSq = $rSq")
 //  val imp = mod.importance (cols.toArray, rSq)
 //  for (c, r) <- imp do println (s"col = $c, \t ${header(c)}, \t importance = $r")
 */
@@ -402,13 +399,10 @@ end regressionTreeMT4TSTest4
 
     banner (s"Feature Selection Technique: $tech")
     val (cols, rSq) = mod.selectFeatures (tech, cross = "none")             // R^2, R^2 bar, sMAPE, NA
-    val k = cols.size
-    println (s"k = $k, n = ${mod.getX.dim2}")
-    new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for RegressionTreeMT4TS with tech", lines = true)
+    mod.reportSelection (cols, rSq, tnt = false)
 //  println (mod.summary ())
 
     banner ("Feature Importance")
-    println (s"$tech: rSq = $rSq")
 //  val imp = mod.importance (cols.toArray, rSq)
 //  for (c, r) <- imp do println (s"col = $c, \t ${header(c)}, \t importance = $r")
 
@@ -444,13 +438,10 @@ end regressionTreeMT4TSTest5
 
     banner (s"Feature Selection Technique: $tech")
     val (cols, rSq) = mod.selectFeatures (tech, cross = "none")             // R^2, R^2 bar, sMAPE, NA
-    val k = cols.size
-    println (s"k = $k, n = ${mod.getX.dim2}")
-    new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for RegressionTreeMT4TS with tech", lines = true)
+    mod.reportSelection (cols, rSq, tnt = false)
 //  println (mod.summary ())
 
     banner ("Feature Importance")
-    println (s"$tech: rSq = $rSq")
 //  val imp = mod.importance (cols.toArray, rSq)
 //  for (c, r) <- imp do println (s"col = $c, \t ${header(c)}, \t importance = $r")
 
@@ -497,13 +488,10 @@ end regressionTreeMT4TSTest6
 
     banner (s"Feature Selection Technique: $tech")
     val (cols, rSq) = mod.selectFeatures (tech, cross = "none")             // R^2, R^2 bar, sMAPE, NA
-    val k = cols.size
-    println (s"k = $k, n = ${mod.getX.dim2}")
-    new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for RegressionTreeMT4TS with tech", lines = true)
+    mod.reportSelection (cols, rSq, tnt = false)
 //  println (mod.summary ())
 
     banner ("Feature Importance")
-    println (s"$tech: rSq = $rSq")
 //  val imp = mod.importance (cols.toArray, rSq)
 //  for (c, r) <- imp do println (s"col = $c, \t ${header(c)}, \t importance = $r")
 

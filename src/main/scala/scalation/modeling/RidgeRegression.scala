@@ -53,17 +53,22 @@ class RidgeRegression (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
                        hparam: HyperParameter = RidgeRegression.hp,
                        xℱ: Transform = null, yℱ: Transform = null)
       extends Predictor (x, y, fname_, hparam)
-         with Fit (dfr = x.dim2, df = x.dim - x.dim2 - 1):
+         with Fit (dfr = x.dim2, df = x.dim - x.dim2 - 1)
+         with EffectiveDoF:
          // degrees of freedom: dfr = n, df = m - n - 1 as centered x matrix has 1 less column
          // if not using an intercept df = (x.dim2, x.dim-x.dim2), correct by calling 'resetDF' method from `Fit`
          // no intercept => correct Degrees of Freedom (DoF); as lambda get larger, need effective DoF
 
     private val debug     = debugf ("RidgeRegression", false)            // debug function
     private val algorithm = hparam("factorization")                      // factorization algorithm
+    private var fac: Factorization = null                                // factorization implementation
     private val lambda    = if hparam("lambda") <= 0.0 then findLambda._1
                             else hparam("lambda").toDouble
+    private var edof      = -0.0                                         // effective Degrees of Freedom
 
     _modelName = s"RidgeRegression_${lambda}"
+
+    debug ("init", s"$_modelName on x.dims = ${x.dims}, y.dim = ${y.dim}")
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the value of the shrinkage parameter lambda.
@@ -71,23 +76,28 @@ class RidgeRegression (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
     def lambda_ : Double = lambda
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the effective Degrees of Freedom (for the regression model).
+     */
+    def edof_ : Double = edof
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Create a solver for the Modified Normal Equations using the selected
      *  factorization technique.
      *  @param x_  the data/input matrix
      */
     private def solver (x_ : MatrixD): Factorization =
-        val xtx  = x_.ᵀ * x_                                             // pre-compute X.t * X
-        val ey   = MatrixD.eye (x_.dim, x_.dim2)                         // identity matrix
-        val xtx_ = xtx.copy                                              // copy xtx (X.t * X)
-        for i <- xtx_.indices do xtx_(i, i) += lambda                    // add lambda to the diagonal
+        def xtx_λ: MatrixD =                                             // only the normal-equation branches need X'X
+            val xtx_ = x_.ᵀ * x_
+            for i <- xtx_.indices do xtx_(i, i) += lambda                // add lambda to the diagonal
+            xtx_
 
         algorithm match                                                  // select the factorization technique
-        case "Fac_QR"       => val xx = x_ ++ (ey * sqrt (lambda))
-                               Fac_QR (xx)                               // QR/LQ Factorization
-//      case "Fac_SVD"      => new Fac_SVD (x_)                          // Singular Value Decomposition - FIX
-        case "Fac_Cholesky" => new Fac_Cholesky (xtx_)                   // Cholesky Factorization
-        case "Fac_LU"       => new Fac_LU (xtx_)                         // LU Factorization
-        case _              => new Fac_Inverse (xtx_)                    // Inverse Factorization
+        case "Fac_QR"       => val eyn = MatrixD.eye (x_.dim2, x_.dim2)  // SQUARE n-by-n identity
+                               Fac_QR (x_ ++ (eyn * sqrt (lambda)), true)   // augmented (m+n)-by-n system
+//      case "Fac_SVD"      => new Fac_SVD (x_)                          // SVD - see note below
+        case "Fac_Cholesky" => new Fac_Cholesky (xtx_λ)
+        case "Fac_LU"       => new Fac_LU (xtx_λ)
+        case _              => new Fac_Inverse (xtx_λ)
         end match
     end solver
 
@@ -100,13 +110,17 @@ class RidgeRegression (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
      *  @param y_  the response/ouput vector
      */
     def train (x_ : MatrixD = x, y_ : VectorD = y): Unit =
-        val fac = solver (x_)                                            // create selected factorization technique
+        fac = solver (x_)                                                // create selected factorization technique
         fac.factor ()                                                    // factor the matrix, either X or X.t * X
 
         b = fac match                                                    // solve for coefficient vector b
-            case fac: Fac_QR  => fac.solve (y_ ++ new VectorD (y_.dim))
+            case fac: Fac_QR  => fac.solve (y_ ++ new VectorD (x_.dim2))  // pad with n zeros (matches √λ·I_n rows)
 //          case fac: Fac_SVD => fac.solve (y_)
             case _            => fac.solve (x_.ᵀ * y_)
+
+        edof = fac match                                                 // effective Degrees of Freedom
+            case q: Fac_QR => calcEDoF (x_, q)                           // ||X R^-1||_F^2 from the augmented QR
+            case _         => (fac.inverse * (x_.ᵀ * x_)).trace          // tr ((X'X + λI)^-1 X'X)
     end train
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -211,7 +225,11 @@ class RidgeRegression (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
      */
     override def summary (x_ : MatrixD = getX, fname_ : Array [String] = fname, b_ : VectorD = b,
                           vifs: VectorD = vif ()): String =
-        super.summary (x_, fname_, b_, vifs)                             // summary from `Fit`
+//      super.summary (x_, fname_, b_, vifs)                             // summary from `Fit` (no regularization)
+
+        val diag   = fac.inverse(?)                                      // take inverse and get main diagonal
+        val stdErr = (diag * mse_).sqrt                                  // standard error of coefficients
+        showSummary (stdErr, fname_, b_, vifs)
     end summary
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -235,8 +253,9 @@ object RidgeRegression extends Regularized:
 
     /** Base hyper-parameter specification for `RidgeRegression` and other regularized regression classes
      */
+    val fr = Regression.hp("factorization")
     val hp = new HyperParameter
-    hp += ("factorization", "Fac_Cholesky", "Fac_Cholesky")            // factorization algorithm
+    hp += ("factorization", fr, fr)                                    // factorization algorithm
     hp += ("lambda", 0.1, 0.1)                                         // Ridge L_2 regularization/shrinkage parameter
     hp += ("sparse", 1, 1)                                             // 1 => sparsify, 0 => don't (@see sparsify in `LassoRegression`)
     hp += ("beta", 0.1, 0.1)                                           // Bridge L_q regularization/shrinkage parameter
@@ -499,7 +518,7 @@ end ridgeRegressionTest4
 /** The `ridgeRegressionTest5` main function tests the `RidgeRegression` class using
  *  the AutoMPG dataset.  Assumes no missing values.
  *  It also combines feature selection with cross-validation and plots
- *  R^2, R^2 bar and R^2 cv vs. the instance index.
+ *  R^2, R^2 bar, sMAPE, and R^2 cv vs. the instance index.
  *  Note, since x0 is automatically included in feature selection, make it an important variable.
  *  > runMain scalation.modeling.ridgeRegressionTest5
  */
@@ -520,7 +539,8 @@ end ridgeRegressionTest4
     val mod = RidgeRegression.center (x, y, x_fname)                   // create a ridge regression model (no intercept)
     mod.inSample_Test ()                                               // train and test the model
     println (mod.summary ())                                           // parameter/coefficient statistics
-    Predictor.makePredictionInt (mod, mod.getX, y, mod.predict (x))    // make and show PREDICTION INTERVALs
+    banner (s"effective Degrees of Freedom = ${mod.edof_}")
+    Predictor.makePredictionInt (mod, mod.getX, y, mod.predict (x))    // make and show PREDICTION INTERVALS
 
     banner ("AutoMPG Validation Test")
     mod.validate ()()
@@ -533,11 +553,8 @@ end ridgeRegressionTest4
 
     for tech <- SelectionTech.values do
         banner (s"Feature Selection Technique: $tech")
-        val (cols, rSq) = mod.selectFeatures (tech)                    // R^2, R^2 bar, R^2 cv
-        val k = cols.size
-        println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for RidgeRegression with $tech", lines = true)
-        println (s"$tech: rSq = $rSq")
+        val (cols, rSq) = mod.selectFeatures (tech)                    // R^2, R^2 bar, sMAPE, R^2 cv
+        mod.reportSelection (cols, rSq)
     end for
 */
 

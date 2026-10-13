@@ -14,17 +14,23 @@
  *      y = F-inv(p) = 1.96
  *  α, the significance level, is the probability of making a Type I error in hypothesis testing, i.e.,
  *      α = P(reject null hypothesis | null hypothesis is true)
- *  In ONE-TAIL hypothesis testing, .025 of the mass is in the right tail (unusually large)
- *  Assuming the data follows the Standard Normal Distribution, how likely is it to see a value >= 1.96
+ *
+ *  In ONE-TAIL hypothesis testing, .05 of the mass is in the right tail (unusually large)
+ *  Assuming the data follows the Standard Normal Distribution, how likely is it to see a value >= 1.645
  *      α = .05
  *      p = 1 - α = .95
+ *
  *  In TWO-TAIL hypothesis testing, .025 of the mass is in the left tail and .025 is in right tail (unusually extreme)
- *  Assuming the data follows the Standard Normal Distribution, how likely is it to see a value <= 1.96 or >= 1.96
+ *  Assuming the data follows the Standard Normal Distribution, how likely is it to see a value <= -1.96 or >= 1.96
  *      α = .05
  *      p = 1 - α/2 = .975
- *--------------------------------------------------------------------------
+ *
  *  The confidence level is the probability of NOT making a Type I error
  *      p_ = 1 - α
+ *
+ *  For small sample sizes, use the Student's t-distribution
+ *
+ *  @see `modeling.Fit` for Prediction Intervals
  */
 
 package scalation
@@ -32,7 +38,7 @@ package mathstat
 
 import scala.collection.mutable.{ArrayBuffer => VEC}
 //import scala.collection.mutable.{ListBuffer => VEC}
-import scala.math.{abs, sqrt}
+import scala.math.{abs, min, sqrt}
 
 private val flaw = flawf ("top")                           // flaw function
 
@@ -140,6 +146,45 @@ def t_meanTest (mu0: Double, mu: Double, sig: Double, n: Int, p_ : Double = .95,
     if show then println (s"t_meanTest: | $mu - $mu0 | <=? $ihw")
     abs (mu - mu0) <= ihw
 end t_meanTest
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** Test (2-tail) whether two PAIRED samples a and b differ in location, using the
+ *  Wilcoxon signed-rank test -- the non-parametric alternative to the paired
+ *  t-test, e.g., for the sMAPE scores of two forecasting methods over the same
+ *  seeds or folds.  Returns (W, z, p-value): the statistic W = min (W+, W-), its
+ *  normal approximation z (continuity-corrected, tie-corrected variance) and the
+ *  two-sided p-value, so that  p-value < 1 - p_  rejects "no difference" at
+ *  confidence level p_ (e.g., p-value < .05 at p_ = .95).  Pairs with a(i) == b(i)
+ *  are dropped before ranking (no evidence either way); if none remain, returns
+ *  (0, 0, 1).  The normal approximation is the usual one for n >= 10 pairs.
+ *  @see en.wikipedia.org/wiki/Wilcoxon_signed-rank_test
+ *  @param a     the first sample
+ *  @param b     the second sample, paired with a (same length)
+ *  @param show  whether to show details of the test
+ */
+def wilcoxon_test (a: VectorD, b: VectorD, show: Boolean = false): (Double, Double, Double) =
+    if a.dim != b.dim then { flaw ("wilcoxon_test", "samples must have the same length"); return (0.0, 0.0, 1.0) }
+
+    val d  = (a - b).filter (_ != 0.0)                                  // non-zero paired differences
+    val n  = d.dim
+    if n == 0 then return (0.0, 0.0, 1.0)
+
+    val rk = d.abs.midRank                                              // mid-ranks of |d| (ties averaged)
+    val wp = Σ (0, n) { i => if d(i) > 0.0 then rk(i) else 0.0 }        // W+ = sum of ranks of positive differences
+    val wm = Σ (0, n) { i => if d(i) < 0.0 then rk(i) else 0.0 }        // W- = sum of ranks of negative differences
+    val w  = min (wp, wm)
+
+    val tcor  = rk.groupBy (identity).values.map (_.size.toDouble)      // Σ (t^3 - t) over the tie groups of |d|
+                  .map (t => t * t * t - t).sum
+    val meanW = n * (n + 1) / 4.0
+    val varW  = n * (n + 1) * (2 * n + 1) / 24.0 - tcor / 48.0
+    if varW <= 0.0 then return (w, 0.0, 1.0)                            // all |d| tied => no test
+
+    val z = (w - meanW + (if w < meanW then 0.5 else -0.5)) / sqrt (varW)   // continuity correction toward the mean
+    val p = min (1.0, 2.0 * (1.0 - random.CDF.normalCDF (abs (z))))
+    if show then println (s"wilcoxon_test: n = $n, W+ = $wp, W- = $wm, W = $w, z = $z, p-value = $p")
+    (w, z, p)
+end wilcoxon_test
 
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -431,4 +476,33 @@ end statisticTest
     println ("t_crit (10)       = " + t_crit (10))
 
 end statisticTest2
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `statisticTest3` main function tests the `wilcoxon_test` function on paired
+ *  scores (e.g., the sMAPE of two forecasting methods over the same 12 seeds):
+ *  one pair is tied (dropped) and the absolute differences have ties, so both
+ *  corrections are exercised.  Expected values were checked against SciPy's
+ *  wilcoxon (zero_method = "wilcox", correction = True, method = "approx").
+ *  > runMain scalation.mathstat.statisticTest3
+ */
+@main def statisticTest3 (): Unit =
+
+    val a = VectorD (21.50, 20.25, 22.00, 19.75, 20.50, 21.25, 20.00, 20.75, 21.50, 20.25, 21.00, 21.75)
+    val b = VectorD (20.75, 19.50, 22.00, 19.00, 21.00, 20.50, 19.25, 20.00, 21.00, 20.75, 20.25, 21.25)
+
+    banner ("Wilcoxon signed-rank test: method a vs. method b (paired)")
+    val (w, z, p) = wilcoxon_test (a, b, show = true)
+    println (s"W = $w (expect 5), z = $z (expect -2.5289027), p-value = $p (expect 0.0114420)")
+    assert (w == 5.0 && abs (z + 2.528902694294) < 1E-9 && abs (p - 0.011441974423) < 1E-6)
+
+    banner ("no difference: identical samples => (0, 0, 1)")
+    println (s"wilcoxon_test (a, a) = ${wilcoxon_test (a, a)}")
+    assert (wilcoxon_test (a, a) == (0.0, 0.0, 1.0))
+
+    banner ("symmetry: swapping the samples gives the same W and p-value")
+    val (w2, _, p2) = wilcoxon_test (b, a)
+    assert (w2 == w && abs (p2 - p) < 1E-12)
+
+end statisticTest3
 

@@ -1,0 +1,938 @@
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** @author  John Miller, Yousef Fekri Dabanloo
+ *  @version 2.0
+ *  @date    Thu Jun 25 19:23:06 EDT 2026
+ *  @see     LICENSE (MIT style license file).
+ *
+ *  @note    Model Support: Allows ARX* Models to be Entered using Formulas
+ *           via `ARX_Formula`
+ *  @note    AI Assisted Code
+ */
+
+package scalation
+package modeling
+package forecasting
+
+import scala.collection.mutable.{ArrayBuffer => VEC, LinkedHashSet => LSET}
+//import scala.collection.mutable.Map
+import scala.language.{dynamics, implicitConversions}
+import scala.math.max
+import scala.runtime.ScalaRunTime.stringOf
+
+import scalation.mathstat._
+
+import AR.hp
+import TransformT._
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `Term` base trait is for any term on the right hand side of the equation.
+ */
+trait Term:
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the name of the term.
+     */
+    def name: String
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the DISPLAY label for this term, distinct from `name`: `name` is the
+     *  dataset key used for column lookup, while `label` uniquely identifies the term
+     *  (lag, transform, interaction) for feature naming in `getFname`.
+     */
+    def label: String = name
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the lag applied.
+     */
+    def lag: Int
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the names of the dataset variables this term depends on.
+     */
+    def vars: Set [String] = Set (name)
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the column of the data/input matrix for this term, one value per
+     *  time point (the first lag values are padded, @see `VectorD.lagv`).
+     *  @param dataset  the map of named data columns
+     */
+    def column (dataset: Map [String, VectorD]): VectorD
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Support term multiplication (e.g., x~1 * y~1) for cross-product interactions.
+     *  @param other  the other (RHS) variable/term
+     */
+    def * (other: Term): Term = ProductTerm (this, other)
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Overload the + operator to allow chaining (e.g., var1 + var2).
+     *  @param other  the other (RHS) variable/term
+     */
+    def + (other: Term): VEC [Term] = VEC (this, other)
+
+end Term
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `FormulaVar` case class represents an individual variable with a strict non-negative
+ *  lag constraint.
+ *  @param name  the variable name
+ *  @param lag   the lag to be applied (e.g., y~2 is lag 2)
+ */
+case class FormulaVar (name: String, lag: Int = 0) extends Term:
+
+    require (lag >= 0, s"DSL Error: Lag for variable '$name' must be >= 0. Found: $lag")
+
+    override def label: String = if lag == 0 then name else s"$name~$lag"
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Overload the ~ operator to assign a lag.
+     *  @param l  the lag
+     */
+    def ~ (l: Int): FormulaVar = FormulaVar (name, l)
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Overload the ~ operator to assign an inclusive range of lags.
+     *  Enables the syntax: "y" ~ (3, 1) or yVar ~ (3, 1)
+     *  @param range  a tuple of (maxLag, minLag)
+     */
+    def ~ (range: (Int, Int)): Seq [FormulaVar] =
+        val (maxLag, minLag) = range
+        require (maxLag >= minLag, s"DSL Error: Max lag ($maxLag) must be >= min lag ($minLag) for variable '$name'")
+        (maxLag to minLag by -1).map (l => FormulaVar(name, l))
+    end ~
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Directly bind this FormulaVar as the response variable to a collection of 
+     *  predictors gathered by the builder, returning a strict ARX_Formula structure.
+     *  @param builder  the gathered builder tracking the RHS terms
+     */
+    def ~= (builder: ARX_FormulaBuilder): ARX_Formula = 
+        ARX_Formula (this, ARX_Formula.distinct (builder.preds))
+//      ARX_Formula (this, builder.preds.to (VEC))
+    end ~=
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the column in the dataset with the given name and lag.
+     *  @param dataset  the data-frame holding the data
+     */
+    def column (dataset: Map [String, VectorD]): VectorD = dataset(name).lagv (lag)
+
+end FormulaVar
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `TransformedTerm` case class supports transformed term (e.g., log(x~1))
+ *  @param source     the underlying formula term being transformed (e.g., a raw variable like x~1).
+ *  @param transform  the mathematical execution function mapping a Double input to a Double output.
+ *  @param op         the operation name (e.g. "log", "pow1.5"), used to build the display `label`
+ */
+case class TransformedTerm (source: Term, transform: Double => Double, op: String)
+     extends Term:
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the name of the term.
+     */
+    def name: String = source.name
+
+    override def label: String =
+        if op.startsWith ("↑") || op.startsWith ("↟") then s"${source.label}$op"
+        else s"$op(${source.label})"
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the lag applied.
+     */
+    def lag: Int = source.lag
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Evaluates the value of this formula term at a specific historical timestamp 't'.
+     *  @param t        the reference time for now
+     *  @param dataset  the data-frame holding the data
+     */
+    def evaluate (t: Int, dataset: Map [String, VectorD]): Double =
+        transform (source.evaluate (t, dataset))
+
+end TransformedTerm
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `ProductTerm` case class supports interaction product terms (e.g., x~1 * y~2).
+ *  @param left   the left hand side term
+ *  @param right  the right hand side term
+ */
+case class ProductTerm (left: Term, right: Term)
+     extends Term:
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the name of the product term.
+     */
+    def name: String = s"${left.name}"
+
+    override def label: String = s"${left.label}*${right.label}"
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the lag applied.
+     */
+    def lag: Int = max (left.lag, right.lag)
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Evaluates both terms independently at time 't' and returns their product.
+     *  This creates cross-product interaction variables required for Symbolic Regression.
+     *  @param t        the reference time for now
+     *  @param dataset  the data-frame holding the data
+     */
+    def evaluate (t: Int, dataset: Map [String, VectorD]): Double = 
+        left.evaluate (t, dataset) * right.evaluate (t, dataset)
+
+end ProductTerm
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `Vars` object catches any unquoted field access (like 'Vars.y') and converts it.
+ */
+object Vars extends Dynamic:
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Intercepts unquoted variable references at compile time and instantiates 
+     *  them as structural formula tracking variables.
+     *  This method fulfills Scala's [[scala.language.dynamics]] protocol. It allows 
+     *  users to type arbitrary token names natively without explicit `val` declarations, 
+     *  bridging the gap between strict type safety and an R-like fluid script syntax.
+     *  @param name  the string representation of the unquoted identifier typed by the user (e.g., "y").
+     */
+    def selectDynamic (name: String): FormulaVar = FormulaVar (name)
+
+end Vars
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** Global functions that wrap any Term into a TransformedTerm.
+ */
+def log (t: Term): Term   = TransformedTerm (t, math.log, "log")
+def log1p (t: Term): Term = TransformedTerm (t, math.log1p, "log1p")
+def sq (t: Term): Term    = TransformedTerm (t, x => x * x, "sq")
+def exp (t: Term): Term   = TransformedTerm (t, math.exp, "exp")
+def expm1 (t: Term): Term = TransformedTerm (t, math.expm1, "expm1")
+def sin (t: Term): Term   = TransformedTerm (t, math.sin, "sin")
+def cos (t: Term): Term   = TransformedTerm (t, math.cos, "cos")
+def pow (t: Term, p: Double): Term = TransformedTerm (t, x => math.pow (x, p), s"pow$p")
+def pow (ts: Seq [Term], p: Double): Seq [Term] = ts.map (pow (_, p))
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `WaveTerm` case class represents a periodic function of the time index `t`
+ *  itself (not of any data column):  sin(ω·t + φ).
+ *  Frequencies are typically discovered via `Periodogram.topKFrequencies`, which returns
+ *  cycles-per-step; the 2π conversion to angular frequency ω = 2π·f is done once inside
+ *  the `wave` helper, so this evaluator is pure sin(ω·t + φ).
+ *
+ *  @note TIME-INDEX INVARIANT: `t` must be the same absolute, continuous row index used
+ *        at train and forecast time.  Under `fromTerms` trimming, t = 0 is the start of
+ *        the trimmed series; the fitted sin/cos coefficient pair absorbs that phase offset.
+ *        Out-of-sample rows MUST continue the same t sequence, or the wave jumps phase.
+ *  @param w      the angular frequency ω = 2π·f (radians per step)
+ *  @param phase  the phase φ: 0 for the sine component, π/2 for the cosine component
+ */
+case class WaveTerm (w: Double, phase: Double) extends Term:
+
+    def name: String =
+        val kind = if phase == 0.0 then "sin" else "cos"
+        f"$kind(w=$w%.4f)"
+
+    override def label: String =
+        val kind = if phase == 0.0 then "sin" else "cos"
+        f"$kind(w=$w%.4f)"
+
+    def lag: Int = 0                                          // wave needs no history; defined for all t
+
+    def evaluate (t: Int, dataset: Map [String, VectorD]): Double =
+        math.sin (w * t + phase)                              // matches sin(ω·t + φ) exactly
+
+end WaveTerm
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** Build a seasonal wave as a sin/cos PAIR for a given frequency in cycles-per-step
+ *  (as returned by `Periodogram.topKFrequencies`).  The 2π conversion to angular frequency
+ *  is applied here, once, so both the DSL and the `WaveTerm` evaluator speak pure sin(ω·t).
+ *  The pair is essential: together sin and cos capture the cycle at ANY phase via their two
+ *  fitted linear coefficients; a lone sin assumes the cycle aligns with t = 0.
+ *  @param freq  the frequency in cycles per time step (0 < f <= 0.5)
+ */
+def wave (freq: Double): Seq [Term] =
+    val w = 2.0 * math.Pi * freq
+    Seq (WaveTerm (w, 0.0), WaveTerm (w, math.Pi / 2.0))     // sin(ω·t), cos(ω·t)
+end wave
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** Build waves for the top-k frequencies discovered by a `Periodogram`.
+ *  @param freqs  the frequency vector (cycles per step), e.g. from topKFrequencies
+ *  @param k      the number of frequencies (sin/cos pairs) to include
+ */
+def wave (freqs: VectorD, k: Int): Seq [Term] =
+    (0 until math.min (k, freqs.dim)).flatMap (i => wave (freqs(i)))
+end wave
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** Build a TransformedTerm from a scalation `Transform`, so the term carries its
+ *  inverse (via tf.fi_) for free.  Uses the scalar-level f_ for per-element evaluation.
+ *  @param source  the underlying term
+ *  @param tf      the scalation Transform (e.g. Log1pForm(), PowForm(), ...)
+ *  @param label   display label
+ */
+def transformed (source: Term, tf: Transform, label: String): TransformedTerm =
+    TransformedTerm (source, tf.f_, label)          // tf.f_ : FunctionS2S = Double => Double
+end transformed
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** A named derived series introduced by `let`.
+ *  @param name  the new series name (e.g. "u")
+ *  @param defn  the term defining it from existing columns
+ *  @param tf    the scalation Transform used (None if the defn is not a single Transform);
+ *               its `fi_` provides the response inverse when this binding heads the ~=
+ */
+case class Binding (name: String, defn: Term, tf: Option [Transform] = None):
+
+    def inverse: Option [Double => Double] = tf.map (_.fi_)     // scalar inverse from the Transform itself
+
+end Binding
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** Bind a name to a variable transformed by a `TransformT` (e.g. Log1p, Norm, MinMax).
+ *  The TransformT is instantiated on the TRAINING slice of the variable's column
+ *  (matching `ARX_SR_D.rescale`), so parameter-carrying transforms (Norm, MinMax,
+ *  DQuad) fit their parameters correctly, and its inverse rides along.
+ *  @param name    the new series name
+ *  @param v       the base variable
+ *  @param tFormT  the transform type (from the TransformT enum)
+ *  @param label   display label (defaults to the TransformT's name)
+ */
+def bind (name: String, v: FormulaVar, tFormT: TransformT, label: String = null)
+         (using dataset: Map [String, VectorD]): Binding =
+    val col     = dataset (v.name)
+    val tr_size = Model.trSize (col.dim)
+    val tf      = tFormT.form (col(0 until tr_size))          // fit on training slice, like rescale
+    val lbl     = if label == null then tFormT.name.stripSuffix ("Form") else label
+    Binding (name, transformed (v, tf, lbl), Some (tf))
+end bind
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** ML-style `let bindings in body`: materialize each binding as a dataset column,
+ *  evaluate the formula against the extended dataset, and thread the response
+ *  binding's inverse (from its scalation `Transform`) into the formula.
+ *  @note:  ?=> denotes context function type 
+ */
+def letIn (bindings: Binding*)(body: Map [String, VectorD] ?=> ARX_Formula)
+          (using base: Map [String, VectorD]): ARX_Formula =
+
+    val extended = scala.collection.mutable.Map.from (base)
+    for b <- bindings do
+        if base.contains (b.name) then
+            throw new IllegalArgumentException (s"DSL Error: let-binding '${b.name}' shadows an existing column")
+        val n   = base (b.defn.name).dim
+        val lag = b.defn.lag
+        val col = new VectorD (n)
+        for t <- 0 until n do
+            col(t) = if t < lag then Double.NaN else b.defn.evaluate (t, base.toMap)
+        extended (b.name) = col
+    end for
+
+    val formula = body (using extended.toMap)
+
+    bindings.find (_.name == formula.resp.name) match
+        case Some (b) if b.tf.isDefined => formula.copy (respTForm = b.tf)
+        case Some (b) =>
+            throw new IllegalArgumentException (
+                s"DSL Error: response binding '${b.name}' has no invertible Transform")
+        case None => formula
+end letIn
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** Sign-safe power (powr): x -> x ↑ r, where r is a nearby rational with an odd
+ *  denominator, so the result remains real-valued for negative x.
+ *  This is the term-level analog of `PowRForm` and uses the same `↑` machinery
+ *  (@see `Rat`, `pow_` in CommonFunctions, and `↑` in ValueType.scala).
+ *  @param t  the term to raise
+ *  @param q  the (real) power, converted to a nearby odd-denominator rational
+ */
+def powr (t: Term, q: Double): Term =
+    val r = Rat.fromDouble3 (q)
+    val p = r.toDouble                                 // actual odd-denominator rational as Double
+    TransformedTerm (t, x => math.signum (x) * math.pow (math.abs (x), p), s"↟$q")
+end powr
+
+def powr (ts: Seq [Term], q: Double): Seq [Term] = ts.map (powr (_, q))
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** Power operators: raise a term (or every term in a lag-range) to a constant exponent.
+ *  Provides `↑` (ScalaTion's usual power operator).
+ *  Operator form: `↟` on Terms, matching `PowRForm`'s convention.
+ *  ↑ character binds in the highest precedence tier, so
+ *  `y~1 ↑ 0.67 + hosp~1` parses correctly without parentheses.
+ */
+extension (t: Term)
+    def ↑ (p: Double): Term = TransformedTerm (t, x => math.pow (x, p), s"↑$p")
+    def ↟ (q: Double): Term = powr (t, q)
+//  def * (right: Term): Term = ProductTerm (t, right)
+
+extension (ts: Seq [Term])
+    def ↑ (p: Double): Seq [Term] = ts.map (_ ↑ p)
+    def ↟ (q: Double): Seq [Term] = ts.map (powr (_, q))
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** Extension to convert raw Strings automatically into FormulaVars when needed.
+ */
+implicit def stringToFormulaVar (name: String): FormulaVar = FormulaVar (name)
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** Overload to support starting the right-hand side builder loop with a single Term
+ */
+implicit def termToBuilder (term: Term): ARX_FormulaBuilder = ARX_FormulaBuilder (Seq (term))
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** Overload to support starting the right-hand side builder loop with an unrolled Range Sequence
+ */
+implicit def seqToBuilder (terms: Seq [Term]): ARX_FormulaBuilder = ARX_FormulaBuilder (terms)
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** Extension to allow ongoing additions to append directly into the VEC.
+ *  @param buffer  the buffer holding the terms
+ */
+extension (buffer: VEC [Term])
+    def + (other: Term): VEC [Term] = 
+        buffer += other
+        buffer
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** Assignment extensions mapping the left variable to the right-side terms.
+ *  @param lhs  the left hand side formula
+ */
+extension (lhs: FormulaVar)
+    def ~= (rhs: Term): ARX_Formula = ARX_Formula (lhs, VEC (rhs))
+    def ~= (rhs: VEC [Term]): ARX_Formula = ARX_Formula (lhs, rhs)
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `ARX_FormulaBuilder` case class
+ *  @param preds  the prediction terms
+ */
+case class ARX_FormulaBuilder (preds: Seq [Term] = Seq ()):
+
+    // Append a standard single term (e.g., + hosp~1)
+    def + (term: Term): ARX_FormulaBuilder = 
+        ARX_FormulaBuilder (preds :+ term)
+
+    // Append a shorthand range expansion sequence (e.g., + y~(3,1))
+    def + (rangeTerms: Seq [Term]): ARX_FormulaBuilder = 
+        ARX_FormulaBuilder(preds ++ rangeTerms)
+
+    // Handle cross-product interactions (e.g., term1 * term2)
+    def * (other: Term): Term = 
+        // Assumes this operator is called on a trailing lone Term inside parentheses
+        ProductTerm (preds.lastOption.getOrElse (FormulaVar ("error")), other)
+
+end ARX_FormulaBuilder
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `ARX_Formula` case class represents the final evaluated formula structure.
+ *  @param resp   the response variable  
+ *  @param preds  the predictor variables
+ */
+case class ARX_Formula (resp: FormulaVar, preds: VEC [Term],
+                        respTForm: Option [Transform] = None):
+    // ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Private helper class to bundle structural properties extracted from the formula.
+     *  @param p    the maximum lag of the endogenous variable
+     *  @param q    the maximum lag of the exogenous variables
+     *  @param trd  the trend terms: 0 (implicit constant), 1 (linear), 2 (quadratic), 3 (cibic)
+     *  @param crx  the cross-terms: toggled: 1 (enabled), 0 (disabled)
+     */
+    private case class FormulaSpecs (p: Int, q: Int, trd: Int, crx: Int)
+
+    // ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Extracts time-series hyper-parameter setting from the formula's predictor list.
+     *  FIX: formula may skip lags, so this code needs to handle that
+     *  FIX: transformations fEn, fEx could also extracted from the formula
+     */
+    private def extractSpecs (): FormulaSpecs =
+        // Separate endogenous (y) and exogenous (x) lags
+        val yLags = preds.filter (_.name == resp.name).map (_.lag)
+        val pMax  = if yLags.isEmpty then 0 else yLags.max
+
+        val xVars = preds.filter (_.name != resp.name)
+        val qMax  = if xVars.isEmpty then 0 else xVars.map (_.lag).max
+
+        // Automate trend parameter extraction (spec)
+        // We look for exact matches or explicit functional formulations of the 't' token
+        val hasQuadratic = preds.exists (p => p.name == "t^2" || p.name == "sq(t)")
+        val hasLinear    = preds.exists (p => p.name == "t")
+
+        val trd = if hasQuadratic then 2
+                  else if hasLinear then 1
+                  else 0                       // default: implicit constant baseline
+
+        // Automate cross-term detection (checks for interaction markers in names)
+        // val hasCross = preds.exists (p => p.name.contains ("*") || p.name.contains (":"))
+        val hasCross = preds.exists (_.isInstanceOf [ProductTerm])
+        banner (s"hasCross: $hasCross")
+        println (preds)
+        val crx = if hasCross then 1 else 0
+
+        FormulaSpecs (pMax, qMax, trd, crx)
+    end extractSpecs
+    
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Core engine that validates data context and instantiates the ARX model.
+     *  @param hh       the maximum forecasting horizon (h = 1 to hh), defaults to 1
+     *  @param dataset  the R-style environment map holding named data columns (given/contextual)
+     */
+    def fit (hh: Int = 1)(using dataset: Map [String, VectorD]): ARX_D =
+
+        // Check: Does the response variable exist in the provided dataset?
+        if ! dataset.contains (resp.name) then
+            throw new IllegalArgumentException (s"Data Error: Response variable '${resp.name}' not found in dataset keys")
+
+        // Check: Do all predictor variables exist in the provided dataset?
+        for pred <- preds do
+            if ! dataset.contains (pred.name) then
+                throw new IllegalArgumentException (s"Data Error: Predictor variable '${pred.name}' not found in dataset keys")
+
+        // Automatically extract all time-series hyper-parameters from the formula
+        val specs = extractSpecs ()
+
+        val y    = dataset (resp.name)
+        val size = y.dim
+
+        // Check: Is the dataset long enough to support the calculated max lag window?
+        val maxLag = max (specs.p, specs.q)
+        if size <= maxLag then
+            throw new IllegalArgumentException (s"Data Error: Dataset size ($size) is too small for max lag ($maxLag)")
+
+        // --- Data Frame Matrices Preparation ---
+        // Extract distinct exogenous variable names to prevent duplicate column stacking
+        val xVars         = preds.filter (_.name != resp.name)
+        val uniqueExNames = xVars.map (_.name).distinct
+        
+        // Enforce alignment: Verify all columns have matching lengths
+        for name <- uniqueExNames do
+            if dataset(name).dim != size then
+                throw new IllegalArgumentException (s"Data Error: '$name' length (${dataset(name).dim}) != $size")
+
+        // Construct the Exogenous MatrixD out of aligned columns
+        val exoCols = uniqueExNames.map (dataset(_))
+        val xe      = MatrixD (exoCols).ᵀ
+
+        hp.set (("p", specs.p), ("px", specs.q), ("spec", specs.trd), ("crx", specs.crx))
+//      RidgeRegression.hp("lambda") = 1.0
+
+        // --- Model Initialization and Training for ARX ---
+//      val mod = ARX (xe, y, hh) 
+
+        // --- Model Initialization and Training for ARX_SR ---
+        // hp("crx") = 1
+        val fEn: LSET [Transform] = LSET (PowForm ())
+        val mod = ARX_SR_D (xe, y, hh, fEndo = fEn)
+        mod.trainNtest (xe, y)(xe, y)
+        mod
+    end fit
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Fit the 'linear-in-the-parameters' direct forecasting model `ARX_D` from this formula.
+     *  @param hh       the maximum forecasting horizon (h = 1 to hh), defaults to 1
+     *  @param tFormT   the response transform type (e.g. Log1p, MinMax); null => response left
+     *                  in its own space.  Fit on the response training slice, applied, and
+     *                  stored by `fromTerms` for forecast inversion.
+     *  @param dataset  the R-style environment map holding named data columns (given/contextual)
+     */
+    def fitDirect (hh: Int = 1, tFormT: TransformT = null)
+                  (using dataset: Map [String, VectorD]): ARX_D =
+        // FIX -- extract and set hyper-parameters -- see fit method above
+        val mod = ARX_D.fromTerms (resp, preds, hh, tFormT = tFormT)
+        val (x_, y_) = (mod.getX, mod.getYy)
+        mod.trainNtest (x_, y_)(x_, y_)
+        mod
+    end fitDirect
+
+end ARX_Formula
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `aRX_FormulaTest` main function tests the `ARX_Formula` class on a simple
+ *  toy problem.
+ *  > runMain scalation.modeling.forecasting.aRX_FormulaTest
+ */
+@main def aRX_FormulaTest (): Unit =
+
+    // Setup an environment map simulating an R DataFrame
+    // Notice that "y" and "x" are correctly shaped, but "z" has an invalid row dimension
+
+    given dataContext: Map [String, VectorD] = Map (
+        "y" -> VectorD (12.0, 15.0, 14.0, 16.0, 18.0, 21.0, 19.0, 22.0),
+        "x" -> VectorD (4.0,  5.2,  4.8,  5.5,  6.0,  6.2,  5.9,  6.5),
+        "z" -> VectorD (1.0,  2.0,  3.0)         // invalid size! Used for testing validation guards
+    )
+
+    // Example A: A perfectly constructed equation
+    // An IDE would autocomplete these variables and validate the syntax structure at compile time
+
+    val y = Vars.y                               // pull your tokens dynamically out of the 'Vars' bucket up front
+    val x = Vars.x
+
+    val validFormula = y ~= y~1 + log (x~1) + sq (x~2) + y~1 * x~1
+//  val validFormula = y ~= y~1 + y~2 + x~1
+    val modelA       = validFormula.fit ()
+    println (s"SUCCESS: Model compiled and trained. Parameters: ${modelA.parameter}")
+
+    // Example B: Runtime validation catching a data alignment issue (using 'z')
+
+    val z = Vars.x
+    try
+        val brokenFormula = y ~= y~1 + z~1
+        brokenFormula.fit ()                     // will gracefully trigger our validation error block
+    catch 
+        case ex: IllegalArgumentException => 
+            println (s"\nINTERCEPTED ERROR: ${ex.getMessage}")
+
+end aRX_FormulaTest
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `aRX_FormulaTest2` main function tests the `ARX_Formula` class using the
+ *  Covid-19 dataset.
+ *  > runMain scalation.modeling.forecasting.aRX_FormulaTest2
+ */
+@main def aRX_FormulaTest2 (): Unit =
+
+    import Example_Covid._
+
+    // Data Loading Configuration
+    val exoColumns = Array ("icu_patients", "hosp_patients")
+    val (xe, y_) = clip (loadData (exoColumns))
+
+    // Set Up the R-style Environment Context for your Formula DSL
+    // We map the loaded vector and matrix columns into our string-accessible given context
+    given dataContext: Map [String, VectorD] = Map (
+        "y"             -> y_,
+        "icu_patients"  -> xe.col(0),
+        "hosp_patients" -> xe.col(1)
+    )
+
+    // Extract tokens dynamically via your 'Vars' bucket
+    val y    = Vars.y
+    val icu  = Vars.icu_patients
+    val hosp = Vars.hosp_patients
+
+    /*
+     * Scientific Justification:
+     * In continuum epidemiology, ICU utilization is heavily dependent on previous hospitalization 
+     * levels coupled with the current infection momentum. 
+     * We look for a Bilinear state-dependent interaction term: (y~1 * hosp~1)
+     */
+    val covidFormula = y ~= y~1 + hosp~1 + (y~1 * hosp~1) + icu~2
+    val modelC = covidFormula.fit ()
+    println (s"SUCCESS: Model compiled and trained. Parameters: ${modelC.parameter}")
+
+    val covidFormula2 = y ~= y~(4,2) + hosp~1 + (y~1 * hosp~1) + icu~2
+    val modelC2 = covidFormula2.fit ()
+    println (s"SUCCESS: Model compiled and trained. Parameters: ${modelC2.parameter}")
+
+end aRX_FormulaTest2
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `aRX_FormulaTest3` main function tests the `ARX_Formula` DSL against the
+ *  direct-forecasting `ARX_SR_D` path (`fitDirect`), using the Covid-19 dataset.
+ *  Exercises a skip-lag range (y~(4,2)) and an explicit interaction term
+ *  (y~1 * hosp~1) -- neither of which the p/q-driven `fit()` can represent exactly.
+ *  > runMain scalation.modeling.forecasting.aRX_FormulaTest3
+ */
+@main def aRX_FormulaTest3 (): Unit =
+
+    import Example_Covid._
+
+    // Data Loading Configuration
+    val exoColumns = Array ("icu_patients", "hosp_patients")
+    val (xe, y_) = clip (loadData (exoColumns))
+
+    given dataContext: Map [String, VectorD] = Map (
+        "y"             -> y_,
+        "icu_patients"  -> xe.col(0),
+        "hosp_patients" -> xe.col(1)
+    )
+
+    val y    = Vars.y
+//  val icu  = Vars.icu_patients
+//  val hosp = Vars.hosp_patients
+
+    // Example A: skip-lag range on y (4, 3, 2 -- deliberately omits lag 1 as a
+    // standalone term) plus an explicit endo-exo interaction term
+//  val covidFormula = y ~= y~(4,2) + hosp~1 + (y~1 * hosp~1) + icu~2
+    val covidFormula = y ~= y~(5,1)
+
+    banner ("fitDirect: DSL -> ARX_SR_D via term-by-term evaluation")
+    val modelD = covidFormula.fitDirect ()
+    println (s"SUCCESS: Model compiled and trained. modelName = ${modelD.modelName}")
+    println (s"Feature names = ${stringOf (modelD.getFname)}")
+    println (s"parameter (bb) = ${modelD.parameter}")
+
+    modelD.forecastAll ()
+    modelD.diagnoseAll (modelD.getY, modelD.getYf)
+
+    // Example B: same formula shape, but with a *contiguous* p/q approximation,
+    // run through the old hp-driven fit() for comparison
+/*
+    banner ("fit: DSL -> ARX_SR via p/q/crx hyperparameters (for comparison)")
+    val modelC = covidFormula.fit ()
+    println (s"SUCCESS: Model compiled and trained. modelName = ${modelC.modelName}")
+    println (s"parameter = ${modelC.parameter}")
+*/
+
+end aRX_FormulaTest3
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `aRX_FormulaTest4` main function tests the `ARX_Formula` DSL's equivalent of
+ *  ARX_SR_D's fEndo/fExo transformation sets, using the Covid-19 dataset.
+ *  Instead of global transform sets applied uniformly to all p (or q) lags, each
+ *  transformed lag is an explicit term:
+ *      fEndo = LSET (PowForm ())  @ p=3   ~~>   y~(3,1) ↑ 1.8
+ *      fExo  = Array (LSET (...)) @ q=2   ~~>   hosp~(2,1) ↑ 1.8
+ *  > runMain scalation.modeling.forecasting.aRX_FormulaTest4
+ */
+@main def aRX_FormulaTest4 (): Unit =
+
+    import Example_Covid._
+
+    // Data Loading Configuration
+    val exoColumns = Array ("icu_patients", "hosp_patients")
+    val (xe, y_) = clip (loadData (exoColumns))
+
+    given dataContext: Map [String, VectorD] = Map (
+        "y"             -> y_,
+        "icu_patients"  -> xe.col(0),
+        "hosp_patients" -> xe.col(1)
+    )
+
+    val y    = Vars.y
+    val icu  = Vars.icu_patients
+    val hosp = Vars.hosp_patients
+
+    // Example A: fEndo equivalent -- raw endo lags 3..1 plus PowForm-style (x^1.8)
+    // versions of the same lags, as explicit terms
+    banner ("Example A: endo transforms (fEndo equivalent)")
+    val formulaA = y ~= y~(3,1) + y~(3,1) ↑ 0.67
+    val modelA   = formulaA.fitDirect ()
+    println (s"modelName = ${modelA.modelName}")
+    println (s"Feature names = ${stringOf (modelA.getFname)}")
+    println (s"parameter (bb col 0) = ${modelA.parameter}")
+    modelA.forecastAll ()
+    modelA.diagnoseAll (modelA.getY, modelA.getYf)
+
+    // Example B: fEndo + fExo equivalent -- endo transforms AND per-exo-variable
+    // transforms, with per-variable control fExo can't express (only hosp gets ↑;
+    // icu gets sq at a single lag; different lag windows per variable)
+    banner ("Example B: endo + exo transforms (fEndo + fExo equivalent)")
+    val formulaB = y ~= y~(3,1) + y~(3,1) ↑ 1.8 +
+                        hosp~(2,1) + hosp~(2,1) ↑ 1.8 +
+                        icu~2 + sq (icu~2)
+    val modelB   = formulaB.fitDirect ()
+    println (s"modelName = ${modelB.modelName}")
+    println (s"Feature names = ${stringOf (modelB.getFname)}")
+    println (s"parameter (bb col 0) = ${modelB.parameter}")
+    modelB.forecastAll ()
+    modelB.diagnoseAll (modelB.getY, modelB.getYf)
+
+    // Example C: mixing transforms with interactions -- impossible with fEndo/fExo,
+    // natural in the DSL: an interaction between a *transformed* endo lag and an exo lag
+    banner ("Example C: transformed-term interaction")
+    val formulaC = y ~= y~(2,1) + y~(2,1) ↑ 1.8 + hosp~1 +
+                        (log1p (y~1) * hosp~1)
+    val modelC   = formulaC.fitDirect ()
+    println (s"modelName = ${modelC.modelName}")
+    println (s"Feature names = ${stringOf (modelC.getFname)}")
+    println (s"parameter (bb col 0) = ${modelC.parameter}")
+    modelC.forecastAll ()
+    modelC.diagnoseAll (modelC.getY, modelC.getYf)
+
+end aRX_FormulaTest4
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `aRX_FormulaTest5` main function tests the `ARX_Formula` DSL's equivalent of
+ *  ARX_SR_D's fEndo/fExo transformation sets, using the Covid-19 dataset.
+ *  > runMain scalation.modeling.forecasting.aRX_FormulaTest5
+ */
+@main def aRX_FormulaTest5 (): Unit =
+
+    import Example_Covid._
+
+    // Data Loading Configuration
+    val exoColumns = Array ("icu_patients", "hosp_patients")
+    val (xe, y_) = clip (loadData (exoColumns))
+
+    given dataContext: Map [String, VectorD] = Map (
+        "y"             -> y_,
+        "icu_patients"  -> xe.col(0),
+        "hosp_patients" -> xe.col(1)
+    )
+
+    val u    = Vars.u
+    val y    = Vars.y
+    val hosp = Vars.hosp_patients
+    val icu  = Vars.icu_patients
+
+    // 1. Declare a variable outside to hold the trained model
+    val hh = 1
+    var model: ARX_D = null
+
+    // 2. Perform the fit inside where the extended context exists
+    letIn (bind ("u", y, Log1p)) {
+        val f = u ~= u~6 + u~6 ↑ 1.1 + hosp~4 + hosp~4 ↑ 1.1 + icu~4
+        model = f.fitDirect (hh)     // uses the extended context implicitly here
+        f                            // return the formula to satisfy letIn
+    }
+
+    // 3. The rest of your evaluation code remains unchanged
+    println (s"modelName = ${model.modelName}")
+    println (s"Feature names = ${stringOf (model.getFname)}")
+    println (s"parameter (bb col 0) = ${model.parameter}")
+    model.forecastAll ()
+    model.diagnoseAll (model.getY, model.getYf)
+
+end aRX_FormulaTest5
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `aRX_FormulaTest6` main function tests seasonal wave (Fourier) terms:
+ *  discover dominant frequencies via `Periodogram`, then add sin/cos pairs to the formula.
+ *  > runMain scalation.modeling.forecasting.aRX_FormulaTest6
+ */
+@main def aRX_FormulaTest6 (): Unit =
+
+    import Example_Covid._
+
+    val exoColumns = Array ("icu_patients", "hosp_patients")
+    val (xe, y_) = clip (loadData (exoColumns))
+
+    given dataContext: Map [String, VectorD] = Map (
+        "y"    -> y_,
+        "icu"  -> xe.col(0),
+        "hosp" -> xe.col(1)
+    )
+
+    val y    = Vars.y
+    val hosp = Vars.hosp
+    val icu  = Vars.icu
+
+    // Step 1: discover dominant frequencies from the (training-portion) response
+    val hh      = 6
+    val tr_size = Model.trSize (y_.dim)
+    val pg      = new Periodogram (y_(0 until tr_size), "new_deaths")   // fit on training only, no test-set peeking
+    val freqs   = pg.topKFrequencies (pg.amplitudes, 3)
+    println (s"discovered frequencies = $freqs")
+    println (s"discovered periods     = ${pg.topKPeriods (pg.amplitudes, 3)}")
+
+    // Step 2: AR lags + exo + the top-2 seasonal sin/cos pairs
+    banner ("AR lags + exo + top-2 Fourier seasonal pairs")
+//  val formula = y ~= y~(5,1) + hosp~1 + icu~2 + wave (freqs, 2)
+    val formula = y ~= y~(5,1) + log (y~2) + y~(5,1)↑1.5 + hosp~1 + icu~(2,1) + wave (freqs, 2)
+    val model   = formula.fitDirect (hh)
+//  val model   = formula.fitDirect (hh, tFormT = Log1p)
+
+    println (s"modelName = ${model.modelName}")
+    println (s"Feature names = ${stringOf (model.getFname)}")
+    println (s"parameter (bb col 0) = ${model.parameter}")
+    model.forecastAll ()
+    model.diagnoseAll (model.getY, model.getYf)
+
+    import SelectionTech._
+    val h = 6
+    val tech = Forward
+//  val tech = Backward
+//  val tech = Beam
+    val (cols, rSq, modForc) = model.selectFeaturesAtH (tech, "none", h = h)   // R^2, R^2 bar, sMAPE, sMAPEC
+    val k = cols.size
+    println (s"k = $k")
+    println (s"best model: ${stringOf (modForc.getFname)}")         // feature names for best model
+
+    new PlotM (null, rSq, Regression.metrics, s"R^2 vs k for ${modForc.modelName} with $tech", lines = true)
+    banner (s"Feature Selection Key Metrics using $tech")
+    for r_ <- rSq do println (s"$tech: rSq = $r_")
+
+    modForc.setSkip ()                                              // don't skip any rows
+    modForc.rollValidate ()
+    modForc.diagnoseAll (modForc.getY, modForc.getYf, Forecaster.teRng (y_.dim))
+
+end aRX_FormulaTest6
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `aRX_FormulaTest7` main function tests the Two-Stage Linear (2SL) approximation
+ *  (Durbin / Hannan-Rissanen) ARMA models, where the MA/error/shock term approximations
+ *  allow for linear optimization.
+ *  > runMain scalation.modeling.forecasting.aRX_FormulaTest7
+ */
+@main def aRX_FormulaTest7 (): Unit =
+
+    import Example_Covid._
+
+    val exoColumns = Array ("icu_patients", "hosp_patients")
+//  val (xe, y_) = clip (loadData (exoColumns))
+    val (_, y_)  = clip (loadData (exoColumns))
+
+    // =========================================================================
+    // STAGE 1: HIGH-ORDER ARX_D APPROXIMATION (L = p + q + 2)
+    // =========================================================================
+    // Setting L = 7 based on your formula constraint
+    val hh = 6
+    val p  = 4
+    val q  = 1
+    val L  = p + q + 2
+
+    // y~(L,1) tells ScalaTion to dynamically generate a sequence of contiguous lags: y~1 + y~2 + ... + y~L
+    // val formula1 = y ~= y~(L,1)
+
+    // Fit the long linear model directly using your historical dataset matrix (hh)
+    AR.hp("p") = L
+    val model1 = new AR (y_, 1)
+    model1.trainNtest ()()
+
+    // Extract the OLS prediction errors. This vector represents the unobserved random shocks.
+    val e_sh_ = (y_ - model1.predictAll ()).shift (1)
+    e_sh_(1) = 0.0                                      // replace infinity (no prediction) with zero
+    println (s"e_sh_.dim = ${e_sh_.dim}")
+    println (s"e_sh_ = $e_sh_")
+
+    given dataContext: Map [String, VectorD] = Map (
+        "y"    -> y_,
+//      "icu"  -> xe.col(0),
+//      "hosp" -> xe.col(1),
+        "e_sh" -> e_sh_
+    )
+
+    val y    = Vars.y
+//  val hosp = Vars.hosp
+//  val icu  = Vars.icu
+    val e_sh = Vars.e_sh
+
+    // =========================================================================
+    // STAGE 2: ARX_D with shock included (MA approximation)
+    // =========================================================================
+    val formula2 = y ~= y~(p,1) + e_sh~0
+    val model2 = formula2.fitDirect (hh)
+
+    model2.forecastAll ()
+    model2.diagnoseAll (model2.getY, model2.getYf)
+
+end aRX_FormulaTest7
+

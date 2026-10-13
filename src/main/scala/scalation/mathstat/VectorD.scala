@@ -17,6 +17,7 @@ package mathstat
 //import java.lang.foreign.ValueLayout.JAVA_DOUBLE
 import java.util.Arrays.copyOf
 
+import scala.annotation.targetName
 import scala.collection.generic.DefaultSerializable
 import scala.collection.immutable.{IndexedSeq => IIndexedSeq, Set}
 import scala.collection.mutable.{ArrayBuffer, IndexedSeq}
@@ -122,6 +123,59 @@ class VectorD (val dim: Int,
     end apply
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Retrieve a lagged relative to time t value from this vector.
+     *  @usage given t: Int = 6; y ~ 1 yields y(5)
+     *  @param lg  the amount of lag to offset (e.g., 1, 2)
+     *  @param t   the hidden contextual time parameter
+     */
+    inline def lag (inline lg: Int)(using t: Int): Double = v(t - lg) 
+
+    @targetName("lagSymbolic")
+    inline def ~ (inline lg: Int)(using t: Int): Double = lag (lg)
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return a vector with elements lagged by lg, i.e., shifted left by lg
+     *  (pad with first value).
+     *  @param lg  the length of the shifting (number of lags)
+     */
+    def lagv (lg: Int = 1): VectorD =
+        val v_ = v
+        val y  = new VectorD (dim)
+        cfor (0, lg)   { i => y.v(i) = v_(0) }
+        cfor (lg, dim) { i => y.v(i) = v_(i-lg) }
+        y
+    end lagv
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Retrieve lagged relative to time t values from this vector.
+     *  @usage given t: Int = 6; y ~ (2, 1) yields [y(4), y(5)]
+     *         e.g., for AR(p) use y ~ (p, 1)
+     *                             [ y(t-p), ... y(t-2), y(t-1) ]
+     *  @param lu  the (oldest, youngest) range/bounds, inclusive
+     *  @param t   the hidden contextual time parameter
+     */
+    inline def lag (lu: (Int, Int))(using t: Int): VectorD =
+        val v_ = v                                            // local access is faster
+        VectorD (for i <- t - lu._1 to t - lu._2 yield v_(i))
+    end lag
+
+    @targetName("lagSymbolicR")
+    inline def ~ (lu: (Int, Int))(using t: Int): VectorD = lag (lu)
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the p prior lagged values that come before t [ v(t-p), ..., v(t-1) ].
+     *  When the index is negative, just return v(0).
+     *  @param p  the number of prior lagged values to return
+     *  @param t  the index from which prior lagged values are sought (exclusive)
+     */
+    def lag (p: Int, t: Int): VectorD =
+        val v_ = v                                            // local access is faster
+        val a  = Array.ofDim [Double] (p)
+        cfor (t-p, t) { i => a(i+p-t) = if i <= 0 then v_(0) else v_(i) }
+        new VectorD (p, a)
+    end lag
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the elements not equal to index ix of this vector.
      *  @param ix  the index to skip/exclude
      */
@@ -150,6 +204,17 @@ class VectorD (val dim: Int,
      *  @param n  the number of elements to be dropped
      */
     override def drop (n: Int = 1): VectorD = new VectorD (dim - n, v.drop (n))
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return a vector with elements shifted left by n (pad with zero).
+     *  @param n  the length of the shifting
+     */
+    def shift (n: Int = 1): VectorD =
+        val v_ = v
+        val y  = new VectorD (dim)
+        cfor (n, dim) { i => y.v(i) = v_(i-n) }
+        y
+    end shift
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return a vector containing all but the last n elements of this vector.
@@ -212,19 +277,6 @@ class VectorD (val dim: Int,
         pieces(k-1) = this ((k-1)*size until dim)
         pieces
     end chop
-
-    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Return the p prior values that come before t [ v(t-p), ..., v(t-1) ].
-     *  When the index is negative, just return v(0).
-     *  @param p  the number of prior values to return
-     *  @param t  the index from which prior values are sought (exclusive)
-     */
-    def prior (p: Int, t: Int): VectorD =
-        val v_ = v                                            // local access is faster
-        val a  = Array.ofDim [Double] (p)
-        cfor (t-p, t) { j => a(j+p-t) = if j <= 0 then v_(0) else v_(j) }
-        new VectorD (p, a)
-    end prior
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Update the i-th element (or in range) of this vector.
@@ -312,6 +364,11 @@ class VectorD (val dim: Int,
     /** Return whether this vector is non-negative (contains no negative values).
      */
     def isNonnegative: Boolean = v.forall (_ >= 0.0)
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return whether this vector has any non-finite elements.
+     */
+    def notFinite: Boolean = v.exists (x => x.isInfinity || x.isNaN)
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Concatenate this vector and vector (or indexed-seq) y.
@@ -783,6 +840,22 @@ class VectorD (val dim: Int,
     end max0
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute (safe) the minimum, but skip undefined elements (those whose values
+     *  are NO_DOUBLE).
+     *  @note:  the `max` method from the superclass is safe as NO_DOUBLE = -infinity
+     */
+    def min: Double =
+        val v_ = v                                             // local access is faster
+        var e  = 0.0
+        var z  = v_(0)
+        cfor (1 until dim) { i =>
+            e = v_(i)
+            if e != NO_DOUBLE && (z == NO_DOUBLE || e < z) then z = e
+        } // cfor
+        z
+    end min
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return a new vector consisting of the maximum of this and y's corresponding elements.
      *  @param y  the other vector/indexed sequence
      */
@@ -949,7 +1022,6 @@ class VectorD (val dim: Int,
      */
     def log: VectorD = map (math.log (_))
 
-    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Log transform this vector by using math.log1p (avoiding the log (0) problem).
      */
@@ -1249,11 +1321,33 @@ class VectorD (val dim: Int,
 
 // Compute statistics/metrics
 
+    // Notation for variance and stdev (and partially mean): 
+    //    op        safe (handles NO_DOUBLE) sample estimate
+    //    op_       safe (handles NO_DOUBLE) population estimate (none for mean)
+    //    _op       fast (assumes NO_DOUBLE elements) sample estimate
+    //    _op_      fast (assumes NO_DOUBLE elements) population estimate (none for mean)
+
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Compute the sample mean (also the population mean, they are the same).
+    /** Compute (fast) the sample mean (also the population mean, they are the same).
      *  >> E(X)
      */
-    inline def mean: Double = v.sum / nd
+    def _mean: Double = v.sum / nd
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute (safe) the sample mean (also the population mean, they are the same),
+     *  but skip undefined elements (those whose values are NO_DOUBLE).
+     *  >> E(X)
+     */
+    def mean: Double =
+        val v_ = v                                             // local access is faster
+        var e, s = 0.0
+        var c = 0
+        cfor (indices) { i =>
+            e = v_(i)
+            if e != NO_DOUBLE then { s += e; c += 1 }
+        } // cfor
+        s / c
+    end mean
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute the mean of a subvector.
@@ -1267,6 +1361,11 @@ class VectorD (val dim: Int,
     end mean
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return a centered version of this vector by subtracting the mean.
+     */
+    inline def center: VectorD = this - mean
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute the centered norm-squared of this vector.
      */
     def cnormSq: Double =
@@ -1277,13 +1376,51 @@ class VectorD (val dim: Int,
     end cnormSq
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Compute the sample variance (and population population).
+    /** Compute (fast) the sample variance (and population population).
      *  >> E(X - μ)^2
      */
-    def variance: Double   = cnormSq / (nd-1)
-    def variance_ : Double = cnormSq / nd
+    def _variance: Double   = cnormSq / (nd-1)
+    def _variance_ : Double = cnormSq / nd
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the sample variance (and population population).
+     *  >> E(X - μ)^2
+     *  @param mu  the given mean
+     */
     def variance (mu: Double): Double  = (normSq - mu * mu * nd) / (nd-1)
     def variance_ (mu: Double): Double = (normSq - mu * mu * nd) / nd
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute (safe) the sample variance, but skip undefined elements (those whose values
+     *  are NO_DOUBLE).
+     *  >> E(X)
+     */
+    def variance: Double =
+        val v_ = v                                             // local access is faster
+        var e, s, ss = 0.0
+        var c = 0
+        cfor (indices) { i =>
+            e = v_(i)
+            if e != NO_DOUBLE then { s += e; ss += e * e; c += 1 }
+        } // cfor
+        (ss - s * s / c) / (c-1)
+    end variance
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute (safe) the population variance, but skip undefined elements (those whose
+     *  values are NO_DOUBLE).
+     *  >> E(X)
+     */
+    def variance_ : Double =
+        val v_ = v                                             // local access is faster
+        var e, s, ss = 0.0
+        var c = 0
+        cfor (indices) { i =>
+            e = v_(i)
+            if e != NO_DOUBLE then { s += e; ss += e * e; c += 1 }
+        } // cfor
+        (ss - s * s / c) / c
+    end variance_
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute the sample covariance (or population covariance) of this vector with vector y.
@@ -1301,7 +1438,13 @@ class VectorD (val dim: Int,
     def rms: Double = math.sqrt (ms)
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Compute the sample standard deviation (and population standard deviation).
+    /** Compute (fast) the sample standard deviation (and population standard deviation).
+     */
+    def _stdev : Double = math.sqrt (_variance)
+    def _stdev_ : Double = math.sqrt (_variance_)
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute (safe) the sample standard deviation (and population standard deviation).
      */
     def stdev: Double   = math.sqrt (variance)
     def stdev_ : Double = math.sqrt (variance_)
@@ -1454,13 +1597,48 @@ class VectorD (val dim: Int,
      *  The `iqsort` method gives the rank order of a vector.
      *  @see en.wikipedia.org/wiki/Spearman%27s_rank_correlation_coefficient
      *  @param y  the other vector
-     */
+     *
     infix def scorr (y: VectorD): Double =
         val rk1 = iqsort                                       // rank order for this vector
         val rk2 = y.iqsort                                     // rank order for vector y
         val s = Σ (v.indices) { i => (rk1(i) - rk2(i))~^2 }
         1 - 6 * s / (nd * (nd*nd - 1))
     end scorr
+     */
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the mid-ranks (1-based) of the elements of this vector: the smallest
+     *  element gets rank 1, and tied elements share the average of the ranks they
+     *  span, e.g., VectorD (5, 3, 3, 9).midRank = VectorD (3, 1.5, 1.5, 4).
+     *  Note, `iqsort` returns the INDEX ORDER (position i holds the index of the
+     *  i-th smallest element), i.e., the inverse permutation, not the rank.
+     */
+    def midRank: VectorD =
+        val v_ = v                                             // local access is faster
+        val rk = iqsort                                        // index order: rk(i) = index of i-th smallest
+        val r  = new VectorD (dim)
+        var i  = 0
+        while i < dim do
+            var j = i                                          // extend i to j over the run of ties
+            while j + 1 < dim && v_(rk(j+1)) == v_(rk(i)) do j += 1
+            val avg = (i + j) / 2.0 + 1.0                      // average of the 1-based ranks i+1 .. j+1
+            cfor (i, j+1) { k => r(rk(k)) = avg }
+            i = j + 1
+        end while
+        r
+    end midRank
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute Spearman's rank correlation of this vector with vector y: the
+     *  Pearson correlation of the two mid-rank vectors (@see `midRank`), which is
+     *  correct with ties and, without ties, equals 1 - 6 Σ d_i^2 / (n (n^2 - 1)).
+     *  Returns -0 (undefined) when either vector is constant (@see `corr`).
+     *  Note, the previous version subtracted the INDEX ORDERS given by `iqsort`
+     *  (the inverse permutations), which is not the rank difference d_i.
+     *  @see en.wikipedia.org/wiki/Spearman%27s_rank_correlation_coefficient
+     *  @param y  the other vector
+     */
+    infix def scorr (y: VectorD): Double = midRank corr y.midRank
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute distance correlation of this vector with vector y.
@@ -1499,6 +1677,12 @@ class VectorD (val dim: Int,
     /** Return the first 2 moments (mean mu and standard deviation sig).
      */
     def mu_sig: VectorD = VectorD (mean, stdev)
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the first 2 moments (mean mu and standard deviation sig), but skip
+     *  elements that are undefined (whose values are NO_DOUBLE).
+     */
+    def _mu_sig: VectorD = VectorD (_mean, _stdev)
 
 end VectorD
 
@@ -1983,4 +2167,38 @@ end vectorDTest6
     println (s"case 3: z.dim = ${z.dim}, time = ${tims(3)}")
 
 end vectorDTest7
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `vectorDTest8` main function tests the `midRank` and (corrected) `scorr`
+ *  methods provided by the `VectorD` class.  The expected values were checked
+ *  against SciPy's `rankdata` and `spearmanr`.
+ *  > runMain scalation.mathstat.vectorDTest8
+ */
+@main def vectorDTest8 (): Unit =
+
+    banner ("midRank: ties share the average rank")
+    val u = VectorD (5, 3, 3, 9)
+    println (s"u.midRank = ${u.midRank}")                              // VectorD (3.0, 1.5, 1.5, 4.0)
+    assert (u.midRank =~ VectorD (3.0, 1.5, 1.5, 4.0))
+    assert (VectorD (2, 2, 2).midRank =~ VectorD (2, 2, 2))            // all tied => all rank 2
+
+    banner ("scorr: no ties (the old index-order formula gave +0.1 here)")
+    val x = VectorD (1.0, 0.47, 0.84, 0.48, 0.64)
+    val y = VectorD (0.15, 0.63, 0.87, 0.52, 0.74)
+    println (s"x scorr y = ${x scorr y}")                              // -0.1
+    assert (math.abs ((x scorr y) + 0.1) < 1E-12)
+
+    banner ("scorr: with ties")
+    val a = VectorD (1, 2, 2, 3, 4)
+    val b = VectorD (1, 2, 3, 3, 5)
+    println (s"a scorr b = ${a scorr b}")                              // 0.9210526315789475
+    assert (math.abs ((a scorr b) - 0.9210526315789475) < 1E-12)
+
+    banner ("scorr: monotone increasing => 1, decreasing => -1")
+    val z = VectorD (10, 20, 30, 40, 50)
+    println (s"z scorr z^2 = ${z scorr (z * z)}, z scorr z.reverse = ${z scorr z.reverse}")
+    assert (math.abs ((z scorr (z * z)) - 1.0) < 1E-12 && math.abs ((z scorr z.reverse) + 1.0) < 1E-12)
+
+end vectorDTest8
 

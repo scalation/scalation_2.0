@@ -14,7 +14,6 @@ package forecasting
 
 import scalation.mathstat._
 
-import Example_Covid.loadData_y
 import Example_LakeLevels.y
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -48,7 +47,7 @@ class NullModel (y: VectorD, hh: Int, tRng: Range = null,
      *  @param y_      the testing/full response/output vector (e.g., full y)
      */
     override def train (x_null: MatrixD, y_ : VectorD): Unit =
-        val yy = y_(skip until y_.dim)
+        val yy = y_(getSkip until y_.dim)
         b = VectorD (yy.mean)
     end train
 
@@ -128,6 +127,7 @@ end nullModelTest
 
 end nullModelTest2
 
+import Example_Covid.{clip, loadData_y}
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `nullModelTest3` main function tests the `NullModel` class on real data:
@@ -137,10 +137,8 @@ end nullModelTest2
  */
 @main def nullModelTest3 (): Unit =
 
-    val yy = loadData_y ()
-//  val y  = yy                                                           // full
-    val y  = yy(0 until 116)                                              // clip the flat end
-    val hh = 6                                                            // maximum forecasting horizon
+    val (_, y) = clip ((null, loadData_y ()))
+    val hh     = 6                                                        // maximum forecasting horizon
 
     val mod = new NullModel (y, hh)                                       // create model for time series data
     banner (s"In-ST Forecasts: ${mod.modelName} on COVID-19 Dataset")
@@ -161,10 +159,8 @@ end nullModelTest3
  */
 @main def nullModelTest4 (): Unit =
 
-    val yy = loadData_y ()
-//  val y  = yy                                                           // full
-    val y  = yy(0 until 116)                                              // clip the flat end
-    val hh = 6                                                            // maximum forecasting horizon
+    val (_, y) = clip ((null, loadData_y ()))
+    val hh     = 6                                                        // maximum forecasting horizon
 
     val mod = new NullModel (y, hh)                                       // create model for time series data
     banner (s"TnT Forecasts: ${mod.modelName} on COVID-19 Dataset")

@@ -14,6 +14,7 @@ package scalation
 package modeling
 
 import scala.math.abs
+import scala.runtime.ScalaRunTime.stringOf
 
 import scalation.mathstat._
 import scalation.optimization.LassoAdmm
@@ -46,7 +47,7 @@ class LassoRegression (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
     private val lambda = hparam("lambda").toDouble                       // shrinkage parameter (weight to put on regularization)
     private val sparse = hparam("sparse").toInt == 1                     // whether to sparsify
 
-    _modelName = "LassoRegression_${lambda}"
+    _modelName = s"LassoRegression_$lambda"
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the value of the shrinkage parameter 'lambda'.
@@ -393,7 +394,7 @@ end lassoRegressionTest3
     val xcols  = Array (1, 3, 4, 5, 6, 7, 8, 9, 10)
     val (x, y) = data.toMatrixV (xcols, 2)
     val fname  = xcols.map (data.schema (_))
-    println (s"fname = $fname")
+    println (s"fname = ${stringOf (fname)}")
     println (s"y = $y")
     println (s"y = $y")
 
@@ -404,10 +405,7 @@ end lassoRegressionTest3
 
     banner ("Forward Selection Test")
     val (cols, rSq) = mod.forwardSelAll ()                             // R^2, R^2 bar, sMAPE, R^2 cv
-    val k = cols.size
-    val t = VectorD.range (1, k)                                       // instance index
-    new PlotM (t, rSq, Regression.metrics, "R^2 vs n for LassoRegression", lines = true)
-    println (s"rSq = $rSq")
+    mod.reportSelection (cols, rSq)
 
 end lassoRegressionTest4
 
@@ -416,7 +414,7 @@ end lassoRegressionTest4
 /** The `lassoRegressionTest5` main function tests the `LassoRegression` class using
  *  the AutoMPG dataset.  Assumes no missing values.
  *  It also combines feature selection with cross-validation and plots
- *  R^2, R^2 bar and R^2 cv vs. the instance index.
+ *  R^2, R^2 bar, sMAPE, and R^2 cv vs. the instance index.
  *  Note, since x0 is automatically included in feature selection, make it an important variable.
  *  > runMain scalation.modeling.lassoRegressionTest5
  */
@@ -449,11 +447,8 @@ end lassoRegressionTest4
 
     for tech <- SelectionTech.values do
         banner (s"Feature Selection Technique: $tech")
-        val (cols, rSq) = mod.selectFeatures (tech)                    // R^2, R^2 bar, R^2 cv
-        val k = cols.size
-        println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for LassoRegression with $tech", lines = true)
-        println (s"$tech: rSq = $rSq")
+        val (cols, rSq) = mod.selectFeatures (tech)                    // R^2, R^2 bar, sMAPE, R^2 cv
+        mod.reportSelection (cols, rSq)
     end for
 */
 

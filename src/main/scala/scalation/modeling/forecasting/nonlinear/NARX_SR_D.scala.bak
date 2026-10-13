@@ -15,16 +15,16 @@ package modeling
 package forecasting
 package nonlinear
 
-import scala.runtime.ScalaRunTime.stringOf
 import scala.collection.mutable.{ArrayBuffer, LinkedHashSet => LSET}
+import scala.runtime.ScalaRunTime.stringOf
 
-import scalation.optimization.quasi_newton.{LBFGS_B => OPTIMIZER}
 import scalation.modeling.{RidgeRegression => REGRESSION}
+import scalation.optimization.quasi_newton.{LBFGS_B => OPTIMIZER}
 
 import scalation.mathstat._
-import TransformT._
 
 import MakeMatrix4TS._
+import TransformT._
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `NARX_SR_D` class provides time series analysis capabilities for NARX Symbolic
@@ -52,7 +52,7 @@ import MakeMatrix4TS._
  *  @param w_nl     the non-linear parameters
  */
 class NARX_SR_D (x: MatrixD, y: MatrixD, hh: Int, n_exo: Int, fname: Array [String],
-                 tRng: Range = null, hparam: HyperParameter = hp,
+                 tRng: Range = null, hparam: HyperParameter = AR.hp,
                  bakcast: Boolean = false,
                  tForms: TransformMap = Map ("tForm_y" -> null), w_nl: VectorD = VectorD (0))
       extends ARX_D (x, y, hh, n_exo, fname, tRng, hparam, bakcast, tForms):
@@ -78,32 +78,32 @@ object NARX_SR_D:
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Create an `NARX_SR_D` object by building an input matrix xy and then calling the
      *  `NARX_SR_D` constructor.
-     *  @param xe             the matrix of exogenous variable values
-     *  @param y              the endogenous/response vector (main time series data)
-     *  @param hh             the maximum forecasting horizon (h = 1 to hh)
-     *  @param fname_         the feature/variable names
-     *  @param tRng           the time range, if relevant (time index may suffice)
-     *  @param hparam         the hyper-parameters
-     *  @param fEndo_enabled  the set of transforms to be used for the endogenous
-     *  @param fExo_enabled   the array containing the sets of transforms to be used for the exogenous 
-     *  @param bakcast        whether a backcasted value is prepended to the time series (defaults to false)
+     *  @param xe      the matrix of exogenous variable values
+     *  @param y       the endogenous/response vector (main time series data)
+     *  @param hh      the maximum forecasting horizon (h = 1 to hh)
+     *  @param fname_  the feature/variable names
+     *  @param tRng    the time range, if relevant (time index may suffice)
+     *  @param hparam  the hyper-parameters
+     *  @param fEndo    the set of transforms to be used for the endogenous
+     *  @param fExo     the array containing the sets of transforms to be used for the exogenous 
+     *  @param bakcast  whether a backcasted value is prepended to the time series (defaults to false)
      */
     def apply (xe: MatrixD, y: VectorD, hh: Int, fname_ : Array [String] = null,
-               tRng: Range = null, hparam: HyperParameter = hp,
-               fEndo_enabled: LSET[TransformT] = LSET(Root), 
-               fExo_enabled: Array [LSET [TransformT]] = Array (LSET(Pow), LSET(Pow)),
+               tRng: Range = null, hparam: HyperParameter = AR.hp,
+               fEndo: LSET [Transform] = LSET (RootForm ()), 
+               fExo: Array [LSET [Transform]] = Array (LSET (PowForm ()), LSET(PowForm ())),
                bakcast: Boolean = false): NARX_SR_D =
 
-        val (wInit_nl, _, _) = initializeW (fEndo_enabled, fExo_enabled)
-        val (fEndo, fExo) = getTransforms(wInit_nl, fEndo_enabled, fExo_enabled)
+//      val (wInit_nl, _, _) = initializeW (fEndo, fExo)
+//      val (fEndo_, fExo_) = getTransforms (wInit_nl, fEndo, fExo)
 
         var xe_bfill: MatrixD = null
-        if xe.dim2 > 0 and hparam("q").toInt > 0 then
+        if xe.dim2 > 0 and hparam("px").toInt > 0 then
             xe_bfill = new MatrixD (xe.dim, xe.dim2)
             for j <- xe.indices2 do xe_bfill(?, j) = backfill (xe(?, j))    // backfill each exogenous variable
 
-        val fEndo_size = fEndo_enabled.size
-        val fExo_sizeArr: Array [Int] = fExo_enabled.map (_.size)
+        val fEndo_size = fEndo.size
+        val fExo_sizeArr: Array [Int] = fExo.map (_.size)
 
         val tForms = Map ("tForm_y" -> null, "fEndo" -> fEndo)   //, "fExo" -> fExo)
         val xy     = buildMatrix (xe_bfill, y, hparam, fEndo, fExo, bakcast)
@@ -115,21 +115,21 @@ object NARX_SR_D:
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Create an `NARX_SR_D` object by building an input matrix xy and then calling the
      *  `NARX_SR_D` constructor, with rescaling of endogneous and exogenous variable values.
-     *  @param xe             the matrix of exogenous variable values
-     *  @param y              the endogenous/response vector (main time series data)
-     *  @param hh             the maximum forecasting horizon (h = 1 to hh)
-     *  @param fname_         the feature/variable names
-     *  @param tRng           the time range, if relevant (time index may suffice)
-     *  @param hparam         the hyper-parameters
-     *  @param fEndo_enabled  the set of transforms to be used for the endogenous
-     *  @param fExo_enabled   the array containing the sets of transforms to be used for the exogenous 
-     *  @param bakcast        whether a backcasted value is prepended to the time series (defaults to false)
-     *  @param tFormScale     the transform for y
+     *  @param xe          the matrix of exogenous variable values
+     *  @param y           the endogenous/response vector (main time series data)
+     *  @param hh          the maximum forecasting horizon (h = 1 to hh)
+     *  @param fname_      the feature/variable names
+     *  @param tRng        the time range, if relevant (time index may suffice)
+     *  @param hparam      the hyper-parameters
+     *  @param fEndo       the set of transforms to be used for the endogenous
+     *  @param fExo        the array containing the sets of transforms to be used for the exogenous 
+     *  @param bakcast     whether a backcasted value is prepended to the time series (defaults to false)
+     *  @param tFormScale  the transform for y
      */
     def rescale (xe: MatrixD, y: VectorD, hh: Int, fname_ : Array[String] = null,
-                 tRng: Range = null, hparam: HyperParameter = hp,
-                 fEndo_enabled: LSET [TransformT] = LSET (Root), 
-                 fExo_enabled: Array [LSET [TransformT]] = Array (LSET (Pow), LSET (Pow)),
+                 tRng: Range = null, hparam: HyperParameter = AR.hp,
+                 fEndo: LSET [Transform] = LSET (RootForm ()), 
+                 fExo: Array [LSET [Transform]] = Array (LSET (PowForm ()), LSET (PowForm ())),
                  bakcast: Boolean = false,
                  tFormScale: VectorD | MatrixD => Transform = MinMax.form): NARX_SR_D =
 
@@ -143,18 +143,18 @@ object NARX_SR_D:
         if tForm_y.getClass.getSimpleName == "zForm" then hparam("nneg") = 0
 
         var xe_bfill: MatrixD = null
-        if xe.dim2 > 0 and hparam("q").toInt > 0 then
+        if xe.dim2 > 0 and hparam("px").toInt > 0 then
             xe_bfill = new MatrixD (xe.dim, xe.dim2)
             for j <- xe.indices2 do xe_bfill(?, j) = backfill (xe(?, j))    // backfill each exogenous variable
             if tFormScale != null then
                 val tForm_exo = tFormScale (xe_bfill(0 until tr_size))
                 xe_bfill      = tForm_exo.f (xe_bfill)                      // rescale the backfilled exogenous variable          
 
-        val fEndo_size = fEndo_enabled.size
-        val fExo_sizeArr: Array [Int] = fExo_enabled.map (_.size)
-        val w_nl = optimize2 (xe_bfill, y_scl, hparam, fEndo_enabled, fExo_enabled, bakcast)  // set non-linear parameters
+        val fEndo_size = fEndo.size
+        val fExo_sizeArr: Array [Int] = fExo.map (_.size)
+        val w_nl = optimize2 (xe_bfill, y_scl, hparam, fEndo, fExo, bakcast)  // set non-linear parameters
         
-        val (fEndo, fExo) = getTransforms (w_nl, fEndo_enabled, fExo_enabled)
+//      val (fEndo, fExo) = getTransforms (w_nl, fEndo, fExo)
         val tForms = Map ("tForm_y" -> tForm_y, "fEndo" -> fEndo)//, "fExo" -> fExo)
         val xy     = buildMatrix (xe_bfill, y_scl, hparam, fEndo, fExo, bakcast)
         val fname  = if fname_ == null then formNames (xe.dim2, hparam, fEndo_size, fExo_sizeArr) else fname_
@@ -175,16 +175,16 @@ object NARX_SR_D:
      *  @param bakcast   whether a backcasted value is prepended to the time series (defaults to false)
      */
     def buildMatrix (xe_bfill: MatrixD, y: VectorD, hp_ : HyperParameter,
-                     fEndo: Array [Transform], fExo: Array [Array [Transform]], bakcast: Boolean): MatrixD =
+                     fEndo: LSET [Transform], fExo: Array [LSET [Transform]], bakcast: Boolean): MatrixD =
 
-        val (p, q, spec, lwave, cross) = (hp_("p").toInt, hp_("q").toInt, hp_("spec").toInt, hp_("lwave").toDouble, hp_("cross").toInt == 1)
+        val (p, q, spec, cross) = (hp_("p").toInt, hp_("px").toInt, hp_("spec").toInt, hp_("crx").toInt == 1)
 
         // apply transformations fEndo to the endogenous variables and add these columns to x_endo
         var x_endo = MatrixD (y).ᵀ                                         // make a matrix out of vector y
         for tr <- fEndo do x_endo = x_endo :^+ tr.f(y)                     // add each transformation of the endogenous variable
 
         // make matrix xy for trend terms and lagged terms of the endogenous variable
-        var xy = makeMatrix4T (y, spec, lwave, bakcast) ++^                // trend terms
+        var xy = makeMatrix4T (y, spec, bakcast) ++^                       // trend terms
                  makeMatrix4L (x_endo, p, bakcast)                         // lagged linear terms
 
         // apply transformations fExo to the exogenous variables and add there columns to x_exo
@@ -212,15 +212,16 @@ object NARX_SR_D:
      *  @param fExo      the transformation functions to apply on the exogenous variables
      *  @param bakcast   whether a backcasted value is prepended to the time series (defaults to false)
      */
-    def optimize (xe_bfill: MatrixD, y: VectorD, hparam: HyperParameter = hp,
-                  fEndo_enabled: LSET [TransformT] = LSET (Root), 
-                  fExo_enabled: Array [LSET [TransformT]] = Array (LSET (Pow), LSET (Pow)),
+    def optimize (xe_bfill: MatrixD, y: VectorD, hparam: HyperParameter = AR.hp,
+                  fEndo: LSET [Transform] = LSET (RootForm ()), 
+                  fExo: Array [LSET [Transform]] = Array (LSET (PowForm ()), LSET (PowForm ())),
                   bakcast: Boolean = false): VectorD =
-        val (p, q, spec, crs) = (hparam("p").toInt, hparam("q").toInt, hparam("spec").toInt, hparam("cross").toInt)
+        val (p, q, spec, crs) = (hparam("p").toInt, hparam("px").toInt, hparam("spec").toInt, hparam("crx").toInt)
 
-        val fEndo_size = fEndo_enabled.size
-        val fExo_size  = fExo_enabled.map (_.size).sum
-        val (wInit_nl, l_wInit_nl, u_wInit_nl) = initializeW (fEndo_enabled, fExo_enabled)
+        val fEndo_size = fEndo.size
+        val fExo_size  = fExo.map (_.size).sum
+        val (wInit_nl, l_wInit_nl, u_wInit_nl) = (VectorD(1), VectorD(1), VectorD(1))
+//      val (wInit_nl, l_wInit_nl, u_wInit_nl) = initializeW (fEndo, fExo)
         val w_nl_size  = wInit_nl.dim
 
         val n_exo    = if xe_bfill != null then xe_bfill.dim2 else 0
@@ -235,9 +236,9 @@ object NARX_SR_D:
         def loss: FunctionV2S = (ww: VectorD) =>
             if count % 10000 == 0 then println (s"count = $count, ww = $ww")
             count += 1
-            val w_nl = ww(0 until w_nl_size)
+//          val w_nl = ww(0 until w_nl_size)
             val w_l  = ww(w_nl_size until ww.dim)
-            val (fEndo, fExo) = getTransforms (w_nl, fEndo_enabled, fExo_enabled)
+//          val (fEndo, fExo) = getTransforms (w_nl, fEndo, fExo)
             val xy = buildMatrix (xe_bfill, y, hparam, fEndo, fExo, bakcast)
             val yp = xy * w_l
             (y - yp).normSq
@@ -265,15 +266,17 @@ object NARX_SR_D:
      *  @param fExo      the transformation functions to apply on the exogenous variables
      *  @param bakcast   whether a backcasted value is prepended to the time series (defaults to false)
      */
-    def optimize2 (xe_bfill: MatrixD, y: VectorD, hparam: HyperParameter = hp,
-                   fEndo_enabled: LSET [TransformT] = LSET(Root), 
-                   fExo_enabled: Array [LSET [TransformT]] = Array (LSET (Pow), LSET (Pow)),
+    def optimize2 (xe_bfill: MatrixD, y: VectorD, hparam: HyperParameter = AR.hp,
+                   fEndo: LSET [Transform] = LSET(RootForm ()), 
+                   fExo: Array [LSET [Transform]] = Array (LSET (PowForm ()), LSET (PowForm ())),
                    bakcast: Boolean = false): VectorD =
 
-        val (wInit, l_wInit, u_wInit) = initializeW (fEndo_enabled, fExo_enabled)
+        val (wInit, l_wInit, u_wInit) = (VectorD(1), VectorD(1), VectorD(1))
+//      val (wInit, l_wInit, u_wInit) = initializeW (fEndo, fExo)
 
         def loss: FunctionV2S = (ww: VectorD) =>
-            val (fEndo, fExo) = getTransforms (ww, fEndo_enabled, fExo_enabled)
+            println (s"loss: ww = $ww")   
+//          val (fEndo, fExo) = getTransforms (ww, fEndo, fExo)
             val xy  = buildMatrix (xe_bfill, y, hparam, fEndo, fExo, bakcast)
             val reg = new REGRESSION (xy, y)
             reg.train (xy, y)
@@ -292,10 +295,10 @@ object NARX_SR_D:
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Form vectors for the initial weights and their bounds for the transforms.
-     *  @param fEndo_enabled  the set of transforms to be used for the endogenous
-     *  @param fExo_enabled   the array containing the sets of transforms to be used for the exogenous 
+     *  @param fEndo  the set of transforms to be used for the endogenous
+     *  @param fExo   the array containing the sets of transforms to be used for the exogenous 
      */
-    def initializeW (fEndo_enabled: LSET [TransformT], fExo_enabled: Array [LSET [TransformT]]):
+    def initializeW (fEndo: LSET [TransformT], fExo: Array [LSET [TransformT]]):
                     (VectorD, VectorD, VectorD) =
 
         var wInit   = new VectorD (0)
@@ -303,15 +306,15 @@ object NARX_SR_D:
         var u_wInit = new VectorD (0)
         // order: endo's transforms, exo1's transforms, exo2's transfroms, ...
 
-        if fEndo_enabled != null then
-            for t <- fEndo_enabled do
+        if fEndo != null then
+            for t <- fEndo do
                 val init = t.wlu
                 wInit    = wInit ++ init.w
                 l_wInit  = l_wInit ++ init.l
                 u_wInit  = u_wInit ++ init.u
 
-        if fExo_enabled.length > 0 then
-            for set <- fExo_enabled do    
+        if fExo.length > 0 then
+            for set <- fExo do    
                 if set != null then
                     for t <- set do
                         val init = t.wlu
@@ -324,22 +327,22 @@ object NARX_SR_D:
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Form arrays of transforms object using the vector of nonlinear parameters.
      *  @param w_nl           the vector of nonlinear parameters
-     *  @param fEndo_enabled  the set of transforms to be used for the endogenous
-     *  @param fExo_enabled   the array containing the sets of transforms to be used for the exogenous 
+     *  @param fEndo  the set of transforms to be used for the endogenous
+     *  @param fExo   the array containing the sets of transforms to be used for the exogenous 
      */
-    def getTransforms (w_nl: VectorD, fEndo_enabled: LSET [TransformT], fExo_enabled: Array [LSET [TransformT]]):
+    def getTransforms (w_nl: VectorD, fEndo: LSET [TransformT], fExo: Array [LSET [TransformT]]):
                       (Array [Transform], Array [Array [Transform]]) =
         val listEndo = new ArrayBuffer [Transform] ()
         var i = 0
-        if fEndo_enabled != null then
-            for t <- fEndo_enabled do
+        if fEndo != null then
+            for t <- fEndo do
                 listEndo += t.form (VectorD (w_nl(i), w_nl(i+1)))
                 i += 2
 
-        val listExo = new Array [Array [Transform]] (fExo_enabled.length)
-        if fExo_enabled.length > 0 then
+        val listExo = new Array [Array [Transform]] (fExo.length)
+        if fExo.length > 0 then
             var k = 0
-            for set <- fExo_enabled do
+            for set <- fExo do
                 val listExo_k = new ArrayBuffer [Transform] ()    
                 if set != null then
                     for t <- set do
@@ -360,7 +363,7 @@ object NARX_SR_D:
      */
     def formNames (n_exo: Int, hp_ : HyperParameter, n_fEn: Int, n_fExArr: Array [Int]): Array [String] =
 
-        val (spec, p, q, cross) = (hp_("spec").toInt, hp_("p").toInt, hp_("q").toInt, hp_("cross").toInt)
+        val (spec, p, q, cross) = (hp_("spec").toInt, hp_("p").toInt, hp_("px").toInt, hp_("crx").toInt)
         val names = ArrayBuffer [String] ()
         for i <- 0 until n_fEn; j <- p to 1 by -1 do names += s"f$i(yl$j)"           // function lags endo terms
 
@@ -386,6 +389,7 @@ object NARX_SR_D:
 end NARX_SR_D
 
 import Example_Covid._
+import AR.hp
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `nARX_SR_DTest3` main function tests the `NARX_SR_D` class on real data:
@@ -406,14 +410,13 @@ import Example_Covid._
 //  val y  = yy                                                         // full
     val y  = yy(0 until 116)                                            // clip the flat end
     val hh = 6                                                          // maximum forecasting horizon
-    hp("lwave") = 20                                                    // wavelength (distance between peaks)
-    hp("cross") = 1                                                     // 1 => add cross terms
+    hp("crx") = 1                                                       // 1 => add cross terms
 
     for p <- 6 to 6; q <- 4 to 4; s <- 1 to 1 do                        // number of lags (endo, exo); trend
         hp("p")    = p                                                  // endo lags
-        hp("q")    = q                                                  // exo lags
-        hp("spec") = s                                                  // trend specification: 0, 1, 2, 3, 5
-        val mod = NARX_SR_D (xe, y, hh)                                  // create model for time series data
+        hp("px")    = q                                                 // exo lags
+        hp("spec") = s                                                  // trend specification: 0, 1, 2, 3
+        val mod = NARX_SR_D (xe, y, hh)                                 // create model for time series data
         mod.inSample_Test ()                                            // In-sample Testing
         println (mod.summary ())                                        // statistical summary of fit
     end for
@@ -439,17 +442,16 @@ end nARX_SR_DTest3
 //  val y  = yy                                                         // full
     val y  = yy(0 until 116)                                            // clip the flat end
     val hh = 6                                                          // maximum forecasting horizon
-    hp("lwave") = 20                                                    // wavelength (distance between peaks)
-//  hp("cross") = 1                                                     // 1 => add cross terms
+//  hp("crx") = 1                                                       // 1 => add cross terms
 
     for p <- 6 to 6; q <- 4 to 4; s <- 1 to 1 do                        // number of lags (endo, exo); trend
         hp("p")    = p                                                  // endo lags
-        hp("q")    = q                                                  // exo lags
-        hp("spec") = s                                                  // trend specification: 0, 1, 2, 3, 5
+        hp("px")   = q                                                  // exo lags
+        hp("spec") = s                                                  // trend specification: 0, 1, 2, 3
 
-        val mod = NARX_SR_D (xe, y, hh)           // create model for time series data
+        val mod = NARX_SR_D (xe, y, hh)                                 // create model for time series data
         banner (s"TnT Forecasts: ${mod.modelName} on COVID-19 Dataset")
-        mod.trainNtest_x ()()                                           // use customized trainNtest_x
+        mod.trainNtest (xe, y)(xe, y)                                   // use customized trainNtest
         println (mod.summary ())                                        // statistical summary of fit
 
         mod.setSkip (0)
@@ -480,20 +482,19 @@ end nARX_SR_DTest4
 //  val y  = yy                                                     // full
     val y  = yy(0 until 116)                                        // clip the flat end
     val hh = 6                                                      // maximum forecasting horizon
-    hp("lwave") = 20                                                // wavelength (distance between peaks)
-    hp("cross") = 0                                                 // 1 => add cross terms
+    hp("crx") = 0                                                   // 1 => add cross terms
     RidgeRegression.hp("lambda") = 6.0
     // hp("pow") = 0.5
     RidgeRegression.hp("factorization") = "Fac_Cholesky"
 
     hp("p")    = 6                                                  // endo lags
-    hp("q")    = 4                                                  // exo lags
-    hp("spec") = 1                                                  // trend specification: 0, 1, 2, 3, 5
+    hp("px")    = 4                                                 // exo lags
+    hp("spec") = 1                                                  // trend specification: 0, 1, 2, 3
 
-    val fEndo_enabled = LSET (Root)
-    val fExo_enabled  = Array (LSET(Root), LSET(Root))              // array of transforms for exogenous (must be exo_vars.length == fExo_enabled.length)
+    val fEndo: LSET [Transform] = LSET (RootForm ())
+    val fExo: Array [LSET [Transform]]  = Array (LSET(RootForm ()), LSET(RootForm ()))   // array of transforms for exogenous (must be exo_vars.length == fExo.length)
 
-    val mod = NARX_SR_D.rescale (xe, y, hh, fEndo_enabled = fEndo_enabled, fExo_enabled = fExo_enabled) // create model for time series data
+    val mod = NARX_SR_D.rescale (xe, y, hh, fEndo = fEndo, fExo = fExo) // create model for time series data
 //  mod.trainNtest_x ()()
     mod.inSample_Test ()
 

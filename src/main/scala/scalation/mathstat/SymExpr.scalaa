@@ -1,0 +1,316 @@
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** @author  John Miller
+ *  @version 2.0
+ *  @date    Sun May 31 17:40:09 EDT 2026
+ *  @see     LICENSE (MIT style license file).
+ *
+ *  @note    Symbolic Expression Engine Including Macro Definition
+ *
+ *  Supports lagged variables/vectors: fx"y(-1) - y(-2) + (x_r(-1) * 2.0)"`
+ */
+
+package scalation
+package mathstat
+
+import scala.annotation.unused
+import scala.quoted._
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `TokenType` enumeration core Token representation types.
+ */ 
+enum TokenType:
+  case Constant, Variable, Operator, Function
+end TokenType
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `Token` enumeration defines core token representations (Flat Structs)
+ *  @param kind.
+ */
+enum Token (val kind: TokenType):
+
+    case Const (paramId: String, value: Double) extends Token (TokenType.Constant)
+    case Var (paramId: String, lag: Int) extends Token (TokenType.Variable)
+    case Op (symbol: String) extends Token (TokenType.Operator)
+    case Func (name: String) extends Token (TokenType.Function)
+
+end Token
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** Type definition for zero-overhead embedded domain-specific language (eDSL)
+ *  for expressions.
+ */
+type Expr = Vector [Token]
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `Interpolators` object provides a macro definition/string interpolator
+ *  for fx"" symbolic math expressions.
+ */
+object Interpolators:
+
+    extension (inline sc: StringContext)
+
+        //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+        /** EXECUTE: Evaluates expressions with known parameters.  Defines the fx"..."
+         *  macro prefix handler.
+         */
+        inline def fx (@unused inline args: Any*): Expr =
+            ${ MacroImpl.parseFormulaMacro('sc) }
+
+        //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+        /** MODEL: Fits the parameters in expressions.  Defines the fm"..." macro prefix handler.
+         */
+        inline def fm (@unused inline args: Any*): Expr = 
+            ${ MacroImpl.parseFormulaMacro('sc) }
+
+end Interpolators
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `MacroImpl` object provides a macro implementation the converts an fx"" symbolic
+ *  math expression into a list/vector of tokens that can efficiently evaluated.
+ */
+object MacroImpl:
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Parse an expression string into a flat RPN token array at compile time.
+     *  returning a compile-time expression containing a flat, linear sequence of
+     *  pre-sorted `Token` elements.
+     *  Eliminates runtime string-parsing overhead and prevents global namespace 
+     *  conflicts with ScalaTion variables by flattening formulas directly into 
+     *  a linear, CPU cache-friendly token sequence at build time.
+     *  @param sc    the raw `StringContext` holding text fragments written inside the fx"" interpolator.
+     *  @param qctx  the implicit macro compiler context mapping compilation phases
+     */
+    def parseFormulaMacro (sc: quoted.Expr [StringContext])(using Quotes): quoted.Expr [Expr] =
+//      import quotes.reflect._
+
+        // Extract the raw literal string out of the StringContext at compile-time
+        val stringValue = sc.valueOrAbort.parts.head
+        println (s"stringValue = $stringValue")
+
+        // Parse it into a concrete Token vector right now during compilation
+        val parsedTokens = SymExprParser.parse (stringValue)
+    
+        // Lift the calculated token sequence directly into generated runtime bytecode
+        scala.quoted.Expr.ofSeq (parsedTokens.map {
+            case Token.Var (id, lag) => '{ Token.Var (${quoted.Expr(id)}, ${quoted.Expr(lag)}) }
+            case Token.Const (id, v) => '{ Token.Const (${quoted.Expr(id)}, ${quoted.Expr(v)}) }
+            case Token.Op (sym)      => '{ Token.Op (${quoted.Expr(sym)}) }
+            case Token.Func (name)   => '{ Token.Func (${quoted.Expr(name)}) }
+        }.toSeq).asInstanceOf [quoted.Expr [Expr]]
+/*
+        // for Test Returns your pre-flattened evaluation layout directly into your bytecode
+        '{
+            Vector (
+                Token.Var ("y", -1), Token.Var ("y", -2), Token.Op ("-"),
+                Token.Var ("x_r", -1), Token.Const ("", 2.0), Token.Op ("*"),
+                Token.Op("+"))
+        }
+        // for Test2 Temporarily hardcode the matching AR(3) output tokens to pass your test
+        '{ 
+            Vector (
+                Token.Var ("c", 0),                                           // intercept constant
+                Token.Var ("b1", 0), Token.Var ("y", -1), Token.Op ("*"), Token.Op ("+"),    // + b1 * y(-1)
+                Token.Var ("b2", 0), Token.Var ("y", -2), Token.Op ("*"), Token.Op ("+"),    // + b2 * y(-2)
+                Token.Var ("b3", 0), Token.Var ("y", -3), Token.Op ("*"), Token.Op ("+"))    // + b3 * y(-3)
+        }
+*/
+        // FIX -- replace hardcoding with Regex Tokenizer alongside a linear Shunting-Yard operator precedence sorter 
+    end parseFormulaMacro
+
+end MacroImpl
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `Context` case class is used to hold ScalaTion Data State.
+ *  @param t       the target time index step
+ *  @param series  the time series symbol and vector of values
+ *  @param betas   the parameters
+ */
+case class Context (t: Int, series: Map [String, VectorD], betas: Map[String, Double]):
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Safe fetch/lookup extracting a scalar vector slice by adding t + lag.
+     *  @param paramId  the identifying string/name for the variable
+     *  @patm lag       where relative to time t to extract the time series value, y(-2) => y(t-2)
+     */
+    def fetch (paramId: String, lag: Int): Double =
+        if betas.contains (paramId) then betas(paramId)      // return fitted coefficient weight
+        else series (paramId)(t + lag)                       // return time series history point
+    end fetch
+
+end Context
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `Evaluator` object provides a Flat Reverse Polish Notation (RPN) Stack Machine
+ *  Evaluator.
+ */
+object Evaluator:
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Evaluate a flat RPN token array using a high-speed stack machine loop.
+     *  @param rpn  the flat, sequential vector of pre-sorted RPN mathematical tokens to process
+     *  @param ctx  the data environment state containing current time index t and ScalaTion vectors.
+     */
+    def execute (rpn: Vector [Token], ctx: Context): Double =
+
+        val stack = new Array [Double](8)       // tiny unboxed stack array for depth 4 limits
+        var sp = 0                              // stack pointer
+
+        var i = 0
+        val len = rpn.length
+        while i < len do
+            rpn(i) match
+            case Token.Const (_, value) =>
+                stack(sp) = value
+                sp += 1
+
+            case Token.Var (id, lag) =>
+                stack(sp) = ctx.fetch(id, lag)
+                sp += 1
+
+            case Token.Op (symbol) =>
+                // Handle custom structural operators emitted by the EBNF parser
+                if symbol == "iverson" then
+                    val conditionResult = stack(sp - 1)
+                    // If true (non-zero), cast indicator value to 1.0, otherwise 0.0
+                    stack(sp - 1) = if conditionResult != 0.0 then 1.0 else 0.0
+
+                else if symbol.contains("#") then
+                    // Function extraction hook: e.g., "Σ#3" pops 3 parameters off the execution frame
+                    val parts = symbol.split ("#")
+                    val funcName = parts(0)
+                    val argsCount = parts(1).toInt
+                    sp -= argsCount
+
+                    stack(sp) = funcName match
+                        case "Σ" | "Δ" => /* Add your multi-argument vector math logic here */ 0.0
+                        case _                 => 0.0
+                    sp += 1
+
+                else
+                    // Standard binary math operator processing path
+                    val right = stack(sp - 1)
+                    val left  = stack(sp - 2)
+                    sp -= 2
+                    stack(sp) = symbol match
+                        case "+" => left + right
+                        case "-" | "−" => left - right
+                        case "*" | "×" | "·" => left * right
+                        case "/" | "÷" => left / right
+                        case "^" => math.pow(left, right)
+                        case "⊕" => if left != 0.0 || right != 0.0 then 1.0 else 0.0
+                        case "==" => if left == right then 1.0 else 0.0
+                        case "≠" | "!=" => if left != right then 1.0 else 0.0
+                        case "<"    => if left < right then 1.0 else 0.0
+                        case "≤" | "<=" => if left <= right then 1.0 else 0.0
+                        case ">"    => if left > right then 1.0 else 0.0
+                        case "≥" | ">=" => if left >= right then 1.0 else 0.0
+                    sp += 1
+
+            case Token.Func (name) =>
+                val arg = stack(sp - 1)
+                // Overwrite the top of the stack with the function result (sp stays same)
+                stack(sp - 1) = name match
+                case "ln"   => math.log (arg)
+                case "exp"  => math.exp (arg)
+                case "abs"  => math.abs (arg)
+                case "sqrt" => math.sqrt (arg)
+                case _      => throw new UnsupportedOperationException (s"Unknown function: $name")
+            i += 1
+        end while
+
+        stack(0) // Return root outcome value
+    end execute
+
+end Evaluator
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `Environment` case class serves as a high-level execution wrapper.
+ *  @param series  the map containing named variables along with their time series vectors
+ */
+case class Environment (series: Map [String, VectorD]):
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Dynamically extract the required lag order 'p', trains ScalaTion's AR engine,
+     *  and map the resulting parameters back to their custom string names,
+     *  returning a Map [String, Double] containing the optimized parameters.
+     *  @param expr            the compiled flat token vector from the fm"" string literal.
+     *  @param targetVariable  the string identifier of the time series being predicted (e.g., "y").
+     */
+    def fit (expr: Expr, targetVariable: String): Map [String, Double] =
+
+        // Calculate required lag order 'p' by scanning for the largest history lag
+        val p = expr.collect { 
+            case Token.Var (id, lag) if id == targetVariable => lag.abs 
+        }.maxOption.getOrElse(1)
+
+        // Fetch the target data array vector from the environment
+        val yData = series.getOrElse (targetVariable, 
+            throw new IllegalArgumentException (s"Target variable '$targetVariable' not found in environment."))
+
+        // Instantiate and run ScalaTion's internal core AR regression training pass
+        modeling.forecasting.AR.hp("p") = p
+        val hh = 2
+        val arModel = new modeling.forecasting.AR (yData, hh)                                  // FIX -- generalize
+        arModel.train (null, yData) 
+
+        // Extract the trained coefficient parameter array vector from ScalaTion
+        val b = arModel.parameter
+
+        // General-Purpose Parameter Mapping: Extract model variable identifiers
+        // Finds variables with lag 0 that aren't the target series (treated as coefficients)
+        val paramNames = expr.collect {
+            case Token.Var (id, lag) if id != targetVariable && lag == 0 => id
+        }.distinct
+
+        // Index 0 in ScalaTion's AR parameters is always the constant intercept.
+        // If the user specified a name, use it; otherwise, fall back to "c".
+        val constantName = paramNames.headOption.getOrElse ("c")
+        val remainingParams = if paramNames.nonEmpty then paramNames.tail else Vector.empty
+
+        // Build the dynamic map linking parameters to vector indices
+        val dynamicBetas = collection.mutable.Map [String, Double] ()
+        dynamicBetas(constantName) = b(0) // Assign the constant intercept
+
+        var idx = 1
+        while idx < b.dim && (idx - 1) < remainingParams.length do
+            dynamicBetas(remainingParams(idx - 1)) = b(idx)
+            idx += 1
+        end while
+
+        dynamicBetas.toMap
+    end fit
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Run an expression across a specific time step cleanly.
+     *  @param expr  the symbolic math expression as a list/vector of tokens
+     *  @param betas
+     */
+    def run (expr: Expr, betas: Map [String, Double] = Map.empty)(using t: Int): Double =
+        val ctx = Context (t, series, betas)
+        Evaluator.execute (expr, ctx)
+    end run
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Evaluate an expression across all valid historical indices
+     *  @param expr  the symbolic math expression as a list/vector of tokens
+     *  @param betas
+     */
+    def runAll (expr: Expr, betas: Map [String, Double] = Map.empty): VectorD =
+        // Dynamically calculate safe calculation boundaries based on compilation lags
+        val maxLag = expr.collect { case Token.Var (_, lag) => lag.abs }.maxOption.getOrElse (0)
+        val firstValidVector = series.values.head
+    
+        val results = for targetT <- maxLag until firstValidVector.size yield
+            val ctx = Context (targetT, series, betas)
+            Evaluator.execute (expr, ctx)
+      
+        VectorD (results)
+    end runAll
+
+end Environment
+

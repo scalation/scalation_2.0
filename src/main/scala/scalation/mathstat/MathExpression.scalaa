@@ -1,0 +1,136 @@
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** @author  John Miller
+ *  @version 2.0
+ *  @date    Sun May 31 17:40:09 EDT 2026
+ *  @see     LICENSE (MIT style license file).
+ *
+ *  @note    Mathematical Expression Macro-based Translator
+ *
+ *  Supports lagged variables/vectors: fx"y(-1) - y(-2) + (x_r(-1) * 2.0)"`
+ */
+
+package scalation
+package mathstat
+
+import scala.quoted.*
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `MathExpression` object allows mathematical expressions to be translated
+ *  into executable ScalaTion via simple macros.
+ */
+object MathExpression:
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Dynamic entry point: can bind to variables returning a Double or VectorD
+     */
+    extension (inline sc: StringContext)
+        // The clean user-facing macro string interpolator
+        inline def fx(): Any = ${ fxImpl('sc) }
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /**
+     */
+    def fxImpl(scExpr: Expr[StringContext])(using Quotes): Expr[Any] =
+        import quotes.reflect.*
+
+        // 1. Fetch the raw math formula string literal from the macro call site
+        val rawFormula: String = scExpr.valueOrAbort.parts.head
+
+        // 2. Identify variables in local scope to prevent compilation errors
+        // We fetch all valid identifier declarations active in the current scope block
+        val localSymbols = Symbol.currentOwner.localContext.owner.declarations
+
+        // 3. Define the precise regex pattern for backtick lag variables: e.g., y`-1, x_r`-2
+        // Group 1 captures the variable name; Group 2 captures the integer lag offset
+        val lagPattern = """([a-zA-Z_]\w*)`(-?\d+)""".r
+
+        // 4. Tokenize and parse the mathematical operator chain
+        // We split by standard arithmetic boundaries (+, -, *, /) while preserving whitespace
+        val tokens = rawFormula.split ("(?<=[+\\-*/×⋅])|(?=[+\\-*/×⋅])").map(_.trim).filter(_.nonEmpty)
+
+        //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+        /** Helper function to build standard Scala AST nodes from each textual formula element
+         *  @param token
+         */
+        def processToken (token: String): Term = 
+
+            token match
+                // Case A: Token is a backtick lagged variable expression (e.g., y`-1)
+                case lagPattern (varName, lagStr) =>
+                    val lagAmount = lagStr.toInt
+                    
+                    // Verify if the variable text identifier actually exists in the local environment
+                    val symbol = localSymbols.find(_.name == varName).getOrElse(
+                        report.errorAndAbort (s"Compilation Error: Variable '$varName' is not defined in this scope.")
+                    )
+                    
+                    // Create the reference lookup node for the variable
+                    val varRef = Ref(symbol)
+                    val varType = varRef.tpe
+
+                    // Extract the native '.lag' method from the class definition (e.g., VectorD)
+                    val lagMethod = varType.classSymbol match
+                        case Some(cls) => cls.methodMember("lag").headOption.getOrElse (
+                            report.errorAndAbort (s"Type [${varType.show}] does not have a native '.lag' method member.")
+                        )
+                        case None => report.errorAndAbort (s"Could not resolve class structure for variable: $varName")
+
+                    // Programmatically construct the AST node tree: variable.lag (lagAmount)
+                    Apply (Select (varRef, lagMethod), List (Literal (IntConstant (lagAmount))))
+
+                // Case B: Token is an isolated regular variable name without a lag (e.g., plain y)
+                case varName if varName.matches ("^[a-zA-Z_]\\w*$") =>
+                    localSymbols.find (_.name == varName) match
+                        case Some(sym) => Ref(sym)
+                        case None      => report.errorAndAbort (s"Compilation Error: Unknown variable identifier '$varName'")
+
+                // Case C: Token is a literal constant scalar number (e.g., 2.0 or 45)
+                case numStr if numStr.matches ("""^\d+(\.\d+)?$""") =>
+                    Literal (DoubleConstant (numStr.toDouble))
+
+                // Case D: Return a transparent identity for structural operators or raw blocks
+                case operator => 
+                    report.errorAndAbort (s"Syntax Error: Unrecognized or misaligned symbol element in math string: '$operator'")
+        end processToken
+
+        // 5. Assemble the terms into a single executable expression tree block
+        // For simplicity, we step through parsed tokens and pair operations sequentially
+        // (For nested operator precedence rules, route this sequence through an abstract binary expression tree folder)
+        val parsedTerms = tokens.filterNot (t => t.matches ("[+\\-*/×⋅]")).map(processToken)
+        val operators   = tokens.filter (t => t.matches ("[+\\-*/×⋅]"))
+
+        val finalTree: Term = parsedTerms.reduceLeftIndexed { (index, leftNode, rightNode) =>
+            val rawOp = operators(index - 1)
+            val cleanOp = rawOp match
+                case "×" | "⋅" => "*"
+                case other         => other
+
+            // Identify the corresponding method identifier available on the left object term
+            val targetMethod = leftNode.tpe.classSymbol.get.methodMember(cleanOp).headOption.getOrElse(
+                report.errorAndAbort (s"Operator compilation mismatch: type [${leftNode.tpe.show}] cannot invoke '$cleanOp'")
+            )
+            
+            // Stitch together: leftNode.operator(rightNode)
+            Apply (Select (leftNode, targetMethod), List (rightNode))
+        }
+
+        // 6. Lift our constructed AST directly into generated runtime bytecode
+        finalTree.asExpr
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Small internal array utility wrapper to support indexed tracking loops
+     */
+    extension [A] (seq: Seq [A])
+
+        private def reduceLeftIndexed (f: (Int, A, A) => A): A =
+            var result = seq.head
+            for i <- 1 until seq.length do
+                result = f(i, result, seq(i))
+            result
+        end reduceLeftIndexed
+
+    end fxImpl
+
+end MathExpression
+

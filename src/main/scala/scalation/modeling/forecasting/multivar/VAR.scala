@@ -20,8 +20,6 @@ package multivar
 
 import scalation.mathstat._
 
-import MakeMatrix4TS.hp
-
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `VAR` class provides multi-variate time series analysis capabilities for VAR models.
  *  VAR models are similar to `ARX` models, except that the exogenous variables are treated
@@ -44,15 +42,14 @@ import MakeMatrix4TS.hp
  *  @param bakcast  whether a backcasted value is prepended to the time series (defaults to false)
  */
 class VAR (x: MatrixD, y: MatrixD, hh: Int, fname: Array [String] = null,
-           tRng: Range = null, hparam: HyperParameter = hp,
+           tRng: Range = null, hparam: HyperParameter = AR.hp,
            bakcast: Boolean = false)                                      // backcasted values only used in `buildMatrix4TS`
 //    extends Forecaster_D (x, y, hh, tRng, hparam, bakcast):             // no automatic backcasting, @see `VAR.apply`
       extends Forecaster_RegV (x, y, hh, fname, tRng, hparam, bakcast):
 
     private val debug = debugf ("VAR", true)                              // debug function
     private val p     = hparam("p").toInt                                 // use the last p values for each variable
-    private val spec  = hparam("spec").toInt                              // trend terms: 0 - none, 1 - constant, 2 - linear, 3 - quadratic
-                                                                          //              4 - sine, 5 cosine
+    private val spec  = hparam("spec").toInt                              // trend terms: 0 - implicit constant, 1 - linear, 2 - quadratic, 3 - cubic
     private val n     = y.dim2                                            // the number of variables
 
     _modelName = s"VAR_${p}_$n"
@@ -104,11 +101,11 @@ object VAR:
      *  @param hh       the maximum forecasting horizon (h = 1 to hh)
      *  @param fname    the feature/variable names
      *  @param tRng     the time range, if relevant (time index may suffice)
-     *  @param hparam   the hyper-parameters (defaults to `MakeMatrix4TS.hp`)
+     *  @param hparam   the hyper-parameters (defaults to `AR.hp`)
      *  @param bakcast  whether a backcasted value is prepended to the time series (defaults to false)
      */
     def apply (y: MatrixD, hh: Int, fname: Array [String] = null, tRng: Range = null,
-               hparam: HyperParameter = hp, bakcast: Boolean = false): VAR =   // backcasted values only used in `buildMatrix4TS`
+               hparam: HyperParameter = AR.hp, bakcast: Boolean = false): VAR =   // backcasted values only used in `buildMatrix4TS`
         val y_0 = y(?, 0)                                                      // the main endogenous variable (column zero)
         val yy  = y(?, 1 until y.dim2)                                         // the other endogenous variables (rest of the columns)
         val x   = ARX.buildMatrix (yy, y_0, hparam, bakcast)                   // add spec trend columns and p|q lags for each column of y
@@ -168,6 +165,7 @@ object VAR:
 end VAR
 
 import Forecaster_RegV.plotAll
+import AR.hp
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `vARTest` main function tests the `VAR` class.
@@ -182,7 +180,6 @@ import Forecaster_RegV.plotAll
     val y  = MatrixD (z, -z + m).ᵀ
     val hh = 3                                                                 // the forecasting horizon
 
-    hp("q") = 2
     for p <- 5 to 5 do                                                         // autoregressive hyper-parameter p
         hp("p") = p
         banner (s"Test: VAR with $p lags")
@@ -212,7 +209,6 @@ end vARTest
     val hh   = 4                                                               // forecasting horizon
     val LAGS = 5                                                               // number of lags
     hp("p") = LAGS
-    hp("q") = 2
 
     val y = Example_GasFurnace.loadData_yy (header)
     println (s"y.dims = ${y.dims}")
@@ -238,7 +234,6 @@ end vARTest2
     val hh   = 6                                                               // maximum forecasting horizon
     val LAGS = 2                                                               // number of lags
     hp("p") = LAGS
-    hp("q") = 2
 
     val vars = Array ("new_deaths", "icu_patients")
     val yy   = Example_Covid.loadData_yy (vars)
@@ -292,7 +287,6 @@ end vARTest3
 
     banner ("Test In-Sample VAR on COVID-19 Weekly Data")
     hp("p") = LAGS
-    hp("q") = 2
     val mod = VAR (y, hh)                                                      // create model for time series data - with exo
     mod.trainNtest_x ()()                                                      // train on full and test on full
 //  println (mod.summary ())
@@ -338,7 +332,6 @@ end vARTest4
     println (s"y.dims = ${y.dims}")
 
     hp("p") = LAGS
-    hp("q") = 2
     banner ("Test In-Sample VAR on COVID-19 Weekly Data")
     val mod = VAR (y, hh)                                                      // create model for time series data - with exo
     mod.trainNtest_x ()()                                                      // train on full and test on full
@@ -394,12 +387,11 @@ end vARTest5
     println (s"y.dims = ${y.dims}")
 
     hp("p") = LAGS
-    hp("q") = 2
     banner ("Test In-Sample VAR on COVID-19 Weekly Data")
     val mod = VAR (y, h, fname = vars)                                         // create model for time series data - with exo
     mod.trainNtest_x ()()                                                      // train on full and test on full
     mod.rollValidate ()                                                        // TnT with Rolling Validation default rc = 2
-    mod.diagnoseAll (mod.getYY, mod.getYf, Forecaster.teRng (y.dim), 0)         // only diagnose on the testing set
+    mod.diagnoseAll (mod.getYY, mod.getYf, Forecaster.teRng (y.dim), 0)        // only diagnose on the testing set
 
 //  println (mod.summary ())
 //  val yy_ = y(1 until y.dim)                                                 // can't forecast first values at t = 0

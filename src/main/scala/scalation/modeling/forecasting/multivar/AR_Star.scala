@@ -40,10 +40,12 @@ class AR_Star (y: MatrixD, hh: Int, fname: Array [String] = null, tRng: Range = 
 
     private val mod = (for j <- y.indices2 yield new AR (y(?, j), hh, tRng, hparam)).toArray
 
+    def mod_resetDF (size: Int): Unit = ???                               // where to put this method
     def getY: VectorD = y(?, 0)
     def hparameter: HyperParameter = hparam
-    def inSample_Test (skip: Int, showYp: Boolean): (VectorD, VectorD) = ???
+    def inSample_Test (showYp: Boolean): (VectorD, VectorD) = ???
     def parameter: VectorD | MatrixD = ???
+    def train (x_ : MatrixD, y_ : VectorD): Unit = ???
     def test (x_ : MatrixD, y_ : VectorD): (VectorD, VectorD) = ???
     def validate (rando: Boolean, ratio: Double) (idx: IndexedSeq [Int]): 
                  (VectorD | MatrixD, VectorD | MatrixD) = ???
@@ -61,7 +63,7 @@ class AR_Star (y: MatrixD, hh: Int, fname: Array [String] = null, tRng: Range = 
      */
     def trainNtest (y_ : MatrixD = y)(yy: MatrixD = y): Unit =
         for k <- mod.indices do
-            mod(k).trainNtest (y_(?, k))(yy(?, k))
+            mod(k).trainNtest (null, y_(?, k))(null, yy(?, k))
     end trainNtest
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::

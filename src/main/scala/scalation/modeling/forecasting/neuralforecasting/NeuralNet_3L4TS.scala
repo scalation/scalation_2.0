@@ -40,7 +40,7 @@ import MakeMatrix4TS._
  *  @param fname    the feature/variable names
  *  @param tRng     the time range, if relevant (time index may suffice)
  *  @param nz       the number of nodes in hidden layer (-1 => use default formula)
- *  @param hparam   the hyper-parameters (defaults to MakeMatrix4TS.hp ++ Optimizer.hp)
+ *  @param hparam   the hyper-parameters (defaults to AR.hp ++ Optimizer.hp)
  *  @param f        the activation function family for layers 1->2 (input to hidden)
  *  @param f1       the activation function family for layers 2->3 (hidden to output)
  *  @param itran    the inverse transformation function returns response matrix to original scale
@@ -48,7 +48,7 @@ import MakeMatrix4TS._
  */
 class NeuralNet_3L4TS (x: MatrixD, y: MatrixD, hh: Int, n_exo: Int, fname: Array [String] = null,
                        tRng: Range = null, nz: Int = -1,
-                       hparam: HyperParameter = hp ++ Optimizer.hp,
+                       hparam: HyperParameter = AR.hp ++ Optimizer.hp,
                        f: AFF = f_tanh, f1: AFF = f_id, val itran: FunctionV2V = null,
                        bakcast: Boolean = false)
       extends Forecaster_D (x, y, hh, fname, tRng, hparam, bakcast):    // no automatic backcasting, @see `NeuralNet_3L4TS.apply`
@@ -56,9 +56,8 @@ class NeuralNet_3L4TS (x: MatrixD, y: MatrixD, hh: Int, n_exo: Int, fname: Array
     private val debug = debugf ("NeuralNet_3L4TS", true)                // debug function
 //  private val flaw  = flawf ("NeuralNet_3L4TS")                       // flaw function
     private val p     = hparam("p").toInt                               // use the last p endogenous values (p lags)
-    private val q     = hparam("q").toInt                               // use the last q exogenous values (q lags)
-    private val spec  = hparam("spec").toInt                            // trend terms: 0 - none, 1 - constant, 2 - linear, 3 - quadratic
-                                                                        //              4 - sine, 5 cosine
+    private val q     = hparam("px").toInt                              // use the last q exogenous values (q lags)
+    private val spec  = hparam("spec").toInt                            // trend terms: 0 - implicit constant, 2 - linear, 3 - quadratic, 3 - cubic
     private val nneg  = hparam("nneg").toInt == 1                       // 0 => unrestricted, 1 => predictions must be non-negative
     private val nnet  = NeuralNet_3L.rescale (x, y, fname, nz, hparam, f, f1)
                                                                         // delegate training to neural network
@@ -73,11 +72,11 @@ class NeuralNet_3L4TS (x: MatrixD, y: MatrixD, hh: Int, n_exo: Int, fname: Array
      *  @param x_  the data/input matrix (e.g., full x)
      *  @param y_  the training/full response vector (e.g., full y)
      */
-    def train_x (x_ : MatrixD, y_ : MatrixD): Unit =
-        debug ("train_x", s"$modelName, x_.dims = ${x_.dims}, y_.dims = ${y_.dims}")
+    override def train (x_ : MatrixD, y_ : MatrixD): Unit =
+        debug ("train", s"$modelName, x_.dims = ${x_.dims}, y_.dims = ${y_.dims}")
 //      nnet.train (x_, y_)                                              // train the neural network
         nnet.train2 (x_, y_)                                             // train the neural network (some auto-tuning)
-    end train_x
+    end train
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Test a `NeuralNet_3L4TS` model y_ = f(x_) + e and return its QoF vector.
@@ -103,7 +102,7 @@ class NeuralNet_3L4TS (x: MatrixD, y: MatrixD, hh: Int, n_exo: Int, fname: Array
      */
     def trainNtest_xx (x_ : MatrixD = x, y_ : MatrixD = y)(xx: MatrixD = x, yy: MatrixD = y):
                      (MatrixD, MatrixD) =
-        train_x (x_, y_)                                                // train the model on training set
+        train (x_, y_)                                                  // train the model on training set
         val (yp, qof) = test_x (xx, yy)                                 // test the model on testing set
         println (nnet.report (qof))                                     // report on Quality of Fit (QoF)
         (yp, qof)
@@ -181,7 +180,7 @@ object NeuralNet_3L4TS extends Scaling:
      *  @param fname    the feature/variable names
      *  @param tRng     the time range, if relevant (time index may suffice)
      *  @param nz       the number of nodes in hidden layer (-1 => use default formula)
-     *  @param hparam   the hyper-parameters (use MakeMatrix4TS.hp ++ Optimizer.hp for default)
+     *  @param hparam   the hyper-parameters (use AR.hp ++ Optimizer.hp for default)
      *  @param f        the activation function family for layers 1->2 (input to hidden)
      *  @param f1       the activation function family for layers 2->3 (hidden to output)
      *  @param itran    the inverse transformation function returns response matrix to original scale
@@ -189,7 +188,7 @@ object NeuralNet_3L4TS extends Scaling:
      */
     def apply (xe: MatrixD, y: VectorD, hh: Int, fname: Array [String] = null,
                tRng: Range = null, nz: Int = -1,
-               hparam: HyperParameter = hp ++ Optimizer.hp,
+               hparam: HyperParameter = AR.hp ++ Optimizer.hp,
                f: AFF = f_tanh, f1: AFF = f_id, itran: FunctionV2V = null,
                bakcast: Boolean = false): NeuralNet_3L4TS =
         val xy    = ARX.buildMatrix (xe, y, hparam, bakcast)
@@ -217,7 +216,7 @@ object NeuralNet_3L4TS extends Scaling:
      */
     def rescale (xe: MatrixD, y: VectorD, hh: Int, fname: Array [String] = null,
                  tRng: Range = null, nz: Int = -1,
-                 hparam: HyperParameter = hp ++ Optimizer.hp,
+                 hparam: HyperParameter = AR.hp ++ Optimizer.hp,
                  f: AFF = f_tanh, f1: AFF = f_id,
                  bakcast: Boolean = false): NeuralNet_3L4TS =
         var itran: FunctionV2V = null                                        // inverse transform -> original scale (V2V or M2M)
@@ -245,7 +244,7 @@ end NeuralNet_3L4TS
     val m   = 30
     val y   = VectorD.range (1, m)                                     // used to CHECK the buildMatrix4TS function
     val hh  = 3                                                        // the forecasting horizon
-    val hp2 = hp ++ Optimizer.hp
+    val hp2 = AR.hp ++ Optimizer.hp
 
     for p <- 5 to 5 do                                                 // autoregressive hyper-parameter p
         hp2("p") = p
@@ -254,7 +253,8 @@ end NeuralNet_3L4TS
         mod.trainNtest_xx ()()                                         // train the model on full dataset
         println (mod.summary)
 
-        mod.forecastAll (mod.getYy)                                    // forecast h-steps ahead (h = 1 to hh) for all y
+//      mod.forecastAll (mod.getYy)                                    // forecast h-steps ahead (h = 1 to hh) for all y
+        mod.forecastAll ()                                             // forecast h-steps ahead (h = 1 to hh) for all y
         mod.diagnoseAll (y, mod.getYf)                                 // diagnose for all horizons
     end for
 
@@ -271,7 +271,7 @@ end neuralNet_3L4TSTest
 
     import Example_LakeLevels.y
     val hh  = 2                                                        // the forecasting horizon
-    val hp2 = hp ++ Optimizer.hp
+    val hp2 = AR.hp ++ Optimizer.hp
 
     for p <- 1 to 7 do                                                 // autoregressive hyper-parameter p
         hp2("p") = p
@@ -280,12 +280,14 @@ end neuralNet_3L4TSTest
         mod.trainNtest_xx ()()                                         // train the model on full dataset
         println (mod.summary)
 
-        mod.forecastAll (mod.getYy)                                    // forecast h-steps ahead (h = 1 to hh) for all y
+//      mod.forecastAll (mod.getYy)                                    // forecast h-steps ahead (h = 1 to hh) for all y
+        mod.forecastAll ()                                             // forecast h-steps ahead (h = 1 to hh) for all y
         mod.diagnoseAll (y, mod.getYf)                                 // diagnose for all horizons
     end for
 
 end neuralNet_3L4TSTest2
 
+import AR.hp
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `neuralNet_3L4TSTest3` main function tests the `NeuralNet_3L4TS` class on real data:
@@ -306,7 +308,6 @@ end neuralNet_3L4TSTest2
 //  val y  = yy                                                          // full
     val y  = yy(0 until 116)                                             // clip the flat end
     val hh = 6                                                           // maximum forecasting horizon
-    hp("lwave") = 20                                                     // wavelength (distance between peaks)
 
     new Plot (null, y, null, s"y (new_deaths) vs. t", lines = true)
     for j <- exo_vars.indices do
@@ -317,7 +318,7 @@ end neuralNet_3L4TSTest2
     val spec = 1                                                          // number of trend terms
 
     hp("p")    = p
-    hp("q")    = q
+    hp("px")   = q
     hp("spec") = spec
     Optimizer.hp("eta") = 0.01
 
@@ -332,7 +333,8 @@ end neuralNet_3L4TSTest2
 
     mod.trainNtest_xx ()()                                                // train on full and test on full
 
-    mod.forecastAll (mod.getYy)                                           // forecast h-steps ahead (h = 1 to hh) for all y
+//  mod.forecastAll (mod.getYy)                                           // forecast h-steps ahead (h = 1 to hh) for all y
+    mod.forecastAll ()                                                    // forecast h-steps ahead (h = 1 to hh) for all y
     mod.diagnoseAll (y, mod.getYf)                                        // diagnose for all horizons
 /*
     banner (s"Feature Selection Technique: Stepwise")

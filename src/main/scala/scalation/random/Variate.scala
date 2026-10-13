@@ -1030,7 +1030,7 @@ case class Normal (mu: Double = 0.0, sigma2: Double = 1.0, stream: Int = 0)
     if sigma2 < 0.0 then flaw ("init", "parameter sigma2 must be nonnegative")
 
     private val sigma    = sqrt (sigma2)
-    private val _2sigma2 = - 2.0 * sigma2
+    private val _2sigma2 = -2.0 * sigma2
     private var computed = true                      // toggle, since values gen in pairs
     private var save     = 0.0                       // save second in pair
 

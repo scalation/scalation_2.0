@@ -18,7 +18,6 @@ package forecasting
 
 import scalation.mathstat._
 
-import Example_Covid.loadData_y
 import Example_LakeLevels.y
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -163,6 +162,7 @@ end trendModelTest
 
 end trendModelTest2
 
+import Example_Covid.{clip, loadData_y}
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `trendModelTest3` main function tests the `TrendModel` class on real data:
@@ -172,10 +172,8 @@ end trendModelTest2
  */
 @main def trendModelTest3 (): Unit =
 
-    val yy = loadData_y ()
-//  val y  = yy                                                           // full
-    val y  = yy(0 until 116)                                              // clip the flat end
-    val hh = 6                                                            // maximum forecasting horizon
+    val (_, y) = clip ((null, loadData_y ()))
+    val hh     = 6                                                        // maximum forecasting horizon
 
     val mod = new TrendModel (y, hh)                                      // create model for time series data
     banner (s"In-ST Forecasts: ${mod.modelName} on COVID-19 Dataset")
@@ -196,10 +194,8 @@ end trendModelTest3
  */
 @main def trendModelTest4 (): Unit =
 
-    val yy = loadData_y ()
-//  val y  = yy                                                           // full
-    val y  = yy(0 until 116)                                              // clip the flat end
-    val hh = 6                                                            // maximum forecasting horizon
+    val (_, y) = clip ((null, loadData_y ()))
+    val hh     = 6                                                        // maximum forecasting horizon
 
     val mod = new TrendModel (y, hh)                                      // create model for time series data
     banner (s"TnT Forecasts: ${mod.modelName} on COVID-19 Dataset")

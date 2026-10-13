@@ -146,7 +146,6 @@ object WeightedMovingAverage:
 
 end WeightedMovingAverage
 
-import Example_Covid.loadData_y
 import Example_LakeLevels.y
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -191,6 +190,7 @@ end weightedMovingAverageTest
 
 end weightedMovingAverageTest2
 
+import Example_Covid.{clip, loadData_y}
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `weightedMovingAverageTest3` main function tests the `WeightedMovingAverage` class
@@ -200,10 +200,8 @@ end weightedMovingAverageTest2
  */
 @main def weightedMovingAverageTest3 (): Unit =
 
-    val yy = loadData_y ()
-//  val y  = yy                                                           // full
-    val y  = yy(0 until 116)                                              // clip the flat end
-    val hh = 6                                                            // maximum forecasting horizon
+    val (_, y) = clip ((null, loadData_y ()))
+    val hh     = 6                                                        // maximum forecasting horizon
 
     val mod = new WeightedMovingAverage (y, hh)                           // create model for time series data
     banner (s"In-ST Forecasts: ${mod.modelName} on COVID-19 Dataset")
@@ -224,10 +222,8 @@ end weightedMovingAverageTest3
  */
 @main def weightedMovingAverageTest4 (): Unit =
 
-    val yy = loadData_y ()
-//  val y  = yy                                                           // full
-    val y  = yy(0 until 116)                                              // clip the flat end
-    val hh = 6                                                            // maximum forecasting horizon
+    val (_, y) = clip ((null, loadData_y ()))
+    val hh     = 6                                                        // maximum forecasting horizon
 
     val mod = new WeightedMovingAverage (y, hh)                           // create model for time series data
     banner (s"TnT Forecasts: ${mod.modelName} on COVID-19 Dataset")

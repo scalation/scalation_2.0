@@ -1,0 +1,463 @@
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** @author  John Miller
+ *  @version 2.0
+ *  @date    Mon Mar 29 14:59:50 EDT 2010
+ *  @see     LICENSE (MIT style license file).
+ *
+ *  @note    Singly Diagonally Implicit Runge-Kutta SDIRK 3(2) Stiff ODE Solver
+ *           AI Assisted Code
+ */
+package scalation
+package dynamics
+
+import scala.annotation.{nowarn, tailrec}
+import scala.collection.mutable.{ArrayBuffer => VEC}
+import scala.math.{abs, max, min, pow}
+
+import scalation.mathstat._
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** An Adaptive Singly Diagonally Implicit Runge-Kutta 3(2) Stiff ODE Solver.
+ *  Implements Alexander's (1977) L-stable formulation.
+ *  Extends ScalaTion 2's `Integrator` trait to natively mesh with `scalation.dynamics`.
+ *  @param f_   the derivative function mapping (t: Double, y: VectorD) => VectorD
+ *  @param tol  the local truncation error tolerance for step sizing
+ */
+class Sdirk32 (f_ : Array [DerivativeV], tol: Double = 1e-5)
+      extends Integrator:
+
+    // Alexander's SDIRK3(2) Butcher Tableau Coefficients
+    private val gamma  = 0.435866521508459
+    private val gamma2 = gamma * gamma
+    private val c      = VectorD (gamma, (1.0 + gamma) / 2.0, 1.0)
+
+    //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Helper method to evaluate the full system derivative array into a single VectorD
+     */
+    private def evalF (t: Double, y: VectorD): VectorD =
+        val out = new VectorD (y.dim)
+        for i <- y.indices do out(i) = f_(i)(t, y)
+        out
+    end evalF
+
+    private val A = MatrixD ((3, 3),
+        gamma,                                     0.0,                               0.0,
+        (1.0 - gamma) / 2.0,                       gamma,                             0.0,
+        (-6.0*gamma2 + 16.0*gamma - 1.0)/4.0, (6.0*gamma2 - 20.0*gamma + 5.0)/4.0, gamma)
+
+    // Stiffly accurate method: b weights are identical to the final row of A
+    private val b = A(2)
+
+    // Embedded 2nd-order companion weights for error estimation
+    private val bHat = VectorD (
+        ( 6.0*gamma2 - 12.0*gamma + 1.0) / (4.0 * (1.0 - 3.0 * gamma)),
+        (-6.0*gamma2 + 16.0*gamma - 1.0) / (4.0 * (1.0 - 3.0 * gamma)),
+        gamma)
+
+    //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Integrate a single step from t to t + dt using fixed step (no error adaptation).
+     *  Required signature from ScalaTion's Integrator trait.
+     *  @param t   the current time
+     *  @param y   the current state vector
+     *  @param dt  the step size
+     */
+    def integrate (t: Double, y: VectorD, dt: Double): VectorD =
+        val nEq = y.dim
+        val k   = new MatrixD (3, nEq)
+        val f0  = evalF (t, y)
+
+        for s <- 0 until 3 do
+            val explicitSum = new VectorD (nEq)
+            for j <- 0 until s do explicitSum += k(j) * A(s, j)
+
+            // Residual evaluation inside the implicit stage:
+            // R(ks) = ks - f(t + c(s)*dt, y + dt*explicitSum + dt*gamma*ks) = 0
+            val residual = (ksGuess: VectorD) => {
+                val yStage = y + (explicitSum * dt) + (ksGuess * (dt * gamma))
+                ksGuess - evalF (t + c(s) * dt, yStage)
+            }
+
+            // Evaluate the implicit stage derivative via multi-variable Newton-Raphson
+            k(s) = newtonSolve (residual, guess = f0)
+
+        // Return the 3rd order update
+        val yNext = y.copy
+        for i <- 0 until 3 do yNext += k(i) * dt * b(i)
+        yNext
+    end integrate
+
+    //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Integrate across the complete time span utilizing an Adaptive Step Size algorithm.
+     *  Overrides or supplements default sequential integration paths.
+     *  @param y0      initial condition vector
+     *  @param t_span  the step range boundary (t_start, t_end)
+     *  @param dtInit  initial guess for step delta
+     */
+    def integrateVV (y0: VectorD, t_span: (Double, Double), dtInit: Double = 1e-3): MatrixD =
+        val (tStart, tEnd) = t_span
+        var t      = tStart
+        var dt     = dtInit
+        var y      = y0.copy
+        val nEq    = y.dim
+
+        val tHist = VEC [Double] (t)
+        val yHist = VEC [VectorD] (y.copy)
+
+        while t < tEnd do
+            if t + dt > tEnd then dt = tEnd - t
+
+            val k         = new MatrixD (3, nEq)
+            var converged = true
+            var s         = 0
+            val f0        = evalF (t, y)
+
+            while s < 3 && converged do
+                val explicitSum = new VectorD (nEq)
+                for j <- 0 until s do explicitSum += k(j) * A(s, j)
+
+                val residual = (ksGuess: VectorD) => {
+                    val yStage = y + (explicitSum * dt) + (ksGuess * (dt * gamma))
+                    ksGuess - evalF (t + c(s) * dt, yStage)
+                }
+
+                try
+                    k(s) = newtonSolve (residual, guess = f0)
+                    s   += 1
+                catch
+                    case _: Exception =>
+                        converged = false     // Newton-Raphson root discovery failure triggered
+
+            if ! converged then
+                dt *= 0.5                     // Execution failed; half step boundaries and attempt recalculation
+            else
+                // Evaluate prospective steps
+                val yNext = y.copy
+                val yHat  = y.copy
+                for i <- 0 until 3 do
+                    yNext += k(i) * (dt * b(i))
+                    yHat  += k(i) * (dt * bHat(i))
+
+                // Compute local truncation error metric using the L-infinity norm via ScalaTion syntax
+//              val error = (yNext - yHat).normInf
+                val error = weightedError (yNext, yHat, y, tol)
+
+                if error <= tol || dt < 1e-12 then
+                    t += dt
+                    y  = yNext
+                    tHist.append (t)
+                    yHist.append (y.copy)
+
+                    // Advance step size configuration safely (Safety 0.9, lower order companion p=2)
+                    val factor = 0.9 * math.pow(tol / (error + 1e-16), 1.0 / 3.0)
+                    dt *= min (max (factor, 0.3), 3.0)
+                else
+                    // Retain coordinate states, update delta step downwards
+                    val factor = 0.9 * pow (tol / (error + 1e-16), 1.0 / 3.0)
+                    dt *= max (factor, 0.1)
+        end while
+
+        // Package results into a final MatrixD sequence matching traditional ScalaTion dynamics traits
+        val outMatrix = new MatrixD (yHist.size, nEq)
+        for i <- yHist.indices do outMatrix(i) = yHist(i)
+        outMatrix
+    end integrateVV
+
+    //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Integrate across the complete time span utilizing an Adaptive Step Size algorithm.
+     *  OPTION B: Advanced Adaptive Integration using user-provided Exact Analytical Jacobians.
+     */
+    def integrateVV2 (y0: VectorD, t_span: (Double, Double), jacSys: VectorD => MatrixD,
+                      dtInit: Double = 1e-3): MatrixD =
+        val (tStart, tEnd) = t_span
+        var t      = tStart
+        var dt     = dtInit
+        var y      = y0.copy
+        val nEq    = y.dim
+
+        val yHist = VEC [VectorD] (y.copy)
+
+        while t < tEnd do
+            if t + dt > tEnd then dt = tEnd - t
+
+            val k         = new MatrixD (3, nEq)
+            var converged = true
+            var s         = 0
+            val f0        = evalF(t, y)
+
+            while s < 3 && converged do
+                val explicitSum = new VectorD (nEq)
+                for j <- 0 until s do explicitSum += k(j) * A(s, j)
+
+                val residual = (ksGuess: VectorD) => {
+                    val yStage = y + (explicitSum * dt) + (ksGuess * (dt * gamma))
+                    ksGuess - evalF (t + c(s) * dt, yStage)
+                }
+
+                try
+                    // Passes the analytical jacobian and current base state vectors down to track chain scaling
+                    k(s) = newtonSolve2 (residual, jacSys, guess = f0, yBase = y, explicitSum = explicitSum, dt = dt)
+                    s   += 1
+                catch
+                    case _: Exception => converged = false
+
+            if ! converged then
+                dt *= 0.5 
+            else
+                val yNext = y.copy
+                val yHat  = y.copy
+                for i <- 0 until 3 do
+                    yNext += k(i) * (dt * b(i))
+                    yHat  += k(i) * (dt * bHat(i))
+
+//              val error = (yNext - yHat).normInf
+                val error = weightedError (yNext, yHat, y, tol)
+
+                if error <= tol || dt < 1e-12 then
+                    t += dt
+                    y = yNext
+                    yHist.append (y.copy)
+                    val factor = 0.9 * pow (tol / (error + 1e-16), 1.0 / 3.0)
+                    dt *= min (max (factor, 0.3), 3.0)
+                else
+                   val factor = 0.9 * pow (tol / (error + 1e-16), 1.0 / 3.0)
+                    dt *= max (factor, 0.1)
+        end while
+
+        val outMatrix = new MatrixD (yHist.size, nEq)
+        for i <- yHist.indices do outMatrix(i) = yHist(i)
+        outMatrix
+    end integrateVV2
+
+    //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** High-performance internal Newton-Raphson vector solver.
+     *  Uses ScalaTion 2's native Fac_LU (LU Factorization) engine to solve systems.
+     *  Newton Solver Variant 1: Numerical Finite-Differencing
+     *  @param resFunc  the response function
+     *  @param guess    the initial guess
+     *  @param maxIter  the maximum number of iterations
+     */
+    private def newtonSolve (resFunc: VectorD => VectorD, guess: VectorD, maxIter: Int = 40): VectorD =
+        val n   = guess.dim
+        val eps = 1e-8
+
+        // Tail-recursive loop helper to replace the imperative 'for' loop cleanly
+        @tailrec
+        def iterate (k: VectorD, currentIter: Int): VectorD =
+            val F = resFunc(k)
+        
+            // Convergence check: returns the value naturally as the expression result
+            if F.normInf < 1e-7 then k
+            else if currentIter >= maxIter then 
+                throw new RuntimeException ("Newton loop failed stage tracking requirements")
+            else
+                // Build structural numerical Jacobian matrix matching local conditions
+                val J = new MatrixD (n, n)
+                for j <- 0 until n do
+                    val kPert = k.copy
+                    kPert(j) += eps
+                    val FPert = resFunc(kPert)
+                    val col   = (FPert - F) * (1.0 / eps)
+                    for i <- 0 until n do J(i, j) = col(i)
+
+                // Leverage ScalaTion's built-in LU Decomposition for matrix solving
+                val lu = new Fac_LU (J)
+                lu.factor ()
+                val delta = lu.solve (F * -1.0)
+        
+                // Advance to the next iteration pass recursively
+                iterate (k + delta, currentIter + 1)
+        end iterate
+
+        // Kick off the tail-recursive iterator with the initial guess
+        iterate (guess.copy, 0)
+    end newtonSolve
+
+    //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Newton Solver Variant 2: Pure Analytical Jacobian Mapping (Zero Finite Difference Noise)
+     *  @param resFunc      the response function
+     *  @param jacSys       the Jacobian ...
+     *  @param yBase        the
+     *  @param explicitSum  the
+     *  @param dt           the
+     *  @param guess        the initial guess
+     *  @param maxIter      the maximum number of iterations
+     */
+    private def newtonSolve2 (resFunc: VectorD => VectorD, jacSys: VectorD => MatrixD, guess: VectorD,
+                              yBase: VectorD, explicitSum: VectorD, dt: Double, maxIter: Int = 40): VectorD =
+        val n = guess.dim
+        val I = MatrixD.eye (n, n)
+
+        @tailrec
+        def iterate (k: VectorD, currentIter: Int): VectorD =
+            val F = resFunc(k)
+            if F.normInf < 1e-7 then k
+            else if currentIter >= maxIter then 
+                throw new RuntimeException ("Analytical Newton failed to converge")
+            else
+                // Evaluate precise state position inside the implicit stage
+                val yStage = yBase + (explicitSum * dt) + (k * (dt * gamma))
+                
+                // Construct Exact Residual Jacobian via chain rule: J_res = I - dt * gamma * J_sys
+                val J_res = I - (jacSys(yStage) * (dt * gamma))
+
+                val lu = new Fac_LU (J_res)
+                lu.factor ()
+                iterate (k + lu.solve (F * -1.0), currentIter + 1)
+        end iterate
+
+        // Kick off the tail-recursive iterator with the initial guess
+        iterate (guess.copy, 0)
+    end newtonSolve2
+
+    //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Extract local truncation error using a component-weighted maximum ratio norm.
+     *  Accessible by any custom ODE package running in the environment.
+     *  @param yNext     the higher-order step proposal
+     *  @param yHat      the lower-order embedded comparison vector
+     *  @param yCurrent  state layout before the step update
+     *  @param tolMult   the baseline accuracy scaling variable (tol)
+     *  @return  the maximum component weighted error ratio
+     */
+    @inline def weightedError (yNext: VectorD, yHat: VectorD, yCurrent: VectorD,
+                               tolMult: Double): Double =
+        var maxWErr = 0.0
+        val rtol    = tolMult
+        val atol    = tolMult * 1e-2                // relative-absolute clearance buffer
+        val nEq     = yCurrent.dim
+
+        cfor (0,  nEq) { i =>
+            val absErr = abs (yNext(i) - yHat(i))
+            val weight = atol + rtol * abs (yCurrent(i))
+            val wErr   = absErr / weight
+            if wErr > maxWErr then maxWErr = wErr
+        } // cfor
+        maxWErr
+    end weightedError
+
+    def integrate (f: Derivative, y0: Double, t: Double, t0: Double, step:  Double): Double = ???
+    def integrateVV (f: Array [DerivativeV], y0: VectorD, t: Double, t0: Double, step: Double): VectorD = ???
+
+end Sdirk32
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `sdirk32Test` main method tests the `Sdirk32` class stiff ODE integrator,
+ *  using a four-variable Michaelis-Menten metabolic reaction system.
+ *  > runMain scalation.dynamics.sdirk32Test
+ */
+@main def sdirk32Test (): Unit =
+
+    println ("=" * 60)
+    println ("STIFF ODE TESTING: Michaelis-Menten Enzyme Kinetics via SDIRK3(2)")
+    println ("=" * 60)
+
+    // Kinetic forward and backward rate constants
+    // High magnitude variances across constants generate structural stiffness
+    val k1 = 100.0  // E + S -> ES binding velocity
+    val k2 = 1.0    // ES -> E + S unbinding reverse velocity
+    val k3 = 10.0   // ES -> E + P production velocity
+
+    // Define system equations mapping to ScalaTion's Array[DerivativeV] array layout
+    // Each entry satisfies: (t: Double, y: VectorD) => Double
+    @nowarn val systemEquations: Array [DerivativeV] = Array (
+        (t, y) => -k1 * y(0) * y(1) + (k2 + k3) * y(2),          // d[E]/dt
+        (t, y) => -k1 * y(0) * y(1) + k2 * y(2),                 // d[S]/dt
+        (t, y) =>  k1 * y(0) * y(1) - (k2 + k3) * y(2),          // d[ES]/dt
+        (t, y) =>  k3 * y(2))                                    // d[P]/dt
+
+    // Initial condition metrics at time zero
+    // Matrix index: [E0, S0, ES0, P0]
+    val y0 = VectorD (1.0, 10.0, 0.0, 0.0)
+
+    // Boundary conditions for time stepping
+    val t_span = (0.0, 5.0)
+    val dtInit = 1e-4
+    val targetTolerance = 1e-5
+
+    // Instantiate our custom solver satisfying the Integrator blueprint
+    val solver = new Sdirk32 (systemEquations, tol = targetTolerance)
+
+    println (s"Initial State Array:  $y0")
+    println (s"Time Limits Checked:  $t_span")
+    println (s"Local Error Target:   $targetTolerance")
+    println ("-" * 60)
+
+    try
+        // Execute the adaptive time-step sequence solver
+        // Returns a MatrixD layout where every row profiles step states
+        val trajectory: MatrixD = solver.integrateVV (y0, t_span, dtInit)
+
+        val totalSteps = trajectory.dim
+        println (s"Simulation finished successfully!")
+        println (s"Total adaptive steps evaluated: $totalSteps")
+        println ("-" * 60)
+
+        // Print the final tracking rows to evaluate equilibrium metrics
+        val finalRowIdx = totalSteps - 1
+        val finalState = trajectory(finalRowIdx)
+
+        println("Final Concentration Profile at Equilibrium:")
+        println (f"  [E]  Free Enzyme:       ${finalState(0)}%10.6f")
+        println (f"  [S]  Free Substrate:    ${finalState(1)}%10.6f")
+        println (f"  [ES] Enzyme Complex:    ${finalState(2)}%10.6f")
+        println (f"  [P]  Final Product:     ${finalState(3)}%10.6f")
+        
+        // Total mass conservation sanity test: [E] + [ES] must always equal E0 (1.0)
+        val totalEnzymeMass = finalState(0) + finalState(2)
+        println (f"  Conservation Check (E + ES): $totalEnzymeMass%.6f (Expected: 1.000000)")
+
+    catch
+        case ex: Exception =>
+            println (s"[FAILURE] Integration process failed: ${ex.getMessage}")
+            ex.printStackTrace ()
+
+    println ("=" * 60)
+
+end sdirk32Test
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `sdirk32Test2` main method tests the `Sdirk32` class stiff ODE integrator,
+ *  using a four-variable Michaelis-Menten metabolic reaction system.
+ *  It uses an Analytical Jacobian Matrix.
+ *  > runMain scalation.dynamics.sdirk32Test2
+ */
+@main def sdirk32Test2 (): Unit =
+
+    println ("=" * 60)
+    println ("RUNNER B: Testing SDIRK3(2) with Exact Analytical Jacobian Matrix")
+    println ("=" * 60)
+
+    val k1 = 100.0; val k2 = 1.0; val k3 = 10.0
+    @nowarn val systemEquations: Array [DerivativeV] = Array (
+        (t, y) => -k1 * y(0) * y(1) + (k2 + k3) * y(2),
+        (t, y) => -k1 * y(0) * y(1) + k2 * y(2),
+        (t, y) =>  k1 * y(0) * y(1) - (k2 + k3) * y(2),
+        (t, y) =>  k3 * y(2)
+    )
+
+    // Exact partial derivative matrix map: df/dy
+    val exactJacobian = (y: VectorD) => {
+        val J = new MatrixD(4, 4)
+        // Row 0: d(dE/dt)
+        J(0, 0) = -k1 * y(1); J(0, 1) = -k1 * y(0); J(0, 2) = k2 + k3; J(0, 3) = 0.0
+        // Row 1: d(dS/dt)
+        J(1, 0) = -k1 * y(1); J(1, 1) = -k1 * y(0); J(1, 2) = k2;      J(1, 3) = 0.0
+        // Row 2: d(dES/dt)
+        J(2, 0) = k1 * y(1);  J(2, 1) = k1 * y(0);  J(2, 2) = -(k2+k3); J(2, 3) = 0.0
+        // Row 3: d(dP/dt)
+        J(3, 0) = 0.0;        J(3, 1) = 0.0;        J(3, 2) = k3;       J(3, 3) = 0.0
+        J
+    }
+
+    val y0 = VectorD (1.0, 10.0, 0.0, 0.0)
+    val solver     = new Sdirk32 (systemEquations, tol = 1e-5)
+    val trajectory = solver.integrateVV2 (y0, (0.0, 5.0), exactJacobian, dtInit = 1e-4)
+
+    println (s"Total adaptive steps evaluated:  ${trajectory.dim}")
+    println (s"Final Substrate/Product state:   [S]=${trajectory(trajectory.dim-1)(1)}, [P]=${trajectory(trajectory.dim-1)(3)}")
+    println ("=" * 60)
+
+end sdirk32Test2
+

@@ -211,11 +211,8 @@ import Example_AutoMPG._
 
     for tech <- SelectionTech.values do 
         banner (s"Feature Selection Technique: $tech")
-        val (cols, rSq) = mod.selectFeatures (tech)                       // R^2, R^2 bar, R^2 cv
-        val k = cols.size
-        println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Symbolic Ridge Regression with $tech", lines = true)
-        println (s"$tech: rSq = $rSq")
+        val (cols, rSq) = mod.selectFeatures (tech)                       // R^2, R^2 bar, sMAPE, R^2 cv
+        mod.reportSelection (cols, rSq)
     end for
 
     FitM.showQofStatTable (mod.crossValidate ())                          // cross-validation for full model
@@ -250,11 +247,8 @@ end symRidgeRegressionTest
 
     for tech <- SelectionTech.values do
         banner (s"Feature Selection Technique: $tech")
-        val (cols, rSq) = mod.selectFeatures (tech)                       // R^2, R^2 bar, R^2 cv
-        val k = cols.size
-        println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Quadratic Ridge Regression with $tech", lines = true)
-        println (s"$tech: rSq = $rSq")
+        val (cols, rSq) = mod.selectFeatures (tech)                       // R^2, R^2 bar, sMAPE, R^2 cv
+        mod.reportSelection (cols, rSq)
     end for
 */
 
@@ -280,11 +274,8 @@ end symRidgeRegressionTest2
 
     for tech <- SelectionTech.values do 
         banner (s"Feature Selection Technique: $tech")
-        val (cols, rSq) = mod.selectFeatures (tech)                       // R^2, R^2 bar, R^2 cv
-        val k = cols.size
-        println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Quadratic X Ridge Regression with $tech", lines = true)
-        println (s"$tech: rSq = $rSq")
+        val (cols, rSq) = mod.selectFeatures (tech)                       // R^2, R^2 bar, sMAPE, R^2 cv
+        mod.reportSelection (cols, rSq)
     end for
 
 end symRidgeRegressionTest3
@@ -309,11 +300,8 @@ end symRidgeRegressionTest3
 
     for tech <- SelectionTech.values do 
         banner (s"Feature Selection Technique: $tech")
-        val (cols, rSq) = mod.selectFeatures (tech)                       // R^2, R^2 bar, R^2 cv
-        val k = cols.size
-        println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Cubic Ridge Regression with $tech", lines = true)
-        println (s"$tech: rSq = $rSq")
+        val (cols, rSq) = mod.selectFeatures (tech)                       // R^2, R^2 bar, sMAPE, R^2 cv
+        mod.reportSelection (cols, rSq)
     end for
 
 end symRidgeRegressionTest4
@@ -338,11 +326,8 @@ end symRidgeRegressionTest4
 
     for tech <- SelectionTech.values do 
         banner (s"Feature Selection Technique: $tech")
-        val (cols, rSq) = mod.selectFeatures (tech)                       // R^2, R^2 bar, R^2 cv
-        val k = cols.size
-        println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Cubic X Ridge Regression with $tech", lines = true)
-        println (s"$tech: rSq = $rSq")
+        val (cols, rSq) = mod.selectFeatures (tech)                       // R^2, R^2 bar, sMAPE, R^2 cv
+        mod.reportSelection (cols, rSq)
     end for
 
 end symRidgeRegressionTest5
@@ -369,11 +354,8 @@ end symRidgeRegressionTest5
 
     for tech <- SelectionTech.values do
         banner (s"Feature Selection Technique: $tech")
-        val (cols, rSq) = mod.selectFeatures (tech)                    // R^2, R^2 bar, R^2 cv
-        val k = cols.size
-        println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Cubic XX Ridge Regression with $tech", lines = true)
-        println (s"$tech: rSq = $rSq")
+        val (cols, rSq) = mod.selectFeatures (tech)                    // R^2, R^2 bar, sMAPE, R^2 cv
+        mod.reportSelection (cols, rSq)
     end for
 
 end symRidgeRegressionTest6
@@ -405,11 +387,8 @@ end symRidgeRegressionTest6
 
     for tech <- SelectionTech.values do
         banner (s"Feature Selection Technique: $tech")
-        val (cols, rSq) = mod.selectFeatures (tech)                    // R^2, R^2 bar, R^2 cv
-        val k = cols.size
-        println (s"k = $k, n = ${x.dim2}")
-        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Symbolic Ridge Regression with $tech", lines = true)
-        println (s"$tech: rSq = $rSq")
+        val (cols, rSq) = mod.selectFeatures (tech)                    // R^2, R^2 bar, sMAPE, R^2 cv
+        mod.reportSelection (cols, rSq)
     end for
 
 end symRidgeRegressionTest7
@@ -522,11 +501,8 @@ end symRidgeRegressionTest9
     banner (s"Best Full Model: ${best.mod.modelName}, qof = ${best.qof}")
 
     banner (s"Feature Selection Technique: Stepwise")
-    val (cols, rSq) = best.mod.selectFeatures (SelectionTech.Stepwise, "one")  // R^2, R^2 bar, R^2 cv
-    val k = cols.size
-    println (s"k = $k, n = ${x.dim2}")
-    new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for Symbolic Regression with Stepwise", lines = true)
-    println (s"Stepwise: rSq = $rSq")
+    val (cols, rSq) = best.mod.selectFeatures (SelectionTech.Stepwise, "one")  // R^2, R^2 bar, sMAPE, R^2 cv
+    best.mod.reportSelection (cols, rSq)
 
 end symRidgeRegressionTest14
 

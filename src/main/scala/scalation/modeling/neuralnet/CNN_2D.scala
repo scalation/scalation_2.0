@@ -49,9 +49,9 @@ class CNN_2D (x: TensorD, y: MatrixD, fname_ : Array [String] = null,
 
     private val debug     = debugf ("CNN_2D", true)                       // debug function
     private val flaw      = flawf ("CNN_2D")                              // flaw function
-    private val eta       = hp("eta").toDouble                            // learning rate
-//  private val bSize     = hp("bSize").toInt                             // batch size
-    private val maxEpochs = hp("maxEpochs").toInt                         // maximum number of training epochs/iterations
+    private val eta       = hparam("eta").toDouble                        // learning rate
+//  private val bSize     = hparam("bSize").toInt                         // batch size
+    private val maxEpochs = hparam("maxEpochs").toInt                     // maximum number of training epochs/iterations
     private val (n, ny)   = (x.dim2, y.dim2)
     private val nz = n - nc + 1
     private var e: MatrixD = null
@@ -87,7 +87,7 @@ class CNN_2D (x: TensorD, y: MatrixD, fname_ : Array [String] = null,
     def predict (z: VectorD): Double | VectorD = ???
     def test (x_ : MatrixD, y_ : VectorD): (VectorD, VectorD) = ???
     def train (x_ : MatrixD, y_ : VectorD): Unit = ???
-    def inSample_Test(skip: Int, showYp: Boolean): (VectorD, VectorD) = ???
+    def inSample_Test(showYp: Boolean): (VectorD, VectorD) = ???
     def validate (rando: Boolean, ratio: Double) (idx: IndexedSeq [Int]):
                  (VectorD | MatrixD, VectorD | MatrixD) = ???
 

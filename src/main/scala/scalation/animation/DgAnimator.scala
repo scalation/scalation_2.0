@@ -38,7 +38,7 @@ class DgAnimator (_title: String, fgColor: Color = black, bgColor: Color = white
 
     /** The debug function
      */
-    private val debug = debugf ("DgAnimator", false)
+    private val debug = debugf ("DgAnimator", true)
 
     /** Clock for animation engine
      */
@@ -67,6 +67,8 @@ class DgAnimator (_title: String, fgColor: Color = black, bgColor: Color = white
     /** Flag to indicate that the animation is complete
      */
     private var aniDone = false
+
+    debug ("init", s"width = $width, height = $height")
   
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Set the animation complete flag to true.

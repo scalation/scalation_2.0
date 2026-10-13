@@ -16,8 +16,7 @@ import scalation.mathstat._
 import Integral.integrate
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `BasisFunction` object provides utility functions related to
- *  basis functions.
+/** The `BasisFunction` object provides utility functions related to basis functions.
  */
 object BasisFunction:
 

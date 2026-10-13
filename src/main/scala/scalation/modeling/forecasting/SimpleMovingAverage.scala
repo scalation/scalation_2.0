@@ -34,9 +34,10 @@ class SimpleMovingAverage (y: VectorD, hh: Int, tRng: Range = null,
                            hparam: HyperParameter = SimpleMovingAverage.hp,
                            bakcast: Boolean = false)
       extends Forecaster (y, hh, tRng, hparam, bakcast)
+         with NoTrainModel
          with NoSubModels:
 
-    private val debug = debugf ("SimpleMovingAverage", true)            // debug function
+    private val debug = debugf ("SimpleMovingAverage", false)           // debug function
     private val flaw  = flawf ("SimpleMovingAverage")                   // flaw function
     private val q     = hparam("q").toInt                               // take mean of last q values
 
@@ -132,7 +133,6 @@ object SimpleMovingAverage:
 
 end SimpleMovingAverage
 
-import Example_Covid.loadData_y
 import Example_LakeLevels.y
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -177,6 +177,7 @@ end simpleMovingAverageTest
 
 end simpleMovingAverageTest2
 
+import Example_Covid.{clip, loadData_y}
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `simpleMovingAverageTest3` main function tests the `SimpleMovingAverage` class on real data:
@@ -186,10 +187,8 @@ end simpleMovingAverageTest2
  */
 @main def simpleMovingAverageTest3 (): Unit =
 
-    val yy = loadData_y ()
-//  val y  = yy                                                           // full
-    val y  = yy(0 until 116)                                              // clip the flat end
-    val hh = 6                                                            // maximum forecasting horizon
+    val (_, y) = clip ((null, loadData_y ()))
+    val hh     = 6                                                        // maximum forecasting horizon
 
     val mod = new SimpleMovingAverage (y, hh)                             // create model for time series data
     banner (s"In-ST Forecasts: ${mod.modelName} on COVID-19 Dataset")
@@ -210,10 +209,8 @@ end simpleMovingAverageTest3
  */
 @main def simpleMovingAverageTest4 (): Unit =
 
-    val yy = loadData_y ()
-//  val y  = yy                                                           // full
-    val y  = yy(0 until 116)                                              // clip the flat end
-    val hh = 6                                                            // maximum forecasting horizon
+    val (_, y) = clip ((null, loadData_y ()))
+    val hh     = 6                                                        // maximum forecasting horizon
 
     val mod = new SimpleMovingAverage (y, hh)                             // create model for time series data
     banner (s"TnT Forecasts: ${mod.modelName} on COVID-19 Dataset")

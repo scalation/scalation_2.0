@@ -99,7 +99,7 @@ trait Integrator:
      *  @param step  the step size
      */
     def integrateVV (f: Array [DerivativeV], y0: VectorD, t: Double,
-                     t0: Double = 0.0, step: Double = defaultStepSize): VectorD
+                     t0: Double /* = 0.0 */, step: Double /* = defaultStepSize */): VectorD
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Get the error estimate.

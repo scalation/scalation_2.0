@@ -452,7 +452,8 @@ end simpleRegressionTest7
 
     val x  = VectorD (1, 2, 3, 4, 5, 6)
 //  val y  = VectorD (1, 3, 3, 5, 4, 4)
-    val y  = VectorD (1, 3, 5, 6, 4, 2)
+//  val y  = VectorD (1, 3, 5, 6, 4, 2)
+    val y  = VectorD (1, 3, 5, 6, 4, 5)
     val ox = MatrixD.one (x.dim) :^+ x
 
     val x_fname  = Array ("x")

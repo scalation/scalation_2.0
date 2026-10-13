@@ -139,6 +139,20 @@ object Differential:
     inline def Ј (f: Array [FunctionV2S], x: VectorD): MatrixD = jacobian (f, x)   // want row-wise
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the Jacobian matrix for a vector-to-vector function (FunctionV2V).
+     *  The output dimension m is auto-detected by evaluating f(x).
+     *  @param f the vector-to-vector function whose Jacobian is sought
+     *  @param x the point (vector) at which to estimate the Jacobian
+     */
+    def jacobian (f: FunctionV2V, x: VectorD): MatrixD =
+        val m = f(x).dim                                 // auto-detect number of equations at runtime
+        val ff = Array.tabulate (m)(i => (b: VectorD) => f(b)(i))
+        jacobian (ff, x)
+    end jacobian
+
+    inline def Ј (f: FunctionV2V, x: VectorD): MatrixD = jacobian (f, x)
+
+    //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Evaluate an array of vector-to-scalar functions (`FunctionV2S`) as one
      *  vector-to-vector function (`FunctionV2V`).
      *  @param f  the array of functions to be evaluated

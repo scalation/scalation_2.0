@@ -20,7 +20,6 @@ import scalation.mathstat._
 import scalation.optimization.quasi_newton.{LBFGS_B => Optimizer}
 import scalation.optimization.quasi_newton.LBFGS_B.makeBounds
 
-import Example_Covid.loadData_y
 import Example_LakeLevels.y
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -184,6 +183,7 @@ end simpleExpSmoothingTest
 
 end simpleExpSmoothingTest2
 
+import Example_Covid.{clip, loadData_y}
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `simpleExpSmoothingTest3` main function tests the `SimpleExpSmoothing` class on real data:
@@ -193,10 +193,8 @@ end simpleExpSmoothingTest2
  */
 @main def simpleExpSmoothingTest3 (): Unit =
 
-    val yy = loadData_y ()
-//  val y  = yy                                                           // full
-    val y  = yy(0 until 116)                                              // clip the flat end
-    val hh = 6                                                            // maximum forecasting horizon
+    val (_, y) = clip ((null, loadData_y ()))
+    val hh     = 6                                                        // maximum forecasting horizon
 
     val mod = new SimpleExpSmoothing (y, hh)                              // create model for time series data
     banner (s"In-ST Forecasts: ${mod.modelName} on COVID-19 Dataset")
@@ -217,10 +215,8 @@ end simpleExpSmoothingTest3
  */
 @main def simpleExpSmoothingTest4 (): Unit =
 
-    val yy = loadData_y ()
-//  val y  = yy                                                           // full
-    val y  = yy(0 until 116)                                              // clip the flat end
-    val hh = 6                                                            // maximum forecasting horizon
+    val (_, y) = clip ((null, loadData_y ()))
+    val hh     = 6                                                        // maximum forecasting horizon
 
     val mod = new SimpleExpSmoothing (y, hh)                              // create model for time series data
     banner (s"TnT Forecasts: ${mod.modelName} on COVID-19 Dataset")

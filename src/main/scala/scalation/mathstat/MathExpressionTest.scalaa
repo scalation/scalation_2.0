@@ -1,0 +1,36 @@
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** @author  John Miller
+ *  @version 2.0
+ *  @date    Sun May 31 17:40:09 EDT 2026
+ *  @see     LICENSE (MIT style license file).
+ *
+ *  @note    Mathematical Expression Macro-based Translator
+ *
+ *  Supports lagged variables/vectors: fx"y(-1) - y(-2) + (x_r(-1) * 2.0)"`
+ */
+
+package scalation
+package mathstat
+
+import MathExpression.fx
+
+@main def mathExpressionTest (): Unit =
+
+  val y   = VectorD (10)
+  val x_r = VectorD (10)
+
+  // Evaluation Horizon A: Scalar calculation step using implicit index pointer
+  given t: Int = 6
+  
+  // The macro automatically rewrites this line into: y.lag(-1) - y.lag(-2) + (x_r.lag(-1) * 2.0)
+  val scalarResult: Double = fx"${y}(-1) - ${y}(-2) + (${x_r}(-1) * 2.0)"
+  println (s"Calculated Scalar Output: $scalarResult")
+
+  // Evaluation Horizon B: Full Vector shift operation
+  val vectorResult: VectorD = fx"${y}(-1) + ${x_r}(-2)"
+
+  println (s"vectorResult = $vectorResult")
+
+end mathExpressionTest
+

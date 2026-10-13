@@ -26,8 +26,6 @@ import scalation.mathstat._
 import scalation.modeling.neuralnet.{RegressionMV => REGRESSION}
 //import scalation.modeling.neuralnet.{RidgeRegressionMV => REGRESSION}
 
-import MakeMatrix4TS.hp
-
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `Forecaster_RegV` abstract class provides multi-variate time series analysis capabilities
  *  for Forecaster_RegV models.  Forecaster_RegV models are similar to `ARX` models, except
@@ -39,11 +37,11 @@ import MakeMatrix4TS.hp
  *  @param hh       the maximum forecasting horizon (h = 1 to hh)
  *  @param fname    the feature/variable names
  *  @param tRng     the time range, if relevant (time index may suffice)
- *  @param hparam   the hyper-parameters (defaults to `MakeMatrix4TS.hp`)
+ *  @param hparam   the hyper-parameters (defaults to `AR.hp`)
  *  @param bakcast  whether a backcasted value is prepended to the time series (defaults to false)
  */
 abstract class Forecaster_RegV (x: MatrixD, y: MatrixD, hh: Int, fname: Array [String] = null,
-                                tRng: Range = null, hparam: HyperParameter = hp,
+                                tRng: Range = null, hparam: HyperParameter = AR.hp,
                                 bakcast: Boolean = false)                 // backcasted values only used in `buildMatrix4TS`
 //    extends Forecaster_D (x, y, hh, tRng, hparam, bakcast):             // no automatic backcasting, @see `Forecaster_RegV.apply`
       extends Diagnoser (dfr = hparam("p").toInt, df = y.dim - hparam("p").toInt)
@@ -58,6 +56,8 @@ abstract class Forecaster_RegV (x: MatrixD, y: MatrixD, hh: Int, fname: Array [S
     protected var bb: MatrixD = null                                      // matrix of parameter values
     protected val yf   = makeForecastTensor (y, hh)                       // make the forecast tensor
     protected val reg  = new REGRESSION (x, y, fname, hparam)             // delegate training to multi-variate regression
+
+    def mod_resetDF (size: Int): Unit = ???                               // where to put this method
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Get the data/input matrix built from lagged y vector (and optionally xe) values.
@@ -274,7 +274,7 @@ abstract class Forecaster_RegV (x: MatrixD, y: MatrixD, hh: Int, fname: Array [S
     /** Convert the underlying Regression Model to a subtype of `Forecaster_Reg` Forecasting Model.
      *  @param mod  the model to convert, e.g., the best model after feature selection
      */
-    def convertReg2Forc (mod: Model_FS = getBest.mod): Forecaster_RegV = ???
+    def getModel (mod: Model_FS = getBest.mod): Forecaster_RegV = ???
 
     private var theBest = BestStep ()()                                   // record the best model from feature selection
 
@@ -310,7 +310,7 @@ abstract class Forecaster_RegV (x: MatrixD, y: MatrixD, hh: Int, fname: Array [S
      *  @param cross  indicator to include the cross-validation/validation QoF measure (defaults to "many")
      *  @param qk     index of Quality of Fit (QoF) to use for comparing quality
      */
-    def forwardSelAll (cross: String)(using qk: Int): (LSET [Int], VEC [VectorD]) = ???
+    def forwardSelAll (cross: String)(using qk: Int): (Array [LSET [Int]], Array [VEC [VectorD]]) = ???
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Perform BACKWARD ELIMINATION to find the LEAST predictive features/variables
@@ -321,7 +321,7 @@ abstract class Forecaster_RegV (x: MatrixD, y: MatrixD, hh: Int, fname: Array [S
      *  @param cross  indicator to include the cross-validation/validation QoF measure (defaults to "many")
      *  @param qk     index of Quality of Fit (QoF) to use for comparing quality
      */
-    def backwardElimAll (first: Int, cross: String) (using qk: Int): (LSET [Int], VEC [VectorD]) = ???
+    def backwardElimAll (first: Int, cross: String) (using qk: Int): (Array [LSET [Int]], Array [VEC [VectorD]]) = ???
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Perform STEPWISE SELECTION to find a GOOD COMBINATION of predictive features/variables
@@ -333,7 +333,7 @@ abstract class Forecaster_RegV (x: MatrixD, y: MatrixD, hh: Int, fname: Array [S
      *  @param swap   whether to allow a swap step (swap out a feature for a new feature in one step)
      *  @param qk     index of Quality of Fit (QoF) to use for comparing quality
      */
-    def stepwiseSelAll (cross: String, swap: Boolean)(using qk: Int): (LSET [Int], VEC [VectorD]) = ???
+    def stepwiseSelAll (cross: String, swap: Boolean)(using qk: Int): (Array [LSET [Int]], Array [VEC [VectorD]]) = ???
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Perform BEAM SEARCH SELECTION to find a GOOD COMBINATION of predictive features/variables to
@@ -347,12 +347,19 @@ abstract class Forecaster_RegV (x: MatrixD, y: MatrixD, hh: Int, fname: Array [S
      *  @param bk     the beam width holding the top k models (defaults to 3)
      *  @param qk     index of Quality of Fit (QoF) to use for comparing quality
      */
-    def beamSelAll (cross: String = "many", bk: Int = 3)(using qk: Int): (LSET [Int], VEC [VectorD]) =
+    def beamSelAll (cross: String = "many", bk: Int = 3)(using qk: Int): (Array [LSET [Int]], Array [VEC [VectorD]]) =
 
         // FIX -- to be implemented
 
         null
     end beamSelAll
+
+    type SelectedModel = Forecaster_RegV
+
+    protected def selectedModel (cols: LSET [Int], h: Int): Forecaster_RegV = ???
+
+    protected def testSelected (mod: Forecaster_RegV, inSample: Boolean, tnt: Boolean, rc: Int,
+                                showYf: Boolean): (MatrixD, MatrixD) = ???
 
 //  T E S T I N G   S C E N A R I O S
 
@@ -449,15 +456,13 @@ abstract class Forecaster_RegV (x: MatrixD, y: MatrixD, hh: Int, fname: Array [S
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Perform In-Sample Testing, i.e., train and test on the full data set.
      *  Return the prediction and the Quality of Fit.
-     *  @param skip    the number of initial time points to skip (due to insufficient past)
      *  @param showYf  whether to show the forecast matrix
      *  FIX - copied from `Forecaster` change it to work for VAR, VARX
      */
-    override def inSample_Test (skip: Int = 2, showYf: Boolean = false): (VectorD, VectorD) =
+    override def inSample_Test (showYf: Boolean = false): (VectorD, VectorD) =
         banner (s"In-Sample Test: $modelName")
         val (yp, qof) = trainNtest_x ()()                                 // train on full and test on full
         forecastAll (getYY)                                               // forecast over all horizons
-        setSkip (skip)                                                    // diagnose: skip the first 'skip' rows
         diagnoseAll (getYY, getYf)                                        // compute metrics for all horizons
         if showYf then
             println (s"Final In-Sample Forecast Matrix yf = ${getYf}")

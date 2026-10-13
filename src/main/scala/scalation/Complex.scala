@@ -145,6 +145,11 @@ case class Complex (re: Double, im: Double = 0.0)
     def abs: Complex = Complex (math.abs (re), math.abs (im))
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the magnitude of 'this' complex number.
+     */
+    def mag: Double = math.sqrt (re * re + im * im)
+
+    //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the maximum of 'this' and 'c' complex numbers.
      *  @param c  that complex number to compare with this
      */
@@ -386,7 +391,13 @@ object Complex:
     /** Return the absolute value of that complex number.
      *  @param c  that complex number
      */
-    def abs (c: Complex): Complex = c.abs
+    inline def abs (c: Complex): Complex = c.abs
+
+    //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the magnitude of that complex number.
+     *  @param c  that complex number
+     */
+    inline def mag (c: Complex): Double = c.mag
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the maximum of two complex number, 'c' and 'd'.
@@ -443,7 +454,7 @@ end Complex
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `complexTest` main function is used to test the `Complex` class.
- *  > runMain scalation.mathstat.complexTest
+ *  > runMain scalation.complexTest
  */
 @main def complexTest (): Unit =
 

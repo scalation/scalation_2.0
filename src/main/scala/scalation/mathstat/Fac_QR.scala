@@ -136,6 +136,11 @@ class Fac_QR (aa: MatrixD, needQ: Boolean = false)
         r_inv * q.transpose
     end inverse
 
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the inverse of R: R^{-1}
+     */
+    def r_inverse: MatrixD = Fac_Inverse.inverse_ut (r)
+
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Transform b into q.t * b, i.e., perform the right side of the equation
      *  r*x = q.t * b not using a full q matrix.

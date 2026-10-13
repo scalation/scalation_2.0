@@ -244,7 +244,9 @@ object Combinatorics:
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute the gamma function 'gamma (a)' using the Lanczos Approximation.
-     *  @see http://en.wikipedia.org/wiki/Lanczos_approximation
+     *  The gamma function generalizes factorial:  Γ(a+1) =  a Γ(a + 1) 
+     *  @see https://en.wikipedia.org/wiki/Gamma_function
+     *  @see https://en.wikipedia.org/wiki/Lanczos_approximation
      *  @param a  the parameter, a real number
      */
     def gammaF (a: Double): Double =
@@ -285,6 +287,63 @@ object Combinatorics:
 //          flaw ("gammaF", "only handle positive integer and halves cases")
 //      prod
 //  } // gammaF
+
+    //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the log of the gamma function.
+     *  @param x  the input argument (must be strictly positive)
+     */
+    def logGamma (x: Double): Double = log (gammaF (x))
+
+    //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the Digamma function ψ(x), which is the logarithmic derivative
+     *
+     *      ψ(x) = d/dx[ln(Γ(x))] = Γ'(x)/Γ(x)
+     *
+     *  of the Gamma function.  Uses a recurrence relation to shift small arguments up,
+     *  then evaluates via asymptotic expansion.
+     *
+     *  Mathematical Identity:  ψ(x + 1) = ψ(x) + 1/x
+     *
+     *  @param x  the input argument (must be strictly positive)
+     */
+    def digamma (x: Double): Double =
+        if x < 1e-5 then 
+            -0.57721566490153286 - 1.0 / x
+        else
+            // Determine how many shifting steps are needed
+            val steps = if x < 7.0 then (7.0 - x).ceil.toInt else 0
+            
+            // Combinator: Generate the shift sequence and calculate the adjustment sum
+            val adjustment = (0 until steps).map (i => 1.0 / (x + i)).sum
+            val xCopy      = x + steps
+            val r2         = 1.0 / (xCopy * xCopy)
+            
+            -adjustment + log(xCopy) - 0.5 / xCopy - r2 * (1.0/12.0 - r2 * (1.0/120.0 - r2 / 252.0))
+    end digamma
+
+    //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Computes the Trigamma function ψ'(x), which is the first derivative of the
+     *  Digamma function ψ(x).  Uses a recurrence relation to shift arguments up,
+     *  then evaluates via asymptotic expansion.
+     * 
+     *  Mathematical Identity:  ψ'(x + 1) = ψ'(x) - 1/(x^2)
+     *
+     *  @param x  the input argument (must be strictly positive)
+     */
+    def trigamma (x: Double): Double =
+        if x < 1e-5 then 
+            1.0 / (x * x)
+        else
+            // Determine how many shifting steps are needed
+            val steps = if x < 7.0 then (7.0 - x).ceil.toInt else 0
+            
+            // Combinator: Clean summation of squares without a mutable while loop
+            val adjustment = (0 until steps).map (i => 1.0 / ((x + i) * (x + i))).sum
+            val xCopy      = x + steps
+            val r2         = 1.0 / (xCopy * xCopy)
+            
+            adjustment + 1.0 / xCopy + 0.5 * r2 + r2 * (1.0 / xCopy) * (1.0/6.0 - r2 * (1.0/30.0 - r2 / 42.0))
+    end trigamma
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute the 'k'th degree rising factorial of 'x'.  When 'x = 1', this is

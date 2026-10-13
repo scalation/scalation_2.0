@@ -48,6 +48,17 @@ class HyperParameter extends Cloneable:
     end update
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Given the names, set the hyper-parameter values.  Note (v, d) for value, default
+     *  @param nvs  the name-value pairs for the hyper-parameter
+     */
+    def set (nvs: (String, ValueType)*): Unit =
+        for nv <- nvs do
+            val (_, d) = hparam (nv._1)
+            hparam += nv._1 -> (nv._2, d)
+        end for
+    end set
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Create and return new hyper-parameters, updating the one with the given name.
      *  @param name   the name of the hyper-parameter
      *  @param value  the value of the hyper-parameter
@@ -102,12 +113,12 @@ class HyperParameter extends Cloneable:
     end -=
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Collect all values into an integer array.
+    /** Collect all values into an array of integers.
      */
     def toInt: Array [Int] = (for v <- hparam.values yield v._1.toInt).toArray
  
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** Collect all values into an integer array.
+    /** Collect all values into an array of doubles.
      */
     def toDouble: Array [Double] = (for v <- hparam.values yield v._1.toDouble).toArray
  
@@ -120,7 +131,7 @@ end HyperParameter
 
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `hyperParameterTest` main function is used to test the `HyperParameter` class.
+/** The `hyperParameterTest` main function tests the `HyperParameter` class.
  *  > runMain scalation.hyperParameterTest
  */
 @main def hyperParameterTest (): Unit =
@@ -148,7 +159,8 @@ end hyperParameterTest
 
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `hyperParameterTest2` main function is used to test the `HyperParameter` class.
+/** The `hyperParameterTest2` main function tests the `HyperParameter` class.
+ *  It test the `set` method.
  *  > runMain scalation.hyperParameterTest2
  */
 @main def hyperParameterTest2 (): Unit =
@@ -162,6 +174,10 @@ end hyperParameterTest
     println (s"hp          = $hp")
     println (s"hp.toInt    = ${stringOf (hp.toInt)}")
     println (s"hp.toDouble = ${stringOf (hp.toDouble)}")
+
+    banner ("Modify the values for hyper-parameters")
+    hp.set (("p", 2), ("q", 3))
+    println (s"hp          = $hp")
 
 end hyperParameterTest2
 

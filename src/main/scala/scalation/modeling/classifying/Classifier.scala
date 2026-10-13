@@ -368,7 +368,7 @@ REPORT
      *  @param cross  indicator to include the cross-validation/validation QoF measure (defaults to "many")
      *  @param qk     index of Quality of Fit (QoF) to use for comparing quality
      */
-    def forwardSelAll (cross: String = "many")(using qk: Int): (LSET [Int], VEC [VectorD]) =
+    def forwardSelAll (cross: String = "many")(using qk: Int): (Array [LSET [Int]], Array [VEC [VectorD]]) =
         val rSq  = VEC [VectorD] ()                                          // QoF: R^2, R^2 Bar, R^2 cv
         val cols = LSET (0)                                                  // start with x_0 in model
 
@@ -385,7 +385,7 @@ REPORT
             end for
         } // breakable
 
-        (cols, rSq)
+        (Array (cols), Array (rSq))                                          // arrays of one element
 //      (cols, rSq(0 until cols.size-1))
     end forwardSelAll
 
@@ -436,7 +436,7 @@ REPORT
      *  @param cross  indicator to include the cross-validation/validation QoF measure (defaults to "many")
      *  @param qk     index of Quality of Fit (QoF) to use for comparing quality
      */
-    def backwardElimAll (first: Int = 1, cross: String = "many")(using qk: Int): (LSET [Int], VEC [VectorD]) =
+    def backwardElimAll (first: Int = 1, cross: String = "many")(using qk: Int): (Array [LSET [Int]], Array [VEC [VectorD]]) =
         val rSq  = VEC [VectorD] ()                                          // R^2, R^2 Bar, R^2 cv
         val cols = LSET.range (0, x.dim2)                                    // start with all x_j in model
 
@@ -456,7 +456,7 @@ REPORT
             end for
         } // breakable
 
-        (cols, rSq)                                                          // reverse the order results
+        (Array (cols), Array (rSq))                                          // arrays of one element
 //      (cols, rSq.reverse)                                                  // reverse the order results
     end backwardElimAll 
 
@@ -471,7 +471,7 @@ REPORT
      *  @param qk     index of Quality of Fit (QoF) to use for comparing quality
      */
     def stepwiseSelAll (cross: String = "many", swap_ : Boolean = true)(using qk: Int):
-                       (LSET [Int], VEC [VectorD]) =
+                       (Array [LSET [Int]], Array [VEC [VectorD]]) =
         val rSq    = VEC [VectorD] ()                                        // QoF: R^2, R^2 Bar, R^2 cv
         val cols   = LSET (0)                                                // start with x_0 in model
         var last_q = -MAX_VALUE                                              // current best QoF
@@ -527,7 +527,7 @@ REPORT
         println (s"stepRegressionAll: selected features = ${cols.map (fname (_))}")
         println (s"stepRegressionAll: features in/out   = $vars")
 
-        (cols, rSq)
+        (Array (cols), Array (rSq))                                          // arrays of one element
 //      (cols, rSq(1 until cols.size))
     end stepwiseSelAll
 
@@ -557,12 +557,47 @@ REPORT
      *  @param bk     the beam width holding the top k models (defaults to 3)
      *  @param qk     index of Quality of Fit (QoF) to use for comparing quality
      */
-    def beamSelAll (cross: String = "many", bk: Int = 3)(using qk: Int): (LSET [Int], VEC [VectorD]) =
+    def beamSelAll (cross: String = "many", bk: Int = 3)(using qk: Int): (Array [LSET [Int]], Array [VEC [VectorD]]) =
 
         // FIX -- to be implemented
 
         null
     end beamSelAll
+
+    type SelectedModel = Classifier
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Build the sub-model of a selected column set (the hook of `reportSelection`).
+     *  @param cols  the selected columns
+     *  @param h     ignored (no horizons)
+     */
+    protected def selectedModel (cols: LSET [Int], h: Int): Classifier =
+        buildModel (x(?, cols), newFname (fname, cols))
+    end selectedModel
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Test a selected sub-model (the hook of `reportSelection`): in-sample, its
+     *  `inSample_Test`; out-of-sample, the table of its k-fold `crossValidate`.
+     *  @param mod       the selected sub-model
+     *  @param inSample  whether to test in-sample
+     *  @param tnt       whether to cross-validate
+     *  @param rc        ignored
+     *  @param showYf    ignored
+     */
+    protected def testSelected (mod: Classifier, inSample: Boolean, tnt: Boolean, rc: Int,
+                                showYf: Boolean): (MatrixD, MatrixD) =
+        var qofIn: MatrixD = null
+        var qofCV: MatrixD = null
+        if inSample then
+            banner (s"$modelName: In-Sample Test of the selected model on ${stringOf (mod.getFname)}")
+            qofIn = MatrixD (mod.inSample_Test ()._2)
+        if tnt then
+            banner (s"$modelName: Cross-Validation of the selected model on ${stringOf (mod.getFname)}")
+            val stats = mod.crossValidate ()
+            FitM.showQofStatTable (stats)
+            qofCV = MatrixD (VectorD (stats.map (_.mean)))
+        (qofIn, qofCV)
+    end testSelected
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute the Variance Inflation Factor (VIF) for each variable to test
@@ -592,13 +627,11 @@ REPORT
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Perform In-Sample Testing, i.e., train and test on the same FULL data set.
      *  Return the prediction and the Quality of Fit.
-     *  @param skip    the number of initial data points to skip (due to insufficient information)
      *  @param showYp  whether to show the prediction vector
      */
-    def inSample_Test (skip: Int = 0, showYp: Boolean = false): (VectorD, VectorD) =
+    def inSample_Test (showYp: Boolean = false): (VectorD, VectorD) =
         banner (s"In-Sample Test: $modelName")
-        val (x_, y_)  = (x.drop (skip), y.drop (skip))
-        val (yp, qof) = trainNtest (x_, y_)(x_, y_)
+        val (yp, qof) = trainNtest (x, y)(x, y)
         if showYp then
             println (s"Final In-Sample Prediction Vector yp = $yp")
         (yp.toDouble, qof)

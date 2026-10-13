@@ -53,6 +53,11 @@ trait ForecastMatrix (y: VectorD, hh: Int, tRng: Range = null):
 
     private val debug = debugf ("ForecastMatrix", false)                   // debug function
 
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the number of leading rows `diagnose` skips (@see `Diagnoser.getSkip`).
+     */
+    def getSkip: Int
+
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Make the full FORECAST MATRIX where the zeroth column holds the actual time series
      *  and the last column is its time/time index.  Columns 1, 2, ... hh are for h steps
@@ -71,6 +76,16 @@ trait ForecastMatrix (y: VectorD, hh: Int, tRng: Range = null):
             for t <- tRng do yf_(t, hh_ + 1) = t                           // last column (h+1) holds time (logical day)
         yf_
     end makeForecastMatrix
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Peusdo-backcast/pad the full FORECAST MATRIX to fill in the zeroth row.
+     *  @param yf  the current forecast matrix
+     */
+    def backcast (yf: MatrixD): MatrixD =
+        yf(0, 1) = yf(0, 0)                                                // use actual value here, but don't include in diagnosis
+        for j <- 2 until yf.dim2-1 do yf(0, j) = yf(1, j-1)
+        yf
+    end backcast
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the slanted/diagonalized-down version of the forecast matrix where each
@@ -134,15 +149,15 @@ trait ForecastMatrix (y: VectorD, hh: Int, tRng: Range = null):
 //          Forecaster.differ (yy, yfh)                                    // uncomment for debugging
             assert (yy.dim == yfh.dim)                                     // make sure the vector sizes agree
 
-            mod_resetDF (yy.dim)                                           // reset the Degrees of Freedom (DF)  
+            mod_resetDF (yy.dim - getSkip)                                 // reset the Degrees of Freedom (DF)  
             val qof    = diagnose (yy, yfh)                                // use column h of yf
-            if DO_PLOT then    // Yousef_added
+            if DO_PLOT then                                                // Yousef_added
                 new Plot (null, yy, yfh, s"Plot yy vs. yfh for horizon $h", lines = true)
             ftMat(h-1) = qof
 //          println (FitM.fitMap (qof, qoF_names))
         end for
         if showYf then println (s"Final Forecast Matrix yf = ${slant (yf)}")
-        if SHOW_QoF then    // Yousef_added
+        if SHOW_QoF then                                                   // Yousef_added
             println ("fitMap QoF = ")
             println (Fit.showFitMap (ftMat.ᵀ))
         ftMat
@@ -172,7 +187,6 @@ trait ForecastMatrix (y: VectorD, hh: Int, tRng: Range = null):
 
 end ForecastMatrix
 
-import Example_Covid.loadData_y
 import Example_LakeLevels.y
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -217,6 +231,7 @@ end forecastMatrixTest
 
 end forecastMatrixTest2
 
+import Example_Covid.{clip, loadData_y}
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `forecastMatrixTest3` main function tests the `RandomWalk` class on real data:
@@ -226,10 +241,8 @@ end forecastMatrixTest2
  */
 @main def forecastMatrixTest3 (): Unit =
 
-    val yy = loadData_y ()
-//  val y  = yy                                                           // full
-    val y  = yy(0 until 116)                                              // clip the flat end
-    val hh = 6                                                            // maximum forecasting horizon
+    val (_, y) = clip ((null, loadData_y ()))
+    val hh     = 6                                                        // maximum forecasting horizon
 
     val mod = new RandomWalk (y, hh)                                      // create model for time series data
     banner (s"In-ST Forecasts: ${mod.modelName} on COVID-19 Dataset")
@@ -250,10 +263,8 @@ end forecastMatrixTest3
  */
 @main def forecastMatrixTest4 (): Unit =
 
-    val yy = loadData_y ()
-//  val y  = yy                                                           // full
-    val y  = yy(0 until 116)                                              // clip the flat end
-    val hh = 6                                                            // maximum forecasting horizon
+    val (_, y) = clip ((null, loadData_y ()))
+    val hh     = 6                                                        // maximum forecasting horizon
 
     val mod = new RandomWalk (y, hh)
     banner (s"TnT Forecasts: ${mod.modelName} on COVID-19 Dataset")

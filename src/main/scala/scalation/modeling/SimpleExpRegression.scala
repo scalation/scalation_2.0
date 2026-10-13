@@ -21,7 +21,8 @@ import scalation.mathstat._
 /** The `SimpleExpRegression` class supports exponential regression.  In this case,
  *  x is [1, x_1].  Fit the parameter vector b in the exponential regression equation
  *
- *      log (mu (x))  =  b dot x  =  b_0 + b_1 * x_1
+ *      y  =  b_0 e^(b_1 x_1)
+ *      log (y)  =  b dot x  =  b_0 + b_1 * x_1 (transformed)
  *
  *  @see www.stat.uni-muenchen.de/~leiten/Lehre/Material/GLM_0708/chapterGLM.pdf 
  *  @param x       the data/input matrix
@@ -39,7 +40,8 @@ class SimpleExpRegression (x: MatrixD, y: VectorD, fname_ : Array [String] = nul
     private val debug     = debugf ("SimpleExpRegression", true)         // debug function
     private val flaw      = flawf ("SimpleExpRegression")                // flaw function
     private val cutoff    = 1E-5                                         // cutoff threshold
-    private val eta       = 0.00005                                      // the learning/convergence rate (requires adjustment)
+//  private val eta       = 0.00005                                      // the learning/convergence rate (requires adjustment)
+    private val eta       = 0.00006                                      // the learning/convergence rate (requires adjustment)
     private val maxEpochs = 1000                                         // the maximum number of training epcochs/iterations
 //  private val eta       = hparam("eta")                                // the learning/convergence rate (requires adjustment)
 //  private val maxEpochs = hparam("maxEpochs").toInt                    // the maximum number of training epcochs/iterations
@@ -51,11 +53,11 @@ class SimpleExpRegression (x: MatrixD, y: VectorD, fname_ : Array [String] = nul
     override def getBest: BestStep = super [NoSubModels].getBest
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    /** The estimated response value at point xi.
-     *  @param xi  the point to evaluate
-     *  @param b   the given parameter values
+    /** The function to compute the estimated response value at point x1 where x = [1, x1].
+     *  @param x1  the point to evaluate
+     *  @param b   the given parameter values b = [b_0, b_1]
      */
-    def f (xi: Double, b: VectorD): Double = b(0) * exp (b(1) * xi)
+    def f (x1: Double, b: VectorD): Double = b(0) * exp (b(1) * x1)
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Train the predictor by fitting the parameter vector (b-vector) in the
@@ -64,23 +66,28 @@ class SimpleExpRegression (x: MatrixD, y: VectorD, fname_ : Array [String] = nul
      *  @param y_  the training/full response/output vector
      */
     def train (x_ : MatrixD = x, y_ : VectorD = y): Unit =
-        val xx = x_(?, 0)
-//      b = VectorD (50.0, -0.03)                                        // FIX - generalize initial guess
         b = VectorD (1.0, 0.3)
+//      b = VectorD (50.0, -0.03)                                        // FIX - generalize initial guess
+        val xx = x_(?, 0)
 
+        var yp, e, g: VectorD = null
         var (go, epoch) = (true, 1)
         cfor (go && epoch <= maxEpochs, epoch += 1) {                    // iterate over the learning epochs
-            val yp = VectorD (for i <- xx.indices yield f (xx(i), b))    // y-predicted vector
-//          val yp = xx.map (f (_, b))                                   // y-predicted vector
-            val e  = y_ - yp                                             // error vector
-            val g0 = (e dot yp) / b(0)                                   // gradient 0 - partial of loss w.r.t. b0
-            val g1 = e dot yp * xx                                       // gradient 1 - partial of loss w.r.t. b1
-            b(0)  += eta/x_.dim * g0                                     // update to first parameter
-            b(1)  += eta/x_.dim * g1                                     // update to second parameter
+            yp = xx.map (f (_, b))                                       // y-predicted vector
+            e  = y_ - yp                                                 // error vector
+            g  = VectorD ((e dot yp) / b(0), e dot yp * xx)              // gradient
+            b += g * (eta/x_.dim)
+            if g.norm < cutoff then go = false                           // stopping rule, may refine
             debug ("train", s"parameters for $epoch th epoch: b = $b \n yp = $yp")
-            if VectorD (g0, g1).norm < cutoff then go = false            // stopping rule, may refine
         } // cfor
     end train
+
+//          val yp = VectorD (for i <- xx.indices yield f (xx(i), b))    // y-predicted vector
+
+//          val g0 = (e dot yp) / b(0)                                   // gradient 0 - partial of loss w.r.t. b0
+//          val g1 = e dot yp * xx                                       // gradient 1 - partial of loss w.r.t. b1
+//          b(0)  += eta/x_.dim * g0                                     // update to first parameter
+//          b(1)  += eta/x_.dim * g1                                     // update to second parameter
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Test a predictive model y_ = f(x_) + e and return its QoF vector.
@@ -160,7 +167,6 @@ end SimpleExpRegression
                              1.0,  1.0, 101.0)
     val y = VectorD (745.0, 895.0, 442.0, 440.0, 1598.0)
     val z = VectorD (1.0, 20.0, 80.0)
-*/
 
     val x = MatrixD ((10, 2), 1.0, 1.0,
                               1.0, 2.0,
@@ -183,18 +189,19 @@ end SimpleExpRegression
                      22.05,
                      29.76,
                      40.17)
-
     val x_ = x(?, 1 until x.dim2)
-    println (s"x_ = $x_")
+*/
 
-    val mod = new SimpleExpRegression (x_, y)                            // create a model
+    val x_ = MatrixD (VectorD.range (1, 11)).transpose
+    val y  = VectorD (2.70, 3.64, 4.93, 6.64, 8.96, 12.10, 16.33, 22.05, 29.76, 40.17)
+
+    val mod = new SimpleExpRegression (x_, y)                            // create a model -- no intercept
 //  val mod = new SimpleExpRegression (x, y)                             // create a model -- with intercept
     mod.inSample_Test ()                                                 // train and test the model
 
     val yp = mod.predict (x_)
     println (s"y  = $y")
     println (s"yp = $yp")
-
     new Plot (null, y, yp, "SimpleExpRegressionTest", lines = true)
 
 /*

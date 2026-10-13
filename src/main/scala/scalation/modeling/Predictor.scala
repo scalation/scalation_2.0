@@ -13,7 +13,7 @@ package modeling
 
 import scala.collection.mutable.{ArrayBuffer => VEC, IndexedSeq, LinkedHashSet => LSET}
 import scala.math.{max, min}
-import scala.util.control.Breaks.{break, breakable}
+import scala.runtime.ScalaRunTime.stringOf
 
 import scalation.mathstat._
 //import scalation.random.RandomVecSample
@@ -54,13 +54,13 @@ end rectify
 
 // Change as needed the default (given instance) whether to display plots
 
-//given DO_PLOT: Boolean = false
-given DO_PLOT: Boolean = true
+given DO_PLOT: Boolean = false
+//given DO_PLOT: Boolean = true
 
 //given DO_REPORT: Boolean = false
 given DO_REPORT: Boolean = true
 
-//given SHOW_QoF: Boolean = false   // Yousef_added
+//given SHOW_QoF: Boolean = false
 given SHOW_QoF: Boolean = true
 
 
@@ -218,7 +218,7 @@ trait Predictor (x: MatrixD, y: VectorD, protected var fname: Array [String], hp
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the hyper-parameters.
      */
-    def hparameter: HyperParameter = hparam
+    final def hparameter: HyperParameter = hparam
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the vector of parameter/coefficient values.
@@ -269,7 +269,7 @@ trait Predictor (x: MatrixD, y: VectorD, protected var fname: Array [String], hp
      *  @see `Fit` for index of QoF measures.
      *  @param cols  the columns of matrix x currently included in the existing model
      *  @param qk    index of Quality of Fit (QoF) to use for comparing quality
-     */
+     * 
     def forwardSel (cols: LSET [Int])(using qk: Int): BestStep =
         var best = BestStep ()()                                             // best step so far
 
@@ -287,6 +287,7 @@ trait Predictor (x: MatrixD, y: VectorD, protected var fname: Array [String], hp
             flaw ("forwardSel", "could not find a variable x_j to add: best.col = -1")
         best
     end forwardSel
+     */
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Evalaute the model with only one column, e.g., intercept only model.
@@ -295,10 +296,45 @@ trait Predictor (x: MatrixD, y: VectorD, protected var fname: Array [String], hp
     def select0 (qk: Int): BestStep =
         val x_cols = x(?, LSET (0))                                          // x projected onto columns {0}
         val mod_0  = buildModel (x_cols, newFname (fname, LSET (0)))         // regress with x_0 added
-        mod_0.train ()                                                       // train model
+
+        val (x_tr, y_tr) = (x_cols(t_rng), y(t_rng))                         // get full/training data
+        mod_0.train (x_tr, y_tr)                                             // train model
         val qof_0 = mod_0.test ()._2
         BestStep (0, qof_0, mod_0)(qof_0(qk))                                // result for intercept only
     end select0
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Evaluate one column set the way every selection step does: build the
+     *  sub-model on the columns, train it on the FS rows (t_rng) and test it there,
+     *  returning the step (a failed fit returns a null QoF, so the search skips the set).
+     *  @param cols  the columns of the set
+     *  @param qk    index of Quality of Fit (QoF) to use for comparing quality
+     */
+    private def evalCols (cols: LSET [Int])(using qk: Int): BestStep =
+        try
+            val x_cols = x(?, cols)                                          // x projected onto cols columns
+            val mod_j  = buildModel (x_cols, newFname (fname, cols))         // regress on these columns
+            val (x_tr, y_tr) = (x_cols(t_rng), y(t_rng))                     // get full/training data
+            mod_j.train (x_tr, y_tr)                                         // train model
+            val qof_j = mod_j.test (x_tr, y_tr)._2                           // test for qof
+            BestStep (-1, qof_j, mod_j, cols)(qof_j(qk))
+        catch case e: Exception =>
+            debug ("evalCols", s"cols = $cols failed: ${e.getMessage}")
+            BestStep (-1, null, null, cols)()
+    end evalCols
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Record a search path: the best-so-far after each step into the rSq trace
+     *  (@see `updateQoF`) and the best step found (@see `updateBest`).
+     *  @param path   the search path
+     *  @param rSq    the trace of key QoF measures, one row per step
+     *  @param cross  indicator to include the cross-validation/validation QoF measure
+     *  @param qk     index of Quality of Fit (QoF) to use for comparing quality
+     */
+    private def record (path: SubsetSearch.Path, rSq: VEC [VectorD], cross: String)(using qk: Int): Unit =
+        for step <- path.steps do updateQoF (rSq, cross, step)
+        updateBest (path.best)
+    end record
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Perform FORWARD SELECTION to find the MOST predictive variables to have
@@ -307,7 +343,7 @@ trait Predictor (x: MatrixD, y: VectorD, protected var fname: Array [String], hp
      *  @see `Fit` for index of QoF measures.
      *  @param cross  indicator to include the cross-validation/validation QoF measure (defaults to "many")
      *  @param qk     index of Quality of Fit (QoF) to use for comparing quality
-     */
+     *
     def forwardSelAll (cross: String = "many")(using qk: Int): (LSET [Int], VEC [VectorD]) =
         resetBest ()
         val rSq  = VEC [VectorD] ()                                          // QoF: R^2, R^2 Bar, sMAPE, R^2 cv
@@ -329,6 +365,28 @@ trait Predictor (x: MatrixD, y: VectorD, protected var fname: Array [String], hp
         } // breakable
 
         (cols, rSq)
+    end forwardSelAll
+     */
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Perform FORWARD SELECTION to find the MOST predictive variables to have
+     *  in the model, returning the variables in the order added and the new Quality
+     *  of Fit (QoF) measures for all steps (@see `SubsetSearch.forward`: the full
+     *  path from the intercept-only model; the best set along it is `getBest`).
+     *  @see `Fit` for index of QoF measures.
+     *  @param cross  indicator to include the cross-validation/validation QoF measure (defaults to "many")
+     *  @param qk     index of Quality of Fit (QoF) to use for comparing quality
+     */
+    def forwardSelAll (cross: String = "many")(using qk: Int): (Array [LSET [Int]], Array [VEC [VectorD]]) =
+        resetBest ()
+        val rSq  = VEC [VectorD] ()                                          // QoF: R^2, R^2 Bar, sMAPE, R^2 cv
+        banner (s"forwardSelAll: (qk = $qk, l = 0) INITIAL variable (0, ${fname(0)}) => cols = ${LSET (0)}")
+        val path = SubsetSearch.forward (x.dim2, evalCols, LSET (0))
+        record (path, rSq, cross)
+        for (step, l) <- path.steps.zipWithIndex if l > 0 do
+            banner (s"forwardSelAll: (l = $l) ADD variable (${step.col}, ${fname(step.col)}) => cols = ${step.mod_cols} @ ${step.qof(qk)}")
+        val cols = if path.steps.isEmpty then LSET (0) else path.steps.last.mod_cols
+        (Array (cols), Array (rSq))
     end forwardSelAll
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -355,7 +413,7 @@ trait Predictor (x: MatrixD, y: VectorD, protected var fname: Array [String], hp
      *  @param first  first variable to consider for elimination
      *                      (default (1) assume intercept x_0 will be in any model)
      *  @param qk     index of Quality of Fit (QoF) to use for comparing quality
-     */
+     * 
     def backwardElim (cols: LSET [Int], first: Int = 1)(using qk: Int): BestStep =
         var best = BestStep ()()                                             // best step so far
 
@@ -373,6 +431,7 @@ trait Predictor (x: MatrixD, y: VectorD, protected var fname: Array [String], hp
             flaw ("backwardElim", "could not find a variable x_j to eliminate: best.col = -1")
         best
     end backwardElim
+     */
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Run the full model before variable elimination as a starting point for
@@ -396,7 +455,7 @@ trait Predictor (x: MatrixD, y: VectorD, protected var fname: Array [String], hp
      *  @param first  first variable to consider for elimination
      *  @param cross  indicator to include the cross-validation/validation QoF measure (defaults to "many")
      *  @param qk     index of Quality of Fit (QoF) to use for comparing quality
-     */
+     *
     def backwardElimAll (first: Int = 1, cross: String = "many")(using qk: Int):
                         (LSET [Int], VEC [VectorD]) =
         resetBest ()
@@ -429,6 +488,35 @@ trait Predictor (x: MatrixD, y: VectorD, protected var fname: Array [String], hp
 
         (LSET.from (rem.reverse), rSq.reverse)                               // reverse the order results
     end backwardElimAll 
+     */
+
+   //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Perform BACKWARD ELIMINATION to find the LEAST predictive variables to remove
+     *  from the full model, returning the variables left and the new Quality of Fit (QoF)
+     *  measures for all steps.
+     *  @see `Fit` for index of QoF measures.
+     *  @param first  first variable to consider for elimination
+     *  @param cross  indicator to include the cross-validation/validation QoF measure (defaults to "many")
+     *  @param qk     index of Quality of Fit (QoF) to use for comparing quality
+     */
+    def backwardElimAll (first: Int = 1, cross: String = "many")(using qk: Int):
+                        (Array [LSET [Int]], Array [VEC [VectorD]]) =
+        resetBest ()
+        val rSq  = VEC [VectorD] ()                                          // R^2, R^2 Bar, sMAPE, R^2 cv
+        val path = SubsetSearch.backward (x.dim2, evalCols, LSET.from (0 until first), minCols = 2)
+        record (path, rSq, cross)
+        for (step, l) <- path.steps.zipWithIndex do
+            if l == 0 then debug ("backwardElimAll", s"(qk = $qk, l = 0) INITIAL variables (all) => cols = ${step.mod_cols} @ ${step.qof(qk)}")
+            else debug ("backwardElimAll", s"(l = $l) REMOVE variable (${step.col}, ${fname(step.col)}) => cols = ${step.mod_cols} @ ${step.qof(qk)}")
+        updateQoF (rSq, cross, select0 (qk))                                 // update Qof results for 0-th variable
+        val rem  = VEC [Int] ()                                              // the columns removed, in order
+        for step <- path.steps.drop (1) do rem += step.col
+        val cols = if path.steps.isEmpty then mcols else path.steps.last.mod_cols
+        rem += cols.max                                                      // remove last non-zero column
+        rem += 0                                                             // remove column 0
+        (Array (LSET.from (rem.reverse)), Array (rSq.reverse))               // reverse the order results
+    end backwardElimAll
+
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Perform STEPWISE SELECTION to find a GOOD COMBINATION of predictive variables to have
@@ -440,7 +528,7 @@ trait Predictor (x: MatrixD, y: VectorD, protected var fname: Array [String], hp
      *  @param cross  indicator to include the cross-validation/validation QoF measure (defaults to "many")
      *  @param swap   whether to allow a swap step (swap out a feature for a new feature in one step)
      *  @param qk     index of Quality of Fit (QoF) to use for comparing quality
-     */
+     * 
     def stepwiseSelAll (cross: String = "many", swap: Boolean = true)(using qk: Int):
                        (LSET [Int], VEC [VectorD]) =
         resetBest ()
@@ -513,6 +601,38 @@ trait Predictor (x: MatrixD, y: VectorD, protected var fname: Array [String], hp
         (cols, rSq)
 //      (cols, rSq(1 until cols.size))
     end stepwiseSelAll
+     */
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Perform STEPWISE SELECTION to find a GOOD COMBINATION of predictive variables to have
+     *  in the model, returning the variables selected and the new Quality of Fit (QoF)
+     *  measures for all steps.  At each step it compares the best forward move with the
+     *  best backward move and takes the better one.  Stops when neither action yields improvement.
+     *  @see `Fit` for index of QoF measures.
+     *  @see `modeling.FeatureSelection` for GIVENS for qk and slack_base
+     *  @param cross  indicator to include the cross-validation/validation QoF measure (defaults to "many")
+     *  @param swap   whether to allow a swap step (swap out a feature for a new feature in one step)
+     *  @param qk     index of Quality of Fit (QoF) to use for comparing quality
+     */
+    def stepwiseSelAll (cross: String = "many", swap: Boolean = true)(using qk: Int):
+                       (Array [LSET [Int]], Array [VEC [VectorD]]) =
+        resetBest ()
+        val rSq  = VEC [VectorD] ()                                          // QoF: R^2, R^2 Bar, sMAPE, R^2 cv
+        banner (s"stepwiseSelAll: (qk = $qk, l = 0) INITIAL variable (0, ${fname(0)}) => cols = ${LSET (0)}")
+        val path = SubsetSearch.stepwise (x.dim2, evalCols, LSET (0), swap = swap)
+        record (path, rSq, cross)
+        var prev = 1                                                         // size of the previous set (intercept only)
+        for (step, l) <- path.steps.zipWithIndex do
+            val cols = step.mod_cols
+            val move = if cols.size > prev then "ADD" else if cols.size < prev then "REMOVE" else "SWAP"
+            banner (s"stepwiseSelAll: (l = ${l+1}) $move variable (${step.col}, ${fname(step.col)}) => cols = $cols @ ${step.qof(qk)}")
+            prev = cols.size
+        end for
+        val cols = if path.steps.isEmpty then LSET (0) else path.steps.last.mod_cols
+        println (s"stepwiseSelAll: selected features = $cols")
+        println (s"stepwiseSelAll: selected features = ${cols.map (fname (_))}")
+        (Array (cols), Array (rSq))
+    end stepwiseSelAll
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Swap out variable with in variable.
@@ -542,12 +662,99 @@ trait Predictor (x: MatrixD, y: VectorD, protected var fname: Array [String], hp
      *  @param bk     the beam width holding the top k models (defaults to 3)
      *  @param qk     index of Quality of Fit (QoF) to use for comparing quality
      */
-    def beamSelAll (cross: String = "many", bk: Int = 3)(using qk: Int): (LSET [Int], VEC [VectorD]) =
-
-        // FIX - to be implemented
-
-        null       
+    def beamSelAll (cross: String = "many", bk: Int = 3)(using qk: Int): (Array [LSET [Int]], Array [VEC [VectorD]]) =
+        resetBest ()
+        val rSq  = VEC [VectorD] ()                                          // QoF: R^2, R^2 Bar, sMAPE, R^2 cv
+        updateQoF (rSq, cross, select0 (qk))                                 // the 0-th variable row
+        banner (s"beamSelAll: (qk = $qk, l = 0) INITIAL variable (0, ${fname(0)}) => cols = ${LSET (0)}")
+        val path = SubsetSearch.beam (x.dim2, evalCols, LSET (0), bk = bk)
+        record (path, rSq, cross)
+        for (step, l) <- path.steps.zipWithIndex do
+            banner (s"beamSelAll: level $l best so far => cols = ${step.mod_cols} @ ${step.qof(qk)}")
+        (Array (path.cols), Array (rSq))
     end beamSelAll
+
+    private var lastProbs: VectorD = null                                    // the last CEM run's inclusion probabilities
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return the inclusion probability per column left by the last `cemSelAll`
+     *  run (null if none ran): columns near one are the stable core of the model.
+     */
+    def cemProbs: VectorD = lastProbs
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Perform CROSS-ENTROPY SELECTION (@see `SubsetSearch.cem`, `CEM_Selector`): each
+     *  round samples column sets from per-column inclusion probabilities, evaluates
+     *  each set as every other technique does (`evalCols`), keeps the elite sets and
+     *  moves the probabilities towards them.  Returns the best set found and the QoF
+     *  of the best-so-far model after each round; `cemProbs` returns the final
+     *  inclusion probabilities.
+     *  @see `Fit` for index of QoF measures.
+     *  @param cross    indicator to include the cross-validation/validation QoF measure (defaults to "many")
+     *  @param first    the number of leading columns always kept (default 1: the intercept x_0)
+     *  @param prior    the prior inclusion probability per column of x (null => 0.5 each)
+     *  @param nSample  the number of column sets sampled per round
+     *  @param maxIter  the maximum number of rounds
+     *  @param maxCols  the maximum number of columns in a sampled set (-1 => no cap)
+     *  @param stream   the random number stream
+     *  @param qk       index of Quality of Fit (QoF) to use for comparing quality
+     */
+    override def cemSelAll (cross: String = "many", first: Int = 1, prior: VectorD = null,
+                            nSample: Int = CEM_Selector.N_SAMPLE, maxIter: Int = CEM_Selector.MAX_ITER,
+                            maxCols: Int = -1, stream: Int = 0)(using qk: Int): (Array [LSET [Int]], Array [VEC [VectorD]]) =
+        resetBest ()
+        val rSq  = VEC [VectorD] ()                                          // QoF of the best-so-far model per round
+        val path = SubsetSearch.cem (x.dim2, evalCols, LSET.from (0 until first), prior, nSample, maxIter, maxCols, stream)
+        record (path, rSq, cross)
+        lastProbs = path.probs
+        if ! path.found then
+            flaw ("cemSelAll", "no column set could be evaluated")
+            return (Array (LSET [Int] ()), Array (rSq))
+        val best = path.best
+        banner (s"cemSelAll: ${path.nEval} column sets evaluated => cols = ${best.mod_cols} @ ${best.qof(qk)}")
+        println (s"cemSelAll: selected features = ${best.mod_cols.map (fname (_))}")
+        println (s"cemSelAll: inclusion probabilities = ${path.probs}")
+        (Array (best.mod_cols), Array (rSq))
+    end cemSelAll
+
+//  R E P O R T I N G   T H E   S E L E C T I O N   (@see `SelectionReport`)
+
+    type SelectedModel = Predictor & Fit
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Build the sub-model of a selected column set (the hook of `reportSelection`).
+     *  @param cols  the selected columns
+     *  @param h     ignored (no horizons)
+     */
+    protected def selectedModel (cols: LSET [Int], h: Int): Predictor & Fit =
+        buildModel (x(?, cols), newFname (fname, cols))
+    end selectedModel
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Test a selected sub-model (the hook of `reportSelection`): in-sample, its
+     *  `inSample_Test` (train on all the rows, REPORT); out-of-sample, the table of
+     *  its k-fold `crossValidate` (`FitM.showQofStatTable`); each QoF as a one-row
+     *  matrix (the cross-validation row holds the means over the folds).
+     *  @param mod       the selected sub-model
+     *  @param inSample  whether to test in-sample
+     *  @param tnt       whether to cross-validate
+     *  @param rc        ignored (no rolling validation)
+     *  @param showYf    ignored (no forecast matrix)
+     */
+    protected def testSelected (mod: Predictor & Fit, inSample: Boolean, tnt: Boolean, rc: Int,
+                                showYf: Boolean): (MatrixD, MatrixD) =
+        var qofIn: MatrixD = null
+        var qofCV: MatrixD = null
+        if inSample then
+            banner (s"$modelName: In-Sample Test of the selected model on ${stringOf (mod.getFname)}")
+            qofIn = MatrixD (mod.inSample_Test ()._2)
+        if tnt then
+            banner (s"$modelName: Cross-Validation of the selected model on ${stringOf (mod.getFname)}")
+            val stats = mod.crossValidate ()
+            FitM.showQofStatTable (stats)
+            qofCV = MatrixD (VectorD (stats.map (_.mean)))
+        (qofIn, qofCV)
+    end testSelected
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Compute the Variance Inflation Factor (VIF) for each variable to test
@@ -578,13 +785,11 @@ trait Predictor (x: MatrixD, y: VectorD, protected var fname: Array [String], hp
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Perform In-Sample Testing, i.e., train and test on the same FULL data set.
      *  Return the prediction and the Quality of Fit.
-     *  @param skip    the number of initial data points to skip (due to insufficient information)
      *  @param showYp  whether to show the prediction vector
      */
-    def inSample_Test (skip: Int = 0, showYp: Boolean = false): (VectorD, VectorD) =
+    def inSample_Test (showYp: Boolean = false): (VectorD, VectorD) =
         banner (s"In-Sample Test: $modelName")
-        val (x_, y_)  = (x.drop (skip), y.drop (skip))
-        val (yp, qof) = trainNtest (x_, y_)(x_, y_)
+        val (yp, qof) = trainNtest (x, y)(x, y)
         if showYp then
             println (s"Final In-Sample Prediction Vector yp = $yp")
         (yp, qof)

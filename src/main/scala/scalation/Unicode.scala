@@ -12,7 +12,7 @@
  *           in scalation: `Complex`, `Rat`, `SortedSetExt`, `TimeNum`, `Util`, `ValueType`
  *           in mathstat: `MatrixD`, `VectorD`
  *           in database: `Tabular`
- *           in calculus: `Differential`,  `Integral`, `Poly`
+ *           in calculus: `Differential`, `Integral`, `Poly`
  *           in modeling.forecasting: `ARIMA_diff`
  */
 

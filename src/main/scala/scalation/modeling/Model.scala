@@ -198,9 +198,11 @@ trait Model:
      */
     def report (ftVec: VectorD): String =
         val (fn, b) = (getFname, parameter.asInstanceOf [VectorD])
-        println (s"b = $b, fn = $fn")
+        println (s"b = $b, fn = ${stringOf (fn)}")
+
         if fn == null then flaw ("report", "no feature names given fn = null")
-        else if fn.size != b.dim then flaw ("report", s"# featuers = ${fn.size} != # parameters = ${b.dim}")
+        else if b == null then flaw ("report", "no parameter vector given b = null")
+        else if fn.size != b.dim then flaw ("report", s"fn: # features = ${fn.size} != # parameters = ${b.dim}")
         s"""
 REPORT
     ----------------------------------------------------------------------------
@@ -243,6 +245,10 @@ REPORT
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Screen the x-columns of matrix xy based on the two thresholds, returning
      *  the reduced matrix and the column indices/predictor variables selected.
+     *  This method/rule delegates to `Model.screen` and `forecasting.ExoScreen` calls
+     *  `Model.screen` with a time-series dependency matrix (each x's strongest LEAD
+     *  of y over lags 1..maxLag in the y column, lag-0 correlations among the x's),
+     *  so one screening rule serves regression and forecasting.
      *  @param xy    the [ x, y ] combined data-response matrix
      *  @param thr1  the threshold used to compare the predictor x-columns to the y-column
      *               only want variables above some minimal dependency level
@@ -251,24 +257,7 @@ REPORT
      *  @param dep   the variable/column dependency measure (defaults to correlation)
      */
     def screen (xy: MatrixD, thr1: Double = 0.05, thr2: Double = 0.95)
-               (dep: MatrixD = xy.corr): (MatrixD, VectorI) =
-
-        val lst  = dep.dim2 - 1                                          // the index of last column (holds y)
-        val depY = dep(?, lst)                                           // the dependency sub-matrix for xy vs. y (last column)
-        val depX = dep(0 until lst, 0 until lst)                         // the dependency sub-matrix for x vs. x
-        val indices  = for i <- 0 until lst if abs (depY(i)) > thr1
-                       yield i                                           // row indices that match (> thr1)
-        val sIndices = indices.sortBy (i => -abs (depY(i)))              // sort indices from highest dep to lowest
-
-        // only add index i if its dependency with all selected columns < thr2
-        val selected = VEC [Int] ()
-        for i <- sIndices do
-            if selected.forall (k => abs (depX(i, k)) < thr2) then
-                selected += i                                            // row indices that also match (< thr2)
-        val selected_ = selected.sorted
-
-        (xy(?, selected_), new VectorI (selected_.size, selected_.toArray))
-    end screen
+               (dep: MatrixD = xy.corr): (MatrixD, VectorI) = Model.screen (xy, thr1, thr2)(dep)
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Return the best model found from feature selection.
@@ -282,10 +271,9 @@ REPORT
      *  Good for initial testing and understanding variable relationships.
      *  Return the prediction and the Quality of Fit.
      *  @note May lead to over-fitting for complex models.
-     *  @param skip    the number of initial data points to skip (due to insufficient information)
      *  @param showYp  whether to show the prediction vector
      */
-    def inSample_Test (skip: Int = 0, showYp: Boolean = false): (VectorD, VectorD)
+    def inSample_Test (showYp: Boolean = false): (VectorD, VectorD)
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /*  Use validation to compute test Quality of Fit (QoF) measures by dividing
@@ -360,6 +348,36 @@ object Model:
      *  @param m  the size of the full dataset
      */
     inline def trSize (m: Int): Int = m - teSize (m)
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Screen the x-columns of matrix xy based on the two thresholds, returning
+     *  the reduced matrix and the column indices/predictor variables selected.
+     *  @param xy    the [ x, y ] combined data-response matrix
+     *  @param thr1  the threshold used to compare the predictor x-columns to the y-column
+     *               only want variables above some minimal dependency level
+     *  @param thr2  the threshold used to compare the predictor x-columns with each other
+     *               only want variables below some cut-off dependency/collinearity level
+     *  @param dep   the variable/column dependency measure (defaults to correlation)
+     */
+    def screen (xy: MatrixD, thr1: Double = 0.05, thr2: Double = 0.95)
+               (dep: MatrixD = xy.corr): (MatrixD, VectorI) =
+
+        val lst  = dep.dim2 - 1                                          // the index of last column (holds y)
+        val depY = dep(?, lst)                                           // the dependency sub-matrix for xy vs. y (last column)
+        val depX = dep(0 until lst, 0 until lst)                         // the dependency sub-matrix for x vs. x
+        val indices  = for i <- 0 until lst if abs (depY(i)) > thr1
+                       yield i                                           // row indices that match (> thr1)
+        val sIndices = indices.sortBy (i => -abs (depY(i)))              // sort indices from highest dep to lowest
+
+        // only add index i if its dependency with all selected columns < thr2
+        val selected = VEC [Int] ()
+        for i <- sIndices do
+            if selected.forall (k => abs (depX(i, k)) < thr2) then
+                selected += i                                            // row indices that also match (< thr2)
+        val selected_ = selected.sorted
+
+        (xy(?, selected_), new VectorI (selected_.size, selected_.toArray))
+    end screen
 
 end Model
 

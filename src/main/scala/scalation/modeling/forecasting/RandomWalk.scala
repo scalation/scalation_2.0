@@ -34,6 +34,7 @@ class RandomWalk (y: VectorD, hh: Int, tRng: Range = null,
                   hparam: HyperParameter = null,
                   bakcast: Boolean = false)
       extends Forecaster (y, hh, tRng, hparam, bakcast)
+         with NoTrainModel
          with NoSubModels:
 
     _modelName = "RandomWalk"
@@ -74,7 +75,6 @@ object RandomWalk:
 
 end RandomWalk
 
-import Example_Covid.loadData_y
 import Example_LakeLevels.y
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -114,13 +114,14 @@ end randomWalkTest
     banner (s"TnT Forecasts: ${mod.modelName} on LakeLevels Dataset")
     mod.trainNtest ()()                                                   // train and test on full dataset
 
-    mod.setSkip (0)
+    mod.setSkip ()                                                        // don't skip any rows
     mod.rollValidate ()                                                   // TnT with Rolling Validation
     mod.diagnoseAll (y, mod.getYf, Forecaster.teRng (y.dim))              // only diagnose on the testing set
     println (s"Final TnT Forecast Matrix yf = ${mod.getYf}")
 
 end randomWalkTest2
 
+import Example_Covid.{clip, loadData_y}
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `randomWalkTest3` main function tests the `RandomWalk` class on real data:
@@ -130,10 +131,8 @@ end randomWalkTest2
  */
 @main def randomWalkTest3 (): Unit =
 
-    val yy = loadData_y ()
-//  val y  = yy                                                           // full
-    val y  = yy(0 until 116)                                              // clip the flat end
-    val hh = 6                                                            // maximum forecasting horizon
+    val (_, y) = clip ((null, loadData_y ()))
+    val hh     = 6                                                        // maximum forecasting horizon
 
     val mod = new RandomWalk (y, hh)                                      // create model for time series data
     banner (s"In-ST Forecasts: ${mod.modelName} on COVID-19 Dataset")
@@ -154,16 +153,14 @@ end randomWalkTest3
  */
 @main def randomWalkTest4 (): Unit =
 
-    val yy = loadData_y ()
-//  val y  = yy                                                           // full
-    val y  = yy(0 until 116)                                              // clip the flat end
-    val hh = 6                                                            // maximum forecasting horizon
+    val (_, y) = clip ((null, loadData_y ()))
+    val hh     = 6                                                        // maximum forecasting horizon
 
     val mod = new RandomWalk (y, hh)
     banner (s"TnT Forecasts: ${mod.modelName} on COVID-19 Dataset")
     mod.trainNtest ()()
 
-    mod.setSkip (0)
+    mod.setSkip ()                                                        // don't skip any rows
     mod.rollValidate ()                                                   // TnT with Rolling Validation
     mod.diagnoseAll (y, mod.getYf, Forecaster.teRng (y.dim))              // only diagnose on the testing set
     println (s"Final TnT Forecast Matrix yf = ${mod.getYf}")              // flat forecast matrix yf

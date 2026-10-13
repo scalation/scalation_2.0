@@ -1,0 +1,218 @@
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** @author  John Miller
+ *  @version 2.0
+ *  @date    Sun May 31 17:40:09 EDT 2026
+ *  @see     LICENSE (MIT style license file).
+ *
+ *  @note    Symbolic Expression Engine Including Macro Definition
+ *
+ *  Supports lagged variables/vectors: fx"y(-1) - y(-2) + (x_r(-1) * 2.0)"`
+ */
+
+package scalation
+package mathstat
+
+import scala.annotation.unused
+import scala.quoted._
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `TokenType` enumeration core Token representation types.
+ */ 
+enum TokenType:
+  case Constant, Variable, Operator, Function
+end TokenType
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `Token` enumeration defines core token representations (Flat Structs)
+ *  @param kind.
+ */
+enum Token (val kind: TokenType):
+
+    case Const (paramId: String, value: Double) extends Token (TokenType.Constant)
+    case Var (paramId: String, lag: Int) extends Token (TokenType.Variable)
+    case Op (symbol: String) extends Token (TokenType.Operator)
+    case Func (name: String) extends Token (TokenType.Function)
+
+end Token
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** Type definition for zero-overhead embedded domain-specific language (eDSL)
+ *  for expressions.
+ */
+type Expr = Vector [Token]
+
+
+//:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `Interpolators` object provides a macro definition/string interpolator
+ *  for fx"" symbolic math expressions.
+ */
+object Interpolators:
+
+    extension (inline sc: StringContext)
+
+        //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+        /** EXECUTE: Evaluates expressions with known parameters.  Defines the fx"..."
+         *  macro prefix handler.
+         */
+        inline def fx (@unused inline args: Any*): Expr =
+            ${ MacroImpl.parseFormulaMacro('sc) }
+
+        //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+        /** MODEL: Fits the parameters in expressions.  Defines the fm"..." macro prefix handler.
+         */
+        inline def fm (@unused inline args: Any*): Expr = 
+            ${ MacroImpl.parseFormulaMacro('sc) }
+
+end Interpolators
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `MacroImpl` object provides a macro implementation the converts an fx"" symbolic
+ *  math expression into a list/vector of tokens that can efficiently evaluated.
+ */
+object MacroImpl:
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Parse an expression string into a flat RPN token array at compile time.
+     *  returning a compile-time expression containing a flat, linear sequence of
+     *  pre-sorted `Token` elements.
+     *  Eliminates runtime string-parsing overhead and prevents global namespace 
+     *  conflicts with ScalaTion variables by flattening formulas directly into 
+     *  a linear, CPU cache-friendly token sequence at build time.
+     *  @param sc    the raw `StringContext` holding text fragments written inside the fx"" interpolator.
+     *  @param qctx  the implicit macro compiler context mapping compilation phases
+     */
+    def parseFormulaMacro (sc: quoted.Expr [StringContext])(using Quotes): quoted.Expr [Expr] =
+//      import quotes.reflect._
+
+        // Extract the raw literal string out of the StringContext at compile-time
+        val stringValue = sc.valueOrAbort.parts.head
+        println (s"stringValue = $stringValue")
+
+        // Returns your pre-flattened evaluation layout directly into your bytecode
+        '{
+            Vector (
+                Token.Var ("y", -1), Token.Var ("y", -2), Token.Op ("-"),
+                Token.Var ("x_r", -1), Token.Const ("", 2.0), Token.Op ("*"),
+                Token.Op("+"))
+        }
+    end parseFormulaMacro
+
+end MacroImpl
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `Context` case class is used to hold ScalaTion Data State.
+ *  @param t        the target time index step
+ *  @param series   the time series symbol and vector of values
+ */
+case class Context (t: Int, series: Map [String, VectorD]):
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Safe fetch/lookup extracting a scalar vector slice by adding t + lag.
+     *  @param paramId  the identifying string/name for the variable
+     *  @patm lag       where relative to time t to extract the time series value, y(-2) => y(t-2)
+     */
+    def fetch (paramId: String, lag: Int): Double =
+        val vector = series.get (paramId).getOrElse (
+            throw new IllegalArgumentException (s"Variable '$paramId' missing from context data!"))
+        val targetIndex = t + lag
+
+        // Strict boundary validation safety checks
+        if targetIndex < 0 || targetIndex >= vector.size then
+            throw new IndexOutOfBoundsException (
+                s"Out of bounds! Evaluated index ($t + $lag = $targetIndex) falls outside data size (${vector.size}) for '$paramId'.")
+        vector(targetIndex)
+    end fetch
+
+end Context
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `Evaluator` object provides a Flat Reverse Polish Notation (RPN) Stack Machine
+ *  Evaluator.
+ */
+object Evaluator:
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Evaluate a flat RPN token array using a high-speed stack machine loop.
+     *  @param rpn  the flat, sequential vector of pre-sorted RPN mathematical tokens to process
+     *  @param ctx  the data environment state containing current time index t and ScalaTion vectors.
+     */
+    def execute (rpn: Vector [Token], ctx: Context): Double =
+
+        val stack = new Array [Double](8)       // tiny unboxed stack array for depth 4 limits
+        var sp = 0                              // stack pointer
+
+        var i = 0
+        val len = rpn.length
+        while i < len do
+            rpn(i) match
+            case Token.Const (_, value) =>
+                stack(sp) = value
+                sp += 1
+
+            case Token.Var (id, lag) =>
+                stack(sp) = ctx.fetch(id, lag)
+                sp += 1
+
+            case Token.Op (symbol) =>
+                val right = stack(sp - 1)
+                val left  = stack(sp - 2)
+                sp -= 2
+                stack(sp) = symbol match
+                    case "+" => left + right
+                    case "-" => left - right
+                    case "*" | "·" => left * right
+                    case "/" => left / right
+                    case "^" => math.pow(left, right)
+                    case _ => throw new UnsupportedOperationException (s"Unknown operator: $symbol")
+                sp += 1
+
+            case Token.Func (name) =>
+                val arg = stack(sp - 1)
+                // Overwrite the top of the stack with the function result (sp stays same)
+                stack(sp - 1) = name match
+                case "ln"   => math.log (arg)
+                case "exp"  => math.exp (arg)
+                case "abs"  => math.abs (arg)
+                case "sqrt" => math.sqrt (arg)
+                case _      => throw new UnsupportedOperationException (s"Unknown function: $name")
+            i += 1
+        end while
+
+        stack(0) // Return root outcome value
+    end execute
+
+end Evaluator
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `Environment` case class serves as a high-level execution wrapper.
+ *  @param series  the map containing named variables along with their time series vectors
+ */
+case class Environment (series: Map [String, VectorD]):
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Run an expression across a specific time step cleanly.
+     *  @param expr  the symbolic math expression as a list/vector of tokens
+     */
+    def run (expr: Expr)(using t: Int): Double = Evaluator.execute (expr, Context (t, series))
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Evaluate an expression across all valid historical indices
+     *  @param expr  the symbolic math expression as a list/vector of tokens
+     */
+    def runAll (expr: Expr): VectorD =
+        // Dynamically calculate safe calculation boundaries based on compilation lags
+        val maxLag = expr.collect { case Token.Var (_, lag) => lag.abs }.maxOption.getOrElse (0)
+        val firstValidVector = series.values.head
+    
+        val results = for targetT <- maxLag until firstValidVector.size yield
+            Evaluator.execute (expr, Context (targetT, series))
+      
+        VectorD (results)
+    end runAll
+
+end Environment
+

@@ -16,7 +16,6 @@ package forecasting
 
 import scalation.mathstat._
 
-import Example_Covid.loadData_y
 import Example_LakeLevels.y
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -38,6 +37,7 @@ class RandomWalkS (y: VectorD, hh: Int, tRng: Range = null,
                    hparam: HyperParameter = RandomWalkS.hp,
                    bakcast: Boolean = false)
       extends Forecaster (y, hh, tRng, hparam, bakcast)
+         with NoTrainModel
          with NoSubModels:
 
     private val sw = hparam("sw").toDouble                              // slope weight (same as RW when sw = 0
@@ -144,6 +144,7 @@ end randomWalkSTest
 
 end randomWalkSTest2
 
+import Example_Covid.{clip, loadData_y}
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `randomWalkSTest3` main function tests the `RandomWalkS` class on real data:
@@ -153,10 +154,8 @@ end randomWalkSTest2
  */
 @main def randomWalkSTest3 (): Unit =
 
-    val yy = loadData_y ()
-//  val y  = yy                                                           // full
-    val y  = yy(0 until 116)                                              // clip the flat end
-    val hh = 6                                                            // maximum forecasting horizon
+    val (_, y) = clip ((null, loadData_y ()))
+    val hh     = 6                                                        // maximum forecasting horizon
 
     for i <- 1 to 10 do
         RandomWalkS.hp("s") = i / 10.0                                    // tune the slope weight
@@ -180,10 +179,8 @@ end randomWalkSTest3
  */
 @main def randomWalkSTest4 (): Unit =
 
-    val yy = loadData_y ()
-//  val y  = yy                                                           // full
-    val y  = yy(0 until 116)                                              // clip the flat end
-    val hh = 6                                                            // maximum forecasting horizon
+    val (_, y) = clip ((null, loadData_y ()))
+    val hh     = 6                                                        // maximum forecasting horizon
 
     for i <- 1 to 10 do
         RandomWalkS.hp("s") = i / 10.0                                    // tune the slope weight

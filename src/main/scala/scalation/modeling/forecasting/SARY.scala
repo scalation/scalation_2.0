@@ -16,8 +16,6 @@ package scalation
 package modeling
 package forecasting
 
-import scala.runtime.ScalaRunTime.stringOf
-
 import scalation.mathstat._
 
 import MakeMatrix4TS._
@@ -38,24 +36,24 @@ import MakeMatrix4TS._
  *  @param hh       the maximum forecasting horizon (h = 1 to hh)
  *  @param fname    the feature/variable names
  *  @param tRng     the time range, if relevant (time index may suffice)
- *  @param hparam   the hyper-parameters (defaults to `MakeMatrix4TS.hp`)
+ *  @param hparam   the hyper-parameters (defaults to `AR.hp`)
  *  @param bakcast  whether a backcasted value is prepended to the time series (defaults to false)
  */
 class SARY (x: MatrixD, y: VectorD, hh: Int, fname: Array [String],
-            tRng: Range = null, hparam: HyperParameter = hp,
+            tRng: Range = null, hparam: HyperParameter = AR.hp,
             bakcast: Boolean = false)                                   // backcast value used only `MakeMatrix4TS`
       extends ARY (x, y, hh, fname, tRng, hparam, bakcast):             // no automatic backcasting, @see `SARY.apply`
 
-    private val debug = debugf ("SARY", true)                           // debug function
-    private val sp    = hparam("sp").toInt                              // the seasonal period
-    private val ps    = hparam("ps").toInt                              // use the last ps seasonal values (ps seasonal lags)
+    private val debug = debugf ("SARY", false)                          // debug function
+    private val sp    = hparam("s").toInt                               // the seasonal period
+    private val ps    = hparam("P").toInt                               // use the last ps seasonal values (ps seasonal lags)
 
     // Store the actual lag structure used in matrix construction
     private val (actualSeasonalLags, actualRegularLags) = getLagStructure ()
 
     _modelName = s"SARY_${p}_${ps}_$sp"
 
-    debug ("init", s"$modelName with additional term spec = $spec")
+    debug ("init", s"$modelName with additional trend spec = $spec")
     debug ("init", s"[ x | y ] = ${x :^+ y}")
     debug ("init", s"Seasonal lags used: $actualSeasonalLags")
     debug ("init", s"Regular lags used:  $actualRegularLags")
@@ -195,14 +193,13 @@ object SARY:
      *  @param bakcast  whether a backcasted value is prepended to the time series (defaults to false)
      *
     def apply (y: VectorD, hh: Int, fname_ : Array [String] = null,
-               tRng: Range = null, hparam: HyperParameter = hp,
+               tRng: Range = null, hparam: HyperParameter = AR.hp,
                bakcast: Boolean = false): SARY =
         val p     = hparam("p").toInt                                   // use the last p values
-        val sp    = hparam("sp").toInt                                  // the seasonal period (time units until repetitive behavior) 
-        val ps    = hparam("ps").toInt                                  // use the last ps seasonal values
-        val spec  = hparam("spec").toInt                                // 0 - implicit constant, 1 - linear, 2 - quadratic, 3 - sin, 4 = cos
-        val lwave = hparam("lwave").toDouble                            // wavelength (distance between peaks)
-        val xt    = makeMatrix4T (y, spec, lwave, bakcast)              // trend terms
+        val sp    = hparam("s").toInt                                   // the seasonal period (time units until repetitive behavior) 
+        val ps    = hparam("P").toInt                                   // use the last ps seasonal values
+        val spec  = hparam("spec").toInt                                // 0 - implicit constant, 1 - linear, 2 - quadratic, 3 - cubic
+        val xt    = makeMatrix4T (y, spec, bakcast)                     // trend terms
         val xs    = makeMatrix4S (y, p, sp, ps, bakcast)                // seasonal lags terms
         val xl    = makeMatrix4L (y, p, bakcast)                        // regular lag terms
         val start = if xs.dim2 == ps then 1 else 2                      // first seasonal lag to use (not subsumed)
@@ -223,15 +220,14 @@ object SARY:
      *  @param bakcast  whether a backcasted value is prepended to the time series (defaults to false)
      */
     def apply (y: VectorD, hh: Int, fname_ : Array [String] = null,
-               tRng: Range = null, hparam: HyperParameter = hp,
+               tRng: Range = null, hparam: HyperParameter = AR.hp,
                bakcast: Boolean = false): SARY =
         val p     = hparam("p").toInt                                   // use the last p values
-        val sp    = hparam("sp").toInt                                  // the seasonal period (time units until repetitive behavior)
-        val ps    = hparam("ps").toInt                                  // use the last ps seasonal values
-        val spec  = hparam("spec").toInt                                // 0 - implicit constant, 1 - linear, 2 - quadratic, 3 - sin, 4 = cos
-        val lwave = hparam("lwave").toDouble                            // wavelength (distance between peaks)
+        val sp    = hparam("s").toInt                                   // the seasonal period (time units until repetitive behavior)
+        val ps    = hparam("P").toInt                                   // use the last ps seasonal values
+        val spec  = hparam("spec").toInt                                // 0 - implicit constant, 1 - linear, 2 - quadratic, 3 - cubic
 
-        val xt = makeMatrix4T (y, spec, lwave, bakcast)              // trend terms
+        val xt = makeMatrix4T (y, spec, bakcast)                        // trend terms
         val (xs, seasonalLags) = makeMatrix4S_NoDupes (y, p, sp, ps, bakcast)
         val xl = makeMatrix4L_NoDupes (y, p, seasonalLags, bakcast)
 
@@ -291,8 +287,8 @@ object SARY:
 
 end SARY
 
-import Example_Covid.loadData_y
 import Example_LakeLevels.y
+import AR.hp
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `RYTest` main function tests the `SARY` class on real data:
@@ -307,11 +303,7 @@ import Example_LakeLevels.y
 
     val mod = SARY (y, hh)                                              // create model for time series data
     banner (s"In-ST Forecasts: ${mod.modelName} on LakeLevels Dataset")
-    mod.trainNtest_x ()()                                               // train and test on full dataset
-
-    mod.forecastAll ()                                                  // forecast h-steps ahead (h = 1 to hh) for all y
-    mod.diagnoseAll (y, mod.getYf)
-    println (s"Final In-ST Forecast Matrix yf = ${mod.getYf}")
+    mod.inSample_Test ()                                                // In-sample Testing
 
 end sARYTest
 
@@ -329,13 +321,11 @@ end sARYTest
 
     val mod = SARY (y, hh)                                              // create model for time series data
     banner (s"TnT Forecasts: ${mod.modelName} on LakeLevels Dataset")
-    mod.trainNtest_x ()()                                               // train and test on full dataset
-
-    mod.rollValidate ()                                                 // TnT with Rolling Validation
-    println (s"Final TnT Forecast Matrix yf = ${mod.getYf}")
+    mod.tnT_Test ()                                                     // Train and Test with Rolling Validation
 
 end sARYTest2
 
+import Example_Covid.{clip, loadData_y}
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `sARYTest3` main function tests the `SARY` class on real data:
@@ -345,27 +335,17 @@ end sARYTest2
  */
 @main def sARYTest3 (): Unit =
 
-    val yy = loadData_y ()
-//  val y  = yy                                                         // full
-    val y  = yy(0 until 116)                                            // clip the flat end
-    val hh = 6                                                          // maximum forecasting horizon
-    hp("lwave") = 20                                                    // wavelength (distance between peaks) 
-    hp("ps")    = 2                                                     // seasonal AR-lags (P)
-    hp("sp")    = 3                                                     // seasonal period
+    val (_, y) = clip ((null, loadData_y ()))
+    val hh     = 6                                                      // maximum forecasting horizon
+    hp("P")    = 2                                                      // seasonal AR-lags (P)
+    hp("s")    = 3                                                      // seasonal period
 
-    for p <- 3 to 6; s <- 1 to 1 do                                     // number of lags; trend
-        hp("p")    = p                                                  // endo lags
-        hp("spec") = s                                                  // trend specification: 0, 1, 2, 3, 4
+    for p <- 3 to 6; s <- 1 to 1 do
+        hp.set (("p", p), ("spec", s))                                  // # endo lags, trend specification: 0, 1, 2, 3
         val mod = SARY (y, hh)                                          // create model for time series data
         banner (s"In-ST Forecasts: ${mod.modelName} on COVID-19 Dataset")
-        mod.trainNtest_x ()()                                           // train and test on full dataset
+        mod.inSample_Test ()                                            // In-sample Testing
         println (mod.summary ())                                        // statistical summary of fit
-
-//      mod.setSkip (p)                                                 // full AR-formula available when t >= p
-        mod.forecastAll ()                                              // forecast h-steps ahead (h = 1 to hh) for all y
-        mod.diagnoseAll (y, mod.getYf)
-//      println (s"Final In-ST Forecast Matrix yf = ${mod.getYf}")
-//      println (s"Final In-ST Forecast Matrix yf = ${mod.getYf.shiftDiag}")
     end for
 
 end sARYTest3
@@ -379,24 +359,14 @@ end sARYTest3
  */
 @main def sARYTest4 (): Unit =
 
-    val yy = loadData_y ()
-//  val y  = yy                                                         // full
-    val y  = yy(0 until 116)                                            // clip the flat end
-    val hh = 6                                                          // maximum forecasting horizon
-    hp("lwave") =     20                                                // wavelength (distance between peaks) 
+    val (_, y) = clip ((null, loadData_y ()))
+    val hh     = 6                                                      // maximum forecasting horizon
 
-    for p <- 1 to 10; s <- 1 to 4 do                                    // number of lags; trend
-        hp("p")     = p                                                 // endo lags
-        hp("spec")  = s                                                 // trend specification: 0, 1, 2, 3, 4
+    for p <- 1 to 10; s <- 0 to 3 do
+        hp.set (("p", p), ("spec", s))                                  // # endo lags, trend specification: 0, 1, 2, 3
         val mod = SARY (y, hh)                                          // create model for time series data
         banner (s"TnT Forecasts: ${mod.modelName} on COVID-19 Dataset")
-        mod.trainNtest_x ()()                                           // use customized trainNtest_x
-
-        mod.setSkip (0)
-        mod.rollValidate ()                                             // TnT with Rolling Validation
-        println (s"After Roll TnT Forecast Matrix yf = ${mod.getYf}")
-        mod.diagnoseAll (y, mod.getYf, Forecaster.teRng (y.dim))        // only diagnose on the testing set
-//      println (s"Final TnT Forecast Matrix yf = ${mod.getYf}")
+        mod.tnT_Test ()                                                 // Train and Test with Rolling Validation
     end for
 
 end sARYTest4
@@ -411,17 +381,14 @@ end sARYTest4
  */
 @main def sARYTest5 (): Unit =
 
-    val yy = loadData_y ()
-//  val y  = yy                                                         // full
-    val y  = yy(0 until 116)                                            // clip the flat end
-    val hh = 6                                                          // maximum forecasting horizon
-    hp("p")     = 10                                                    // endo lags
-    hp("spec")  = 4                                                     // trend specification: 0, 1, 2, 3, 4
-    hp("lwave") = 20                                                    // wavelength (distance between peaks)
+    val (_, y) = clip ((null, loadData_y ()))
+    val hh     = 6                                                      // maximum forecasting horizon
+    hp("p")    = 10                                                     // endo lags
+    hp("spec") = 3                                                      // trend specification: 0, 1, 2, 3
 
     val mod = SARY (y, hh)                                              // create model for time series data
     banner (s"In-ST Forecasts: ${mod.modelName} on COVID-19 Dataset")
-    mod.trainNtest_x ()()                                               // train and test on full dataset
+    mod.inSample_Test ()                                                // In-sample Testing
     println (mod.summary ())                                            // statistical summary of fit
 
     mod.forecastAll ()                                                  // forecast h-steps ahead (h = 1 to hh) for all y
@@ -433,16 +400,7 @@ end sARYTest4
     for tech <- values do                                               // try all feature selection techniques
         banner (s"Feature Selection Technique: $tech")
         val (cols, rSq) = mod.selectFeatures (tech, "none")             // R^2, R^2 bar, sMAPE, sMAPEC 
-        val k = cols.size
-        println (s"k = $k")
-
-        val modBest = mod.getBest.mod                                   // regress on this x
-        println (stringOf (mod.getFname))
-        println (stringOf (modBest.getFname))
-
-        new PlotM (null, rSq, Regression.metrics, s"R^2 vs n for ${mod.modelName}", lines = true)
-        banner (s"Feature Selection Key Metrics using $tech")
-        for r_ <- rSq do println (s"$tech: rSq = $r_")
+        mod.reportSelection (cols, rSq, tnt = false)
     end for
 
 end sARYTest5
@@ -456,21 +414,16 @@ end sARYTest5
  * 
 @main def sARYTest6 (): Unit =
 
-    val yy = loadData_y ()
-//  val y  = yy                                                         // full
-    val y  = yy(0 until 116)                                            // clip the flat end
-    val hh = 6                                                          // maximum forecasting horizon
-    hp("lwave") = 20                                                    // wavelength (distance between peaks)
+    val (_, y)  = clip ((null, loadData_y ()))
+    val hh      = 6                                                     // maximum forecasting horizon
 
-    for p <- 1 to 5; s <- 1 to 1 do                                     // number of lags; trend
-        hp("p")    = p                                                  // endo lags
-        hp("spec") = s                                                  // trend specification: 0, 1, 2, 3, 4
+    for p <- 1 to 5; s <- 1 to 1 do
+        hp.set (("p", p), ("spec", s))                                  // # endo lags, trend specification: 0, 1, 2, 3
         val mod = SARY.quadratic (y, hh)                                // create model for time series data
         banner (s"In-ST Forecasts: ${mod.modelName} on COVID-19 Dataset")
-        mod.trainNtest_x ()()                                           // train and test on full dataset
+        mod.inSample_Test ()                                            // In-sample Testing
         println (mod.summary ())                                        // statistical summary of fit
 
-//      mod.setSkip (p)                                                 // full AR-formula available when t >= p
         mod.forecastAll ()                                              // forecast h-steps ahead (h = 1 to hh) for all y
         mod.diagnoseAll (y, mod.getYf)
 //      println (s"Final In-ST Forecast Matrix yf = ${mod.getYf}")

@@ -5,7 +5,9 @@
  *  @date    Fri Oct  16 15:05:06 EDT 2009
  *  @see     LICENSE (MIT style license file).
  *
- *  @note    Petri Nets Consisting of Places, Transitions, Tokens and Flows
+ *  @note    Petri Nets Consisting of Places, Transitions, Arcs, Tokens, and Flows
+ *           Provides a Simulation Engine for Hybrid Colored Petri Nets.
+ *           Bipartite Graph with Two Types of Nodes: Places () and Transitions |
  */
 
 package scalation
@@ -31,7 +33,7 @@ import scalation.scala2d.Colors._
  *  @param y       the place's y-coordinate
  *  @param tokens  the number of tokens per color
  */
-class PlaceI (val x: Double, val y: Double, var tokens: VectorI)
+class PlaceI (val x: Double, val y: Double, var tokens: VectorI = null)
       extends Identifiable:
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -63,7 +65,7 @@ end PlaceI
  *  @param y       the place's y-coordinate
  *  @param fluids  the amount of fluid per color
  */
-class PlaceD (val x: Double, val y: Double, var fluids: VectorD)
+class PlaceD (val x: Double, val y: Double, var fluids: VectorD = null)
       extends Identifiable:
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -96,7 +98,7 @@ end PlaceD
  *  @param firingDist  the random variate for the firing distribution
  *  @param colors      the colors of the tokens (needed for firing rules)
  */
-class Transition (val x: Double, val y: Double, firingDist: Variate, colors: Array [Color])
+class Transition (val x: Double, val y: Double, firingDist: Variate = null, colors: Array [Color] = null)
       extends Temporal with Ordered [Transition] with PetriNetRules with Identifiable:
 
     /** The containing Petri net
@@ -180,7 +182,8 @@ class Transition (val x: Double, val y: Double, firingDist: Variate, colors: Arr
      *  @param _outI  the outgoing arcs to discrete/`Int` places
      *  @param _outD  the outgoing arcs to continuous/`Double` places
      */
-    def connect (_pnet: PetriNet, _inI: Array [ArcI], _inD: Array [ArcD], _outI: Array [ArcI], _outD: Array [ArcD]): Unit =
+    def connect (_pnet: PetriNet, _inI: Array [ArcI], _inD: Array [ArcD],
+                 _outI: Array [ArcI], _outD: Array [ArcD]): Unit =
         pnet   = _pnet
         cqueue = pnet.getCommandQueue
         inI    = _inI
@@ -356,7 +359,7 @@ end Transition
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `ArcI` class represents an arc connecting discrete place with a
- *  transition. If incoming is true the arc is from the place to transition,
+ *  transition.  If incoming is true the arc is from the place to transition,
  *  otherwise it is from the transition to the place (outgoing).
  *  @param place        the discrete place at one end of the arc
  *  @param transition   the transition at the other end of the arc
@@ -432,15 +435,15 @@ end ArcD
 
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `PetriNet` class provides a simulation engine for Hybrid Colored Petri Nets.
+/** The `PetriNet` case class provides a simulation engine for Hybrid Colored Petri Nets.
  *  Reference: "Discrete-event simulation of fluid stochastic Petri Nets"
  *  @param colors      array of colors for tokens/fluids
  *  @param placeI      array of discrete places
  *  @param placeD      array of continuous places
  *  @param transition  array of timed transitions
  */
-class PetriNet (colors: Array [Color], placeI: Array [PlaceI], placeD: Array [PlaceD],
-                transition: Array [Transition])
+case class PetriNet (colors: Array [Color], placeI: Array [PlaceI], placeD: Array [PlaceD],
+                     transition: Array [Transition])
       extends PetriNetRules:
 
     private val debug = debugf ("PetriNet", true)               // debug function
@@ -471,7 +474,7 @@ class PetriNet (colors: Array [Color], placeI: Array [PlaceI], placeD: Array [Pl
 
     /** The Petri net directed graph animator
      */
-    private val pna = new DgAnimator ("PetriNetAnimator", white, black)
+    private val pna = new DgAnimator ("PetriNetAnimator", white, black, width = 1200, height = 800)
 
     /** The animation command queue
      */
@@ -528,11 +531,11 @@ class PetriNet (colors: Array [Color], placeI: Array [PlaceI], placeD: Array [Pl
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Initialize the animation by drawing the Petri net components onto the
      *  animation drawing panel using animation commands.
-     *  @param timeDilationFactor  time dilation is used to speed up/slow down animation
      *  @param gColors             the colors for nodes and edges in the graph
      *                             i.e., discrete-places, continuous-places, transitions and arcs
+     *  @param timeDilationFactor  time dilation is used to speed up/slow down animation
      */
-    def initAnimation (gColors: Array [Color] = Array (yellow, gold, silver, lightyellow),
+    def initAnimation (gColors: Array [Color] = Array (yellow, gold, silver, blue),
                        timeDilationFactor: Double = 1000.0): Unit =
         println ("PetriNet.initAnimation: begin drawing the Petri net graph")
 
@@ -542,7 +545,8 @@ class PetriNet (colors: Array [Color], placeI: Array [PlaceI], placeD: Array [Pl
                                     Array [Double] (timeDilationFactor), 0.0))
 
         for pI <- placeI do
-            cqueue.add (AnimateCommand (CreateNode, pI.id, Ellipse (), "pI" + pI.id, false, gColors(0),
+            val n_name = if pI.name != "" then s"pI${pI.name}" else s"pI${pI.id}"
+            cqueue.add (AnimateCommand (CreateNode, pI.id, Ellipse (), n_name, false, gColors(0),
                                         Array [Double] (pI.x, pI.y, 30, 30), 0))
 
             val tokens = pI.tokens
@@ -559,7 +563,8 @@ class PetriNet (colors: Array [Color], placeI: Array [PlaceI], placeD: Array [Pl
         //:: Draw the continuous places along with their initial fluid levels.
 
         for pD <- placeD do
-            cqueue.add (AnimateCommand (CreateNode, pD.id, Ellipse (), "pD" + pD.id, false, gColors(1),
+            val n_name = if pD.name != "" then s"pD${pD.name}" else s"pD${pD.id}"
+            cqueue.add (AnimateCommand (CreateNode, pD.id, Ellipse (), n_name, false, gColors(1),
                                         Array [Double] (pD.x, pD.y, 30, 40), 0))
 
             val fluids = pD.fluids
@@ -577,7 +582,8 @@ class PetriNet (colors: Array [Color], placeI: Array [PlaceI], placeD: Array [Pl
         //:: Draw the transitions along with their incoming and outgoing arcs.
 
         for tr <- transition do
-            cqueue.add (AnimateCommand (CreateNode, tr.id, Rectangle (), "tr" + tr.id, true, gColors(2),
+            val n_name = if tr.name != "" then s"tr${tr.name}" else s"tr${tr.id}"
+            cqueue.add (AnimateCommand (CreateNode, tr.id, Rectangle (), n_name, true, gColors(2),
                                         Array [Double] (tr.x, tr.y, 30, 60), 0))
             for aI <- tr.inI do
                 cqueue.add (AnimateCommand (CreateEdge, aI.id, QCurve (), "aI" + aI.id, true, gColors(3),

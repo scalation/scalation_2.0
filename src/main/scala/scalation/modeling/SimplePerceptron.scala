@@ -7,8 +7,7 @@
  *
  *  @note    Simple Neural Networks Using Gradient Descent Optimization
  *           Tests both Gradient Descent (GD) and Incremental Gradient Descent (IGD)
- *           Simplified versions of `Regression`, `Perceptron`, `NeuralNet_2L`, and `NeuralNet_3L`
- *           for illustration/learning, not production
+ *           Simplified versions of `Perceptron` for illustration/learning, not production
  *
  *  @note    the symbol ƒ indicates the derivative of function f, i.e., ƒ = f'
  */
@@ -21,7 +20,7 @@ import scalation.mathstat.VectorDOps._
 import ActivationFun._
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/** The `SimpleNN` object contains a simple dataset for testing Gradient Descent (GD)
+/** The `SimplePerceptron` object contains a simple dataset for testing Gradient Descent (GD)
  *  and Incremental Gradient Descent (IGD) optimization algorithms.
  *  @see https://nowak.ece.wisc.edu/MFML.pdf
  */
@@ -61,7 +60,7 @@ import SimplePerceptron._
  */
 @main def simplePerceptron1 (): Unit =
 
-    val sst = (y - y.mean).normSq                               // sum of squares total
+    val sst = y.center.normSq                                   // sum of squares total
 
     val b = VectorD (0.1, 0.2, 0.1)                             // initial weights/parameters (random in practice)
 
@@ -116,17 +115,17 @@ end simplePerceptron1
  */
 @main def simplePerceptron2 (): Unit =
 
-    val sst = (y - y.mean).normSq                               // sum of squares total
+    val sst = y.center.normSq                                   // sum of squares total
 
-//  val b = VectorD (0.1, 0.2, 0.1)                             // initial weights/parameters (random in practice)
-    val b = VectorD (0.2, 1.6, -1.6)                             // initial weights/parameters (random in practice)
+    val b = VectorD (0.1, 0.2, 0.1)                             // initial weights/parameters (random in practice)
+//  val b = VectorD (0.2, 1.6, -1.6)                            // initial weights/parameters (random in practice)
 
     val η = 2.5                                                 // learning rate (to be tuned)
     var u, ŷ, ε, ƒ, δ: Double = NO_DOUBLE
     var g: VectorD = null
     val yp = new VectorD (y.dim)                                // save each prediction in yp
 
-    for epoch <- 1 to 1 do
+    for epoch <- 1 to 10 do
         println (s"Improvement step $epoch")
         var sse = 0.0
         for i <- x.indices do

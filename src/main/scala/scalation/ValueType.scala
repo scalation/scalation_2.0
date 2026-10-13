@@ -29,7 +29,7 @@ import scala.collection.mutable.{ArrayBuffer => VEC}                      // for
 import scala.math.{abs, max, min, pow, Pi, sqrt}
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-/*  Top-level definitions of values/constants and functions related to basic datatypes.
+/*  Top-level definitions of values/constants and functions related to basic data-types.
  *  @see CommonFunctions.scala for Top-level definitions of common scalar functions.
  *  @see Util.scala for top-level definitions utility functions.
  */
@@ -86,6 +86,10 @@ val _2byPi = 2.0 / Pi
  */
 val Piby2 = Pi / 2.0
 
+/** The number srqt π (needed in common calculations)
+ */
+val sqrt_Pi = sqrt (Pi)
+
 /** The number srqt 2π (needed in common calculations)
  */
 val sqrt_2Pi = sqrt (2.0 * Pi)
@@ -93,6 +97,11 @@ val sqrt_2Pi = sqrt (2.0 * Pi)
 /** The number srqt 2/π (needed in common calculations)
  */
 val sqrt_2byPi = sqrt (2.0 / Pi)
+
+/** The Golden Ratio ϕ is the solution to this quadratic equation: ϕ^2 = ϕ + 1 
+ *  ϕ = (1+√5)/2
+ */
+val GOLDEN_R = 1.618033988749895
 
 /** Indicators of missing/illegal values per datatype
  */
@@ -342,7 +351,7 @@ object ValueTypeOrd extends Ordering [ValueType]:
     end compare
 end ValueTypeOrd
 
-val regexL = raw"[\-\+]?\d+".r                            // regular expression for intergers (`Int` or `Long`)
+val regexL = raw"[\-\+]?\d+".r                            // regular expression for integers (`Int` or `Long`)
 val regexD = raw"[\-\+]?\d*\.\d+".r                       // regular expression for double precision floating point (`Double`)
 //val regexT = raw"regex for TimeNum is possible".r       // FIX
 
@@ -407,49 +416,109 @@ extension (x: ValueType)
     /** The < extension method determines whether x < y.
      */
     def < (y: ValueType): Boolean =
-        x match
+        (x, y) match
+        // Handle identical primitives safely
+        case (xi: Int, yi: Int)       => xi < yi
+        case (xl: Long, yl: Long)     => xl < yl
+        case (xd: Double, yd: Double) => xd < yd
+        
+        // Handle mixed numeric types by safely converting to Double (.toDouble) before comparing
+        case (_: (Int | Long | Double), _: (Int | Long | Double)) => x.toDouble < y.toDouble
+
+        // Handle Strings and TimeNum
+        case (xs: String, ys: String)   => StringOps (xs) < ys
+        case (xt: TimeNum, yt: TimeNum) => xt < yt
+        case _ => throw new IllegalArgumentException (s"Cannot compare incompatible types: ${x.getClass} and ${y.getClass}")
+    end <
+/*
+        x match                                                                 // old code was unsafe
         case _: Double  => x.asInstanceOf [Double]  < y.asInstanceOf [Double]
         case _: Int     => x.asInstanceOf [Int]     < y.asInstanceOf [Int]
         case _: Long    => x.asInstanceOf [Long]    < y.asInstanceOf [Long]
         case _: String  => StringOps (x.asInstanceOf [String]) < y.asInstanceOf [String]
         case _: TimeNum => x.asInstanceOf [TimeNum] < y.asInstanceOf [TimeNum]
-    end <
+*/
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** The <= extension method determines whether x <= y.
      */
     def <= (y: ValueType): Boolean =
-        x match
-        case _: Double  => x.asInstanceOf [Double]  <= y.asInstanceOf [Double]
-        case _: Int     => x.asInstanceOf [Int]     <= y.asInstanceOf [Int]
-        case _: Long    => x.asInstanceOf [Long]    <= y.asInstanceOf [Long]
-        case _: String  => StringOps (x.asInstanceOf [String]) <= y.asInstanceOf [String]
-        case _: TimeNum => x.asInstanceOf [TimeNum] <= y.asInstanceOf [TimeNum]
+        (x, y) match
+        // Handle identical primitives safely
+        case (xi: Int, yi: Int)       => xi <= yi
+        case (xl: Long, yl: Long)     => xl <= yl
+        case (xd: Double, yd: Double) => xd <= yd
+    
+        // Handle mixed numeric types by safely converting to Double (.toDouble) before comparing
+        case (_: (Int | Long | Double), _: (Int | Long | Double)) => x.toDouble <= y.toDouble
+
+        // Handle Strings and TimeNum
+        case (xs: String, ys: String)   => StringOps (xs) <= ys
+        case (xt: TimeNum, yt: TimeNum) => xt <= yt
+        case _ => throw new IllegalArgumentException (s"Cannot compare incompatible types: ${x.getClass} and ${y.getClass}")
     end <=
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** The > extension method determines whether x > y.
      */
     def > (y: ValueType): Boolean =
-        x match
-        case _: Double  => x.asInstanceOf [Double]  > y.asInstanceOf [Double]
-        case _: Int     => x.asInstanceOf [Int]     > y.asInstanceOf [Int]
-        case _: Long    => x.asInstanceOf [Long]    > y.asInstanceOf [Long]
-        case _: String  => StringOps (x.asInstanceOf [String]) > y.asInstanceOf [String]
-        case _: TimeNum => x.asInstanceOf [TimeNum] > y.asInstanceOf [TimeNum]
+        (x, y) match
+        // Handle identical primitives safely
+        case (xi: Int, yi: Int)       => xi > yi
+        case (xl: Long, yl: Long)     => xl > yl
+        case (xd: Double, yd: Double) => xd > yd
+    
+        // Handle mixed numeric types by safely converting to Double (.toDouble) before comparing
+        case (_: (Int | Long | Double), _: (Int | Long | Double)) => x.toDouble > y.toDouble
+
+        // Handle Strings and TimeNum
+        case (xs: String, ys: String)   => StringOps (xs) > ys
+        case (xt: TimeNum, yt: TimeNum) => xt > yt
+        case _ => throw new IllegalArgumentException (s"Cannot compare incompatible types: ${x.getClass} and ${y.getClass}")
     end >
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** The >= extension method determines whether x >= y.
      */
     def >= (y: ValueType): Boolean =
-        x match
-        case _: Double  => x.asInstanceOf [Double]  >= y.asInstanceOf [Double]
-        case _: Int     => x.asInstanceOf [Int]     >= y.asInstanceOf [Int]
-        case _: Long    => x.asInstanceOf [Long]    >= y.asInstanceOf [Long]
-        case _: String  => StringOps (x.asInstanceOf [String]) >= y.asInstanceOf [String]
-        case _: TimeNum => x.asInstanceOf [TimeNum] >= y.asInstanceOf [TimeNum]
+        (x, y) match
+        // Handle identical primitives safely
+        case (xi: Int, yi: Int)       => xi >= yi
+        case (xl: Long, yl: Long)     => xl >= yl
+        case (xd: Double, yd: Double) => xd >= yd
+    
+        // Handle mixed numeric types by safely converting to Double (.toDouble) before comparing
+        case (_: (Int | Long | Double), _: (Int | Long | Double)) => x.toDouble >= y.toDouble
+
+        // Handle Strings and TimeNum
+        case (xs: String, ys: String)   => StringOps (xs) >= ys
+        case (xt: TimeNum, yt: TimeNum) => xt >= yt
+        case _ => throw new IllegalArgumentException (s"Cannot compare incompatible types: ${x.getClass} and ${y.getClass}")
     end >=
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** The + extension method adds x and y, promoting types automatically (e.g., Int + Double -> Double).
+     */
+    def + (y: ValueType): ValueType =
+        (x, y) match
+        // Case 1: Both are Int -> Returns Int, similarly for Long and Double
+        case (xi: Int, yi: Int)       => xi + yi
+        case (xl: Long, yl: Long)     => xl + yl
+        case (xd: Double, yd: Double) => xd + yd
+
+        // Case 2: Mixed Int, Long, and Double -> Automatically promotes to up
+        case (xi: Int, yd: Double)  => xi.toDouble + yd
+        case (xd: Double, yi: Int)  => xd + yi.toDouble
+        case (xl: Long, yd: Double) => xl.toDouble + yd
+        case (xd: Double, yl: Long) => xd + yl.toDouble
+        case (xi: Int, yl: Long)    => xi.toLong + yl 
+        case (xl: Long, yi: Int)    => xl + yi.toLong
+
+        // Case 3: Fallback or String Concatenation
+        case (xs: String, ys: String)   => xs + ys
+        case (xt: TimeNum, yt: TimeNum) => xt + yt
+        case _ => throw new IllegalArgumentException (s"Cannot add incompatible types: ${x.getClass} and ${y.getClass}")
+    end +
 
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -478,7 +547,9 @@ extension (p: Property)
     println (s"store = $store")
     println (s"store(0) == 1: ${store(0) == 1}")
     println (s"store(0) < 1: ${store(0) < 1}")
-    //println (s"store(0) > 1: ${store(0) > 1}")
+    println (s"store(0) > 1: ${store(0) > 1}")
+
+    println (s"sum = ${store(0) + store(1) + store(2)}")
 
 end valueTypeTest
 

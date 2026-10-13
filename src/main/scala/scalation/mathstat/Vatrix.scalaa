@@ -1,0 +1,262 @@
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** @author  John Miller
+ *  @version 2.0
+ *  @date    Thu Aug 27 22:56:13 EDT 2026
+ *  @see     LICENSE (MIT style license file).
+ *
+ *  @note    The Base Type to Support Methods that Take Either `VectorD` or `MatrixD` Arugments
+ *           AI Assisted Code
+ *           FIX: needs to be sealed for efficiency, but then all extending classes would
+ *                need to be inside this file
+ */
+
+package scalation
+package mathstat
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `Vatrix_` type alias provides high-performance algebraic transformations. 
+ *  The compiler completely erases this name at runtime, ensuring direct
+ *  monomorphic execution loops on primitive arrays.
+ */
+type Vatrix_ = VectorD | MatrixD
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The `Vatrix` sealed trait unifies matching signatures between `VectorD` and `MatrixD`.
+ *  - Methods returning scalars or primitives incur NO dynamic dispatch overhead.
+ *  - Methods transforming collections leverage `Vatrix_` for type context preservation.
+ */
+sealed trait Vatrix:
+
+    // ---------------------------------------------------------------------
+    // Structural Metadata & Grid Attributes
+    // ---------------------------------------------------------------------
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Map to vector dimensions or matrix row-count (dim).
+     */
+    def length: Int
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Map to total raw element layout size.
+     */
+    def size: Int
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Hardcoded type-flag for zero-overhead early branch-routing.
+     */
+    def isMatrix: Boolean
+
+    // ---------------------------------------------------------------------
+    // Element-Wise Unary Transformations that return Vatrix_ (returning Vatrix induces overhead)
+    // ---------------------------------------------------------------------
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Absolute value of all internal elements.
+     */
+    def abs: Vatrix_
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Square all individual data cells.
+     */
+    def sq: Vatrix_
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Calculate element-wise square roots.
+     */
+    def sqrt: Vatrix_
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute reciprocal: 1.0 / x for all data cells.
+     */
+    def recip: Vatrix_
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Log transform this vatrix by using math.log (avoiding the log (0) problem).
+     */
+    def log: Vatrix_
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Log transform this vatrix by using math.log1p (avoiding the log (0) problem).
+     */
+    def log1p: Vatrix_
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Exp transform this vatrix by using math.exp (the inverse of log).
+     */
+    def exp: Vatrix_
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Exp transform this vatrix by using math.expm1 (the inverse of log1p).
+     */
+    def expm1: Vatrix_
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Cos transform this vatrix by using math.cos (the inverse of acos).
+     */
+    def cos: Vatrix_
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Inverse cos transform this vatrix by using math.acos (the inverse of cos).
+     */
+    def acos: Vatrix_
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Sin transform this vatrix by using math.sin (the inverse of asin).
+     */
+    def sin: Vatrix_
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Inverse sin transform this vatrix by using math.asin (the inverse of sin).
+     */
+    def asin: Vatrix_
+
+    // ---------------------------------------------------------------------
+    // Inline Scalar Operators (Returns Vatrix_)
+    // ---------------------------------------------------------------------
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the element-wise sum of this and scalar a.
+     *  @param a  the scalar second operand
+     */
+    def + (a: Double): Vatrix_
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the element-wise difference of this and scalar a.
+     *  @param a  the scalar second operand
+     */
+    def - (a: Double): Vatrix_
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the element-wise product of this and scalar a.
+     *  @param a  the scalar second operand
+     */
+    def * (a: Double): Vatrix_
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the element-wise quotient of this and scalar a.
+     *  @param a  the scalar second operand
+     */
+    def / (a: Double): Vatrix_
+
+    // ---------------------------------------------------------------------
+    // Multi-Element Slice Bounds (Returns Vatrix_)
+    // ---------------------------------------------------------------------
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Extract first n continuous array items or rows.
+     *  @param n  the number to return
+     */
+    def head (n: Int): Vatrix_
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Extract final n continuous array items or rows.
+     *  @param n  the number to return
+     */
+    def tail (n: Int): Vatrix_
+
+    // ---------------------------------------------------------------------
+    // Descriptive Statistical Reductions that Return Primitives
+    // ---------------------------------------------------------------------
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Aggregated sum of all values.
+     */
+    def sum: Double
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Centroid average of values.
+     */
+    def mean: Double
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Smallest element value.
+     */
+    def min: Double
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Largest element value.
+     */
+    def max: Double
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Sample (and population _) variance across flat element array.
+     */
+    def variance: Double
+    def variance_ : Double
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the mean square (ms) (or root mean square (rms)) of this vatrix.
+     */
+    def ms: Double
+    def rms: Double
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Sample (and population _) Standard deviation across elements.
+     */
+    def stDev: Double
+    def stDev_ : Double
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Euclidean Norm (Vector) / Frobenius Norm (Matrix) anf the its square.
+     */
+    def norm: Double
+    def normSq: Double
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Compute the Manhattan norm (1-norm) of this vatrix.
+     */
+    def norm1: Double 
+
+    // ---------------------------------------------------------------------
+    // Data Cleaning & Precision Integrity Checkers (Returns Primitives)
+    // ---------------------------------------------------------------------
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Verify presence of broken computation artifacts.
+     */
+    def hasNaN: Boolean
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Catch mathematical limit overflow boundaries.
+     */
+    def hasInfinity: Boolean
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return whether this vatrix is completely blank/zeroed out.
+     */
+    def isZero: Boolean
+
+    //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Count the number of zero elements in the this vatrix.
+     */
+    def countZero: Int
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return whether this vatrix is non-negative (contains no negative values).
+     */
+    def isNonnegative: Boolean
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Suppress precision drift values below tolerance to 0.0.
+     */
+    def clean (tol: Double): Vatrix_
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Set all elements in this vatrix to scalar zero.
+     */
+    def clear (): Unit
+
+    // ---------------------------------------------------------------------
+    // Native Systems Interoperability Export
+    // ---------------------------------------------------------------------
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Expose structural data as a single raw flat primitive array.
+     */
+    def toArray: Array [Double]
+
+end Vatrix
+

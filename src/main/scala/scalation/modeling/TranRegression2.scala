@@ -128,13 +128,11 @@ class TranRegression2 (x: MatrixD, y: VectorD, fname_ : Array [String] = null,
     /** Perform In-Sample Testing, i.e., train and test on the same FULL data set.
      *  Train on transformed y (via getY), test on original y.
      *  Return the prediction and the Quality of Fit.
-     *  @param skip    the number of initial data points to skip (due to insufficient information)
      *  @param showYp  whether to show the prediction vector
      */
-    override def inSample_Test (skip: Int = 0, showYp: Boolean = false): (VectorD, VectorD) =
+    override def inSample_Test (showYp: Boolean = false): (VectorD, VectorD) =
         banner (s"In-Sample Test: $modelName")
-        val (x_, y__, y_) = (x.drop (skip), getY.drop (skip), y.drop (skip))
-        val (yp, qof) = trainNtest (x_, y__)(x_, y_)
+        val (yp, qof) = trainNtest (x, getY)(x, y)
         if showYp then
             println (s"Final In-Sample Prediction Vector yp = $yp")
         (yp, qof)
@@ -412,7 +410,7 @@ end tranRegression2Test
     println (s"b    = $b")
 
     val yyp  = x * b                      // transformed
-    val sst  = (yy - yy.mean).normSq
+    val sst  = yy.center.normSq
     val e    = yy - yyp
     val sse  = e.normSq
     val rSq  = 1.0 - sse / sst
@@ -427,10 +425,10 @@ end tranRegression2Test
 
     banner ("original")
     val yp   = yyp.map (sq)               // orginal
-    val sst2 = (y - y.mean).normSq
+    val sst2 = y.center.normSq
     val e2   = y - yp
     val sse2 = e2.normSq
-    val rSq2  = 1.0 - sse2 / sst2
+    val rSq2 = 1.0 - sse2 / sst2
 
     println (s"y    = $y")
     println (s"yp   = $yp")
@@ -642,7 +640,7 @@ end tranRegression2Test6
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `tranRegression2Test7` main function tests the `TranRegression2` class using
  *  the AutoMPG dataset.  It also combines feature selection with cross-validation
- *  and plots R^2, R^2 bar and R^2 cv vs. the instance index.
+ *  and plots R^2, R^2 bar, sMAPE, and R^2 cv vs. the instance index.
  *  > runMain scalation.modeling.tranRegression2Test7
  */
 @main def tranRegression2Test7 (): Unit =
@@ -670,11 +668,8 @@ end tranRegression2Test6
 
 /*
     banner ("Forward Selection Test")
-    val (cols, rSq) = mod.forwardSelAll ()                         // R^2, R^2 bar, R^2 cv
-    val k = cols.size
-    println (s"k = $k, n = ${ox.dim2}")
-    new PlotM (null, rSq.ᵀ, Regression.metrics, s"R^2 vs n for TranRegression2 ${f._3}", lines = true)
-    println (s"rSq = $rSq")
+    val (cols, rSq) = mod.forwardSelAll ()                         // R^2, R^2 bar, sMAPE, R^2 cv
+    mod.reportSelection (cols, rSq)
 */
 
 end tranRegression2Test7

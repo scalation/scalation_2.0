@@ -64,7 +64,7 @@ import SimpleNN_3L._
     import scalation.mathstat.MatrixDOps._
 
     val (x, y) = (xy(?, 1 until 3), xy(?, 3 until 5))           // input matrix, output/response matrix
-    val sst    = (y - y.mean).normSq                            // sum of squares total
+    val sst    = y.center ().normSq                             // sum of squares total
     println (s"sst = $sst")
 
     val a = MatrixD ((2, 3), 0.1, 0.1, 0.1,                     // parameter/weight matrix: input -> hidden
@@ -149,7 +149,7 @@ end simpleNN_3L1
 
     import scalation.mathstat.MatrixDOps.⊗                      // outer product of two vectors: v1 ⊗ v2 = v1 v1.ᵀ
                                                                 // matrix where m_ij = v1_i * v2_j
-    val sst = (y - y.mean).normSq                               // sum of squares total
+    val sst = y.center ().normSq                                // sum of squares total
     println (s"sst = $sst")
 
     val a = MatrixD ((2, 3),  0.2,  0.3,  0.2,                  // parameter/weight matrix: input -> hidden

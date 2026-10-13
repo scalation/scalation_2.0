@@ -27,9 +27,9 @@ import scalation.dynamics.DormandPrince.integrateV
  *  flow vector is used  for the threshold (require at least this number of tokens/amount
  *  of fluid) and the flow (move this number this number of tokens/amount of fluid
  *  over the arc).  It is also possible to set the flow  below the threshold.
- *  In the the linear flow model, a base flow vector can be augmented by additional
+ *  In the linear flow model, a base flow vector can be augmented by additional
  *  flow that is a function of the residual left after the base is taken and the
- *  time it takes to fire the transition.  The total flow may not exceed the the
+ *  time it takes to fire the transition.  The total flow may not exceed the
  *  number/amount at the place.  Additional flow models are under development.
  */
 trait PetriNetRules:
@@ -38,8 +38,8 @@ trait PetriNetRules:
     /** Return whether the vector inequality is true: t >= b.
      *  The firing threshold should be checked for every incoming arc.
      *  If all return true, the transition should fire.
-     *  @param  t  the token vector (number of tokens per color)
-     *  @param  b  the base constant vector
+     *  @param t  the token vector (number of tokens per color)
+     *  @param b  the base constant vector
      */
     def thresholdI (t: VectorI, b: VectorI): Boolean = t >= b 
 
@@ -47,8 +47,8 @@ trait PetriNetRules:
     /** Return whether the vector inequality is true: f >= b.
      *  The firing threshold should be checked for every incoming arc.
      *  If all return true, the transition should fire.
-     *  @param  f  The fluid vector (amount of fluid per color)
-     *  @param  b  The base constant vector
+     *  @param f  The fluid vector (amount of fluid per color)
+     *  @param b  The base constant vector
      */
     def thresholdD (f: VectorD, b: VectorD): Boolean = f >= b
 
@@ -58,11 +58,11 @@ trait PetriNetRules:
      *  This is adjusted by weight vectors multiplying the number of
      *  aggregate tokens and the aggregate amount of fluids summed over
      *  all input places: delay = v + w_t * t + w_f * f.
-     *  @param  v    the random variate used to compute base firing time
-     *  @param  w_t  the weight for the token vector
-     *  @param  t    the aggregate token vector (summed over all input places)
-     *  @param  w_f  the weight for the fluid vector
-     *  @param  f    the aggregate fluid level vector (summed over all input places)
+     *  @param v    the random variate used to compute base firing time
+     *  @param w_t  the weight for the token vector
+     *  @param t    the aggregate token vector (summed over all input places)
+     *  @param w_f  the weight for the fluid vector
+     *  @param f    the aggregate fluid level vector (summed over all input places)
      */
     def calcFiringDelay (v: Variate, w_t: VectorD, t: VectorI, w_f: VectorD, f: VectorD): Double =
         var delay = v.gen

@@ -60,12 +60,24 @@ object Example_Covid:
                         "excess_mortality",
                         "excess_mortality_cumulative_per_million")
 
-    val response = "new_deaths"                                   // main response/output variable
-    val NO_EXO   = Array.ofDim [String] (0)                       // empty array => no exogenous variables
+    val response  = "new_deaths"                                  // main response/output variable
+    val NO_EXO    = Array.ofDim [String] (0)                      // empty array => no exogenous variables
+    val BEST_EXO  = Array ("icu_patients")                        // exo with best lagged correlation with response
+    val BEST2_EXO = Array ("icu_patients", "positive_rate")       // top two exo variables (best combination of 2)
+//  val exo_vars  = Array ("icu_patients", "positive_rate", "hosp_patients", "new_tests", "people_vaccinated")
 
-    val yy = Example_Covid.loadData_y ()
-//  val y  = yy                                                   // full
-    val y  = yy(0 until 116)                                      // clip the flat end
+    //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Clip the time series endogenous variable to the given range and do the same
+     *  for the exogenous variables, if any.  For Covid, it flattens out at about 116 weeks.
+     *  Usage: val (_, y)  = clip ((null, loadData_y ()))
+     *  Usage: val (xe, y) = clip (loadData (BEST_EXO))
+     *  @param xe_y  the full exogenous time series matrix (other selected variables), pass null if none
+     *                   and the full endogenous time series vector (response variable)
+     *  @param rng   the time range to keep (defaults to 0 until 116)
+     */
+    def clip (xe_y: (MatrixD, VectorD), rng: Range = 0 until 116): (MatrixD, VectorD) =
+        (if xe_y._1 != null then xe_y._1(rng) else null, xe_y._2(rng))
+    end clip
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Load the Covid-19 weekly data into a matrix for the exogenous variables x
@@ -110,10 +122,30 @@ object Example_Covid:
         data(?, y_cols)
     end loadData_yy
 
+    //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Build the named-column dataset map used by the formula layer (`ARX_Formula`,
+     *  `ARX_D.fromTerms`, `llmsr.FormulaScorer`, the search arms): the response under
+     *  the key "y" and each exogenous column under its short name, all clipped
+     *  to the given time range.  Usage:  given dataset: Map [String, VectorD] =
+     *  context (BEST2_EXO, Array ("icu", "pRate")).
+     *  @param x_strs  the column names for the exogenous variables x
+     *  @param names   the short (formula) names for them (defaults to x_strs)
+     *  @param y_str   the column name for the endogenous variable y
+     *  @param rng     the time range to keep (defaults to 0 until 116, @see `clip`)
+     */
+    def context (x_strs: Array [String], names: Array [String] = null,
+                 y_str: String = response, rng: Range = 0 until 116): Map [String, VectorD] =
+        val nms = if names == null then x_strs else names
+        require (nms.length == x_strs.length, "context: one short name per exogenous column")
+        val (xe, y) = clip (loadData (x_strs, y_str), rng)
+        val exo = for j <- x_strs.indices yield nms(j) -> xe(?, j)
+        Map ("y" -> y) ++ exo
+    end context
+
 end Example_Covid
 
 import Example_Covid._
-import MakeMatrix4TS.hp
+import AR.hp
 
 //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `example_CovidTest` main function tests the `Example_Covid` object.
@@ -121,6 +153,8 @@ import MakeMatrix4TS.hp
  *  > runMain scalation.modeling.forecasting.example_CovidTest
  */
 @main def example_CovidTest (): Unit =
+
+    val (_, y) = clip ((null, loadData_y ()))
 
     banner (s"Print the response = $response column for the Covid-19 dataset (${y.dim} points")
     for i <- y.indices do println (s"$i \t ${y(i)}")
@@ -141,9 +175,7 @@ end example_CovidTest
 
     import scala.collection.mutable.{LinkedHashSet => LSET}
 
-    val (xx, yy) = loadData (header, response)
-//  val (x, y)   = (xx, yy)                                             // full
-    val (x, y)   = (xx(0 until 116), yy(0 until 116))                   // clip the flat end
+    val (x, y) = clip (loadData (header, response))                     // header gives all exo vars
 
     new Plot (null, y, null, s"y ($response)", lines = true)
 
@@ -182,6 +214,7 @@ end example_CovidTest2
  */
 @main def example_CovidTest3 (): Unit =
 
+    val (_, y) = clip ((null, loadData_y ()))
     val hh = 6                                                            // max forecasting horizon
 
     new Plot (null, y, null, s"y ($response)", lines = true)
@@ -225,6 +258,7 @@ end example_CovidTest3
  */
 @main def example_CovidTest4 (): Unit =
 
+    val (_, y) = clip ((null, loadData_y ()))
     val hh = 6                                                          // max forecasting horizon
 
     new Plot (null, y, null, s"y ($response)", lines = true)
@@ -262,6 +296,7 @@ end example_CovidTest4
  */
 @main def example_CovidTest5 (): Unit =
 
+    val (_, y) = clip ((null, loadData_y ()))
     val hh = 6                                                          // max forecasting horizon
     val hp = AR.hp                                                      // hyper-parameters for AR family of models
 
@@ -296,6 +331,7 @@ end example_CovidTest5
  */
 @main def example_CovidTest6 (): Unit =
 
+    val (_, y) = clip ((null, loadData_y ()))
     val hh = 6                                                          // max forecasting horizon
     val hp = AR.hp                                                      // hyper-parameters for AR family of models
 
@@ -330,6 +366,7 @@ end example_CovidTest6
  */
 @main def example_CovidTest7 (): Unit =
 
+    val (_, y) = clip ((null, loadData_y ()))
     val hh = 6                                                          // max forecasting horizon
     val hp = AR.hp                                                      // hyper-parameters for AR family of models
     hp("q") = 0                                                         // no MA terms => AR with different optimizer
@@ -365,6 +402,7 @@ end example_CovidTest7
  */
 @main def example_CovidTest8 (): Unit =
 
+    val (_, y) = clip ((null, loadData_y ()))
     val hh = 6                                                          // max forecasting horizon
     val hp = AR.hp                                                      // hyper-parameters for AR family of models
     hp("q") = 0                                                         // no MA terms => AR with different optimizer
@@ -400,8 +438,9 @@ end example_CovidTest8
  */
 @main def example_CovidTest9 (): Unit =
 
+    val (_, y) = clip ((null, loadData_y ()))
     val hh = 6                                                          // max forecasting horizon
-//  hp("lambda") = 1.0                                                  // regularization parameter
+//  hp("lambda") = 1.0                                                  // regularization/shrinkage parameter
 
     new Plot (null, y, null, s"y ($response)", lines = true)
 
@@ -434,8 +473,9 @@ end example_CovidTest9
  */
 @main def example_CovidTest10 (): Unit =
 
+    val (_, y) = clip ((null, loadData_y ()))
     val hh = 6                                                          // max forecasting horizon
-//  hp("lambda") = 1.0                                                  // regularization parameter
+//  hp("lambda") = 1.0                                                  // regularization/shrinkage parameter
 
     new Plot (null, y, null, s"y ($response)", lines = true)
 
@@ -479,8 +519,9 @@ end example_CovidTest10
  */
 @main def example_CovidTest11 (): Unit =
 
+    val (_, y) = clip ((null, loadData_y ()))
     val hh = 6                                                          // max forecasting horizon
-//  hp("lambda") = 1.0                                                  // regularization parameter
+//  hp("lambda") = 1.0                                                  // regularization/shrinkage parameter
 
     new Plot (null, y, null, s"y ($response)", lines = true)
 
@@ -513,8 +554,9 @@ end example_CovidTest11
  */
 @main def example_CovidTest12 (): Unit =
 
+    val (_, y) = clip ((null, loadData_y ()))
     val hh = 6                                                          // max forecasting horizon
-//  hp("lambda") = 1.0                                                  // regularization parameter
+//  hp("lambda") = 1.0                                                  // regularization/shrinkage parameter
 
     new Plot (null, y, null, s"y ($response)", lines = true)
 
@@ -538,6 +580,7 @@ end example_CovidTest12
  */
 @main def example_CovidTest13 (): Unit =
 
+    val (_, y) = clip ((null, loadData_y ()))
     val hh = 6                                                          // max forecasting horizon
     val hp = AR.hp                                                      // hyper-parameters for AR family of models
     hp("q") = 1                                                         // one MA term
@@ -564,6 +607,7 @@ end example_CovidTest13
  */
 @main def example_CovidTest14 (): Unit =
 
+    val (_, y) = clip ((null, loadData_y ()))
     val hh = 6                                                          // max forecasting horizon
     val hp = AR.hp                                                      // hyper-parameters for AR family of models
     hp("q") = 1                                                         // one MA term
@@ -610,20 +654,11 @@ end example_CovidTest14
  */
 @main def example_CovidTest15 (): Unit =
 
-//  val exo_vars  = Array ("icu_patients", "hosp_patients", "new_tests", "people_vaccinated")
-//  val exo_vars  = Array ("icu_patients", "hosp_patients")
-    val exo_vars  = NO_EXO
-    val (xxe, yy) = loadData (exo_vars, response)
-    println (s"xxe.dims = ${xxe.dims}, yy.dim = ${yy.dim}")
+    val (xe, y)  = clip (loadData (BEST_EXO))
+    val hh       = 6                                                    // maximum forecasting horizon
+//  hp("lambda") = 1.0                                                  // regularization/shrinkage parameter
 
-//  val xe = xxe                                                        // full
-    val xe = xxe(0 until 116)                                           // clip the flat end
-//  val y  = yy                                                         // full
-    val y  = yy(0 until 116)                                            // clip the flat end
-    val hh = 6                                                          // maximum forecasting horizon
-//  hp("lambda") = 1.0                                                  // regularization parameter
-
-    banner (s"exo_vars = ${stringOf (exo_vars)}, endo_var = $response")
+    banner (s"exo_vars = ${stringOf (BEST_EXO)}, endo_var = $response")
     println (s"xe.dims = ${xe.dims}, y.dim = ${y.dim}")
     new Plot (null, y, null, s"y ($response)", lines = true)
 
@@ -668,20 +703,11 @@ end example_CovidTest15
  */
 @main def example_CovidTest16 (): Unit =
 
-//  val exo_vars  = Array ("icu_patients", "hosp_patients", "new_tests", "people_vaccinated")
-//  val exo_vars  = Array ("icu_patients", "hosp_patients")
-    val exo_vars  = NO_EXO
-    val (xxe, yy) = loadData (exo_vars, response)
-    println (s"xxe.dims = ${xxe.dims}, yy.dim = ${yy.dim}")
+    val (xe, y)  = clip (loadData (BEST_EXO))
+    val hh       = 6                                                    // maximum forecasting horizon
+//  hp("lambda") = 1.0                                                  // regularization/shrinkage parameter
 
-//  val xe = xxe                                                        // full
-    val xe = xxe(0 until 116)                                           // clip the flat end
-//  val y  = yy                                                         // full
-    val y  = yy(0 until 116)                                            // clip the flat end
-    val hh = 6                                                          // maximum forecasting horizon
-//  hp("lambda") = 1.0                                                  // regularization parameter
-
-    banner (s"exo_vars = ${stringOf (exo_vars)}, endo_var = $response")
+    banner (s"exo_vars = ${stringOf (BEST_EXO)}, endo_var = $response")
     println (s"xe.dims = ${xe.dims}, y.dim = ${y.dim}")
     new Plot (null, y, null, s"y ($response)", lines = true)
 
@@ -714,19 +740,11 @@ end example_CovidTest16
  */
 @main def example_CovidTest17 (): Unit =
 
-//  val exo_vars  = Array ("icu_patients", "hosp_patients", "new_tests", "people_vaccinated")
-    val exo_vars  = Array ("icu_patients", "hosp_patients")
-    val (xxe, yy) = loadData (exo_vars, response)
-    println (s"xxe.dims = ${xxe.dims}, yy.dim = ${yy.dim}")
+    val (xe, y)  = clip (loadData (BEST_EXO))
+    val hh       = 6                                                    // maximum forecasting horizon
+//  hp("lambda") = 1.0                                                  // regularization/shrinkage parameter
 
-//  val xe = xxe                                                        // full
-    val xe = xxe(0 until 116)                                           // clip the flat end
-//  val y  = yy                                                         // full
-    val y  = yy(0 until 116)                                            // clip the flat end
-    val hh = 6                                                          // maximum forecasting horizon
-//  hp("lambda") = 1.0                                                  // regularization parameter
-
-    banner (s"exo_vars = ${stringOf (exo_vars)}, endo_var = $response")
+    banner (s"exo_vars = ${stringOf (BEST_EXO)}, endo_var = $response")
     println (s"xe.dims = ${xe.dims}, y.dim = ${y.dim}")
     new Plot (null, y, null, s"y ($response)", lines = true)
 
@@ -759,19 +777,11 @@ end example_CovidTest17
  */
 @main def example_CovidTest18 (): Unit =
 
-//  val exo_vars  = Array ("icu_patients", "hosp_patients", "new_tests", "people_vaccinated")
-    val exo_vars  = Array ("icu_patients", "hosp_patients")
-    val (xxe, yy) = loadData (exo_vars, response)
-    println (s"xxe.dims = ${xxe.dims}, yy.dim = ${yy.dim}")
+    val (xe, y)  = clip (loadData (BEST_EXO))
+    val hh       = 6                                                    // maximum forecasting horizon
+//  hp("lambda") = 1.0                                                  // regularization/shrinkage parameter
 
-//  val xe = xxe                                                        // full
-    val xe = xxe(0 until 116)                                           // clip the flat end
-//  val y  = yy                                                         // full
-    val y  = yy(0 until 116)                                            // clip the flat end
-    val hh = 6                                                          // maximum forecasting horizon
-//  hp("lambda") = 1.0                                                  // regularization parameter
-
-    banner (s"exo_vars = ${stringOf (exo_vars)}, endo_var = $response")
+    banner (s"exo_vars = ${stringOf (BEST_EXO)}, endo_var = $response")
     println (s"xe.dims = ${xe.dims}, y.dim = ${y.dim}")
     new Plot (null, y, null, s"y ($response)", lines = true)
 
@@ -805,19 +815,11 @@ end example_CovidTest18
  */
 @main def example_CovidTest19 (): Unit =
 
-//  val exo_vars  = Array ("icu_patients", "hosp_patients", "new_tests", "people_vaccinated")
-    val exo_vars  = Array ("icu_patients", "hosp_patients")
-    val (xxe, yy) = loadData (exo_vars, response)
-    println (s"xxe.dims = ${xxe.dims}, yy.dim = ${yy.dim}")
+    val (xe, y)  = clip (loadData (BEST_EXO))
+    val hh       = 6                                                    // maximum forecasting horizon
+//  hp("lambda") = 1.0                                                  // regularization/shrinkage parameter
 
-//  val xe = xxe                                                        // full
-    val xe = xxe(0 until 116)                                           // clip the flat end
-//  val y  = yy                                                         // full
-    val y  = yy(0 until 116)                                            // clip the flat end
-    val hh = 6                                                          // maximum forecasting horizon
-//  hp("lambda") = 1.0                                                  // regularization parameter
-
-    banner (s"exo_vars = ${stringOf (exo_vars)}, endo_var = $response")
+    banner (s"exo_vars = ${stringOf (BEST_EXO)}, endo_var = $response")
     println (s"xe.dims = ${xe.dims}, y.dim = ${y.dim}")
     new Plot (null, y, null, s"y ($response)", lines = true)
 
@@ -851,19 +853,11 @@ end example_CovidTest19
  */
 @main def example_CovidTest20 (): Unit =
 
-//  val exo_vars  = Array ("icu_patients", "hosp_patients", "new_tests", "people_vaccinated")
-    val exo_vars  = Array ("icu_patients", "hosp_patients")
-    val (xxe, yy) = loadData (exo_vars, response)
-    println (s"xxe.dims = ${xxe.dims}, yy.dim = ${yy.dim}")
+    val (xe, y)  = clip (loadData (BEST_EXO))
+    val hh       = 6                                                    // maximum forecasting horizon
+//  hp("lambda") = 1.0                                                  // regularization/shrinkage parameter
 
-//  val xe = xxe                                                        // full
-    val xe = xxe(0 until 116)                                           // clip the flat end
-//  val y  = yy                                                         // full
-    val y  = yy(0 until 116)                                            // clip the flat end
-    val hh = 6                                                          // maximum forecasting horizon
-//  hp("lambda") = 1.0                                                  // regularization parameter
-
-    banner (s"exo_vars = ${stringOf (exo_vars)}, endo_var = $response")
+    banner (s"exo_vars = ${stringOf (BEST_EXO)}, endo_var = $response")
     println (s"xe.dims = ${xe.dims}, y.dim = ${y.dim}")
     new Plot (null, y, null, s"y ($response)", lines = true)
 
@@ -884,19 +878,11 @@ end example_CovidTest20
  */
 @main def example_CovidTest21 (): Unit =
 
-//  val exo_vars  = Array ("icu_patients", "hosp_patients", "new_tests", "people_vaccinated")
-    val exo_vars  = Array ("icu_patients", "hosp_patients")
-    val (xxe, yy) = loadData (exo_vars, response)
-    println (s"xxe.dims = ${xxe.dims}, yy.dim = ${yy.dim}")
+    val (xe, y)  = clip (loadData (BEST_EXO))
+    val hh       = 6                                                    // maximum forecasting horizon
+//  hp("lambda") = 1.0                                                  // regularization/shrinkage parameter
 
-//  val xe = xxe                                                        // full
-    val xe = xxe(0 until 116)                                           // clip the flat end
-//  val y  = yy                                                         // full
-    val y  = yy(0 until 116)                                            // clip the flat end
-    val hh = 6                                                          // maximum forecasting horizon
-//  hp("lambda") = 1.0                                                  // regularization parameter
-
-    banner (s"exo_vars = ${stringOf (exo_vars)}, endo_var = $response")
+    banner (s"exo_vars = ${stringOf (BEST_EXO)}, endo_var = $response")
     println (s"xe.dims = ${xe.dims}, y.dim = ${y.dim}")
     new Plot (null, y, null, s"y ($response)", lines = true)
 
@@ -917,19 +903,11 @@ end example_CovidTest21
  */
 @main def example_CovidTest22 (): Unit =
 
-//  val exo_vars  = Array ("icu_patients", "hosp_patients", "new_tests", "people_vaccinated")
-    val exo_vars  = Array ("icu_patients", "hosp_patients")
-    val (xxe, yy) = loadData (exo_vars, response)
-    println (s"xxe.dims = ${xxe.dims}, yy.dim = ${yy.dim}")
+    val (xe, y)  = clip (loadData (BEST_EXO))
+    val hh       = 6                                                    // maximum forecasting horizon
+//  hp("lambda") = 1.0                                                  // regularization/shrinkage parameter
 
-//  val xe = xxe                                                        // full
-    val xe = xxe(0 until 116)                                           // clip the flat end
-//  val y  = yy                                                         // full
-    val y  = yy(0 until 116)                                            // clip the flat end
-    val hh = 6                                                          // maximum forecasting horizon
-//  hp("lambda") = 1.0                                                  // regularization parameter
-
-    banner (s"exo_vars = ${stringOf (exo_vars)}, endo_var = $response")
+    banner (s"exo_vars = ${stringOf (BEST_EXO)}, endo_var = $response")
     println (s"xe.dims = ${xe.dims}, y.dim = ${y.dim}")
     new Plot (null, y, null, s"y ($response)", lines = true)
 

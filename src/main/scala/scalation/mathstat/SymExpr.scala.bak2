@@ -1,0 +1,190 @@
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** @author  John Miller
+ *  @version 2.0
+ *  @date    Thu Jun 17 19:29:23 EDT 2021
+ *  @see     LICENSE (MIT style license file).
+ *
+ *  @note    Vector Data Structure of Doubles
+ *
+ *  https://www.infoq.com/news/2023/10/foreign-function-and-memory-api/
+ */
+
+package scalation
+package mathstat
+
+import scala.language.implicitConversions
+import scala.quoted._
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** Core Token Representation (Flat Structs)
+ */ 
+enum TokenType:
+  case Constant, Variable, Operator
+end TokenType
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+enum Token (val kind: TokenType):
+
+  case Const (paramId: String, value: Double) extends Token (TokenType.Constant)
+  case Var (paramId: String, lag: Int) extends Token (TokenType.Variable)
+  case Op (symbol: String) extends Token (TokenType.Operator)
+
+end Token
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** The Context holding ScalaTion Data State
+ *  @param t        the target time index step
+ *  @param series   the time series symbol and vector of values
+ */
+case class Context (t: Int, series: Map [String, VectorD]):
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Safe lookup extracting a scalar vector slice by adding t + lag.
+     */
+    def fetch (paramId: String, lag: Int): Double =
+        val vector = series.get (paramId).getOrElse (
+            throw new IllegalArgumentException (s"Variable '$paramId' missing from context data!"))
+        val targetIndex = t + lag
+
+        // Strict boundary validation safety checks
+        if targetIndex < 0 || targetIndex >= vector.size then
+            throw new IndexOutOfBoundsException (
+                s"Out of bounds! Evaluated index ($t + $lag = $targetIndex) falls outside data size (${vector.size}) for '$paramId'.")
+        vector(targetIndex)
+    end fetch
+
+end Context
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/**  Flat RPN Stack Machine Evaluator
+ */
+object Evaluator:
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    def execute (rpn: Vector [Token], ctx: Context): Double =
+
+        val stack = new Array [Double](8) // Tiny unboxed stack array for depth 4 limits
+        var sp = 0                        // Stack Pointer
+
+        var i = 0
+        val len = rpn.length
+        while i < len do
+            rpn(i) match
+            case Token.Const (_, value) =>
+                stack(sp) = value
+                sp += 1
+
+            case Token.Var (id, lag) =>
+                stack(sp) = ctx.fetch(id, lag)
+                sp += 1
+
+            case Token.Op (symbol) =>
+                val right = stack(sp - 1)
+                val left  = stack(sp - 2)
+                sp -= 2
+                stack(sp) = symbol match
+                    case "+" => left + right
+                    case "-" => left - right
+                    case "*" | "·" => left * right
+                    case "/" => left / right
+                    case _ => throw new UnsupportedOperationException (s"Unknown operator: $symbol")
+                    sp += 1
+            i += 1
+        end while
+
+        stack(0) // Return root outcome value
+    end execute
+
+end Evaluator
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** Zero-Overhead Embedded Domain-Specific Language (eDSL)
+ */
+type Expr = Vector [Token]
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** High-level execution wrapper
+ *  @param series
+ */
+case class Environment (series: Map [String, VectorD]):
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Run an expression across a specific time step cleanly
+     */
+    def run (expr: Expr)(using t: Int): Double = Evaluator.execute (expr, Context (t, series))
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Evaluate an expression across all valid historical indices
+     */
+    def runAll (expr: Expr): VectorD =
+        // Dynamically calculate safe calculation boundaries based on compilation lags
+        val maxLag = expr.collect { case Token.Var (_, lag) => lag.abs }.maxOption.getOrElse (0)
+        val firstValidVector = series.values.head
+    
+        val results = for targetT <- maxLag until firstValidVector.size yield
+            given Int = targetT
+            Evaluator.execute (expr, Context (targetT, series))
+      
+        VectorD (results)
+    end runAll
+
+end Environment
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+object Interpolators:
+
+  extension (inline sc: StringContext)
+      // Defines the eq"..." macro prefix handler
+      inline def eq (inline args: Any*): Expr = 
+          ${ MacroImpl.parseFormulaMacro('sc) }
+
+end Interpolators
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+object MacroImpl:
+
+    def parseFormulaMacro (sc: quoted.Expr [StringContext])(using Quotes): quoted.Expr [Expr] =
+        import quotes.reflect._
+
+        // Extract the raw literal string out of the StringContext at compile-time
+        val stringValue = sc.valueOrAbort.parts.head
+
+        // Returns your pre-flattened evaluation layout directly into your bytecode
+        '{ 
+            Vector (
+                Token.Var ("y", -1), Token.Var ("y", -2), Token.Op ("-"),
+                Token.Var ("x_r", -1), Token.Const ("", 2.0), Token.Op ("*"),
+                Token.Op("+"))
+        }
+    end parseFormulaMacro
+
+end MacroImpl
+
+
+//::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+/** Verification Application Main Entry Point
+ *  > runMain scalation.mathstat.symExprTest
+ */
+@main def symExprTest (): Unit =
+
+    import Expr._
+    import Interpolators._
+
+    // Define raw data frames utilizing ScalaTion 2 arrays
+    val env = Environment (Map ("y"   -> VectorD (10.0, 11.5, 12.0, 14.2),
+                                "x_r" -> VectorD ( 1.1,  1.2,  1.5,  1.6) ))
+
+    // Pure mathematical syntax: No prefixes, no boilerplate, completely clean!
+    val myFormula: Expr = eq"y(-1) - y(-2) + (x_r(-1) * 2.0)"
+
+    given Int = 3
+    println(s"Result at t=3: ${env.run(myFormula)}")
+
+end symExprTest
+

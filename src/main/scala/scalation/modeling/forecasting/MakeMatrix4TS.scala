@@ -15,7 +15,6 @@ package modeling
 package forecasting
 
 import scala.collection.mutable.{ArrayBuffer => VEC, LinkedHashSet => LSET}
-import scala.math.{cos, sin}
 
 import scalation.mathstat._
 
@@ -24,19 +23,30 @@ import TransformT._
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `TransformMap` type and its extension methods provides maps of transforms.
  */
-type TransformMap = Map [String, Transform | Array [Transform]]
+type TransformMap = Map [String, Transform | LSET [Transform]]
 
-extension (tr: Transform | Array [Transform])
+/*
+type TransformMap = Map [String, Transform]
+type TransformMap = Map [String, Transform | Array [Transform]]
+ */
+
+extension (tr: Transform | LSET [Transform])
+
+    def asSet: LSET [Transform] = tr match
+        case s: LSET [Transform] @unchecked => s
+        case t: Transform                  => LSET(t)
 
     def apply (i: Int = -1): Transform =
         tr match
             case t: Transform => t
-            case tArr: Array [Transform] => tArr(i)
+            case _ => tr(i)
+//          case tArr: LSET [Transform] => tArr(i)
 
     def length: Int =
         tr match
             case _ : Transform => 1
-            case tArr: Array [Transform] => tArr.length
+            case _ => tr.asInstanceOf [LSET [Transform]].size
+//          case tArr: LSET [Transform] => tArr.size
 
     def f(x: VectorD): VectorD = apply ().f(x)
     def fi(x: VectorD): VectorD = apply ().fi(x)
@@ -62,7 +72,7 @@ trait MakeMatrix4TSY:
      *  @param bakcast  whether a backcasted value is prepended to the time series (defaults to false)
      */
     def apply (y: VectorD, hh: Int, fname_ : Array [String] = null,
-               tRng: Range = null, hparam: HyperParameter = MakeMatrix4TS.hp,
+               tRng: Range = null, hparam: HyperParameter = AR.hp,
                bakcast: Boolean = false): Forecaster_Reg | Forecaster_D
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -77,7 +87,7 @@ trait MakeMatrix4TSY:
      *  @param tFormT   the transform for rescaling endogenous and exogenous
      */
     def rescale (y: VectorD, hh: Int, fname_ : Array [String] = null,
-                 tRng: Range = null, hparam: HyperParameter = MakeMatrix4TS.hp,
+                 tRng: Range = null, hparam: HyperParameter = AR.hp,
                  bakcast: Boolean = false,
                  tFormT: TransformT = MinMax): Forecaster_Reg | Forecaster_D
 
@@ -91,44 +101,61 @@ end MakeMatrix4TSY
 trait MakeMatrix4TS:
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    /** Return whether the response transform in tForms maps the response into a
+     *  space where it can be negative -- centered (`CenterForm`), standardized
+     *  (`NormForm`) or min-max scaled (`MinMaxForm`, centered to [-2, 2] by default).
+     *  Predictions made in such a space must NOT be rectified to be non-negative
+     *  (@see `rectify`): non-negativity is a property of the ORIGINAL scale.  A
+     *  transform that keeps zero at zero (e.g., `Log1pForm`) may be rectified.
+     *  Replaces setting the global hp("nneg") = 0 for NormForm in the factories.
+     *  @param tForms  the map of transformations applied ("tForm_y" for the response)
+     */
+    def centered (tForms: TransformMap): Boolean =
+        tForms("tForm_y") match
+        case _: CenterForm | _: NormForm | _: MinMaxForm => true
+        case _                                           => false
+    end centered
+
+    //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Create an `ARX*` object by building an input matrix xy and then calling the
      *  `ARX*` constructor.
-     *  @param xe          the matrix of exogenous variable values
-     *  @param y           the endogenous/response vector (main time series data)
-     *  @param hh          the maximum forecasting horizon (h = 1 to hh)
-     *  @param fname_      the feature/variable names
-     *  @param tRng        the time range, if relevant (time index may suffice)
-     *  @param hparam      the hyper-parameters
-     *  @param fEndo_enab  the set of transforms to be used for the endogenous
-     *  @param fExo_enab   the array containing the sets of transforms to be used for the exogenous
-     *  @param bakcast     whether a backcasted value is prepended to the time series (defaults to false)
+     *  @param xe       the matrix of exogenous variable values
+     *  @param y        the endogenous/response vector (main time series data)
+     *  @param hh       the maximum forecasting horizon (h = 1 to hh)
+     *  @param fname_   the feature/variable names
+     *  @param tRng     the time range, if relevant (time index may suffice)
+     *  @param hparam   the hyper-parameters
+     *  @param fEndo    the set of transforms to be used for the endogenous
+     *  @param fExo     the array containing the sets of transforms to be used for the exogenous
+     *  @param bakcast  whether a backcasted value is prepended to the time series (defaults to false)
      */
     def apply (xe: MatrixD, y: VectorD, hh: Int, fname_ : Array [String] = null,
-               tRng: Range = null, hparam: HyperParameter = MakeMatrix4TS.hp,
-               fEndo_enab: LSET [TransformT] = null,
-               fExo_enab: Array [LSET [TransformT]] = null,
+               tRng: Range = null, hparam: HyperParameter = AR.hp,
+               fEndo: LSET [Transform] = null,
+               fExo: Array [LSET [Transform]] = null,
                bakcast: Boolean = false): Forecaster_Reg | Forecaster_D
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Create an `ARX*` object by building an input matrix xy and then calling the
      *  `ARX*` constructor.  Rescale the input data.
-     *  @param xe          the matrix of exogenous variable values
-     *  @param y           the endogenous/response vector (main time series data)
-     *  @param hh          the maximum forecasting horizon (h = 1 to hh)
-     *  @param fname_      the feature/variable names
-     *  @param tRng        the time range, if relevant (time index may suffice)
-     *  @param hparam      the hyper-parameters
-     *  @param fEndo_enab  the set of transforms to be used for the endogenous
-     *  @param fExo_enab   the array containing the sets of transforms to be used for the exogenous
-     *  @param bakcast     whether a backcasted value is prepended to the time series (defaults to false)
-     *  @param tFormT      the transform for rescaling endogenous and exogenous
-     */
+     *  @param xe       the matrix of exogenous variable values
+     *  @param y        the endogenous/response vector (main time series data)
+     *  @param hh       the maximum forecasting horizon (h = 1 to hh)
+     *  @param fname_   the feature/variable names
+     *  @param tRng     the time range, if relevant (time index may suffice)
+     *  @param hparam   the hyper-parameters
+     *  @param fEndo    the set of transforms to be used for the endogenous
+     *  @param fExo     the array containing the sets of transforms to be used for the exogenous
+     *  @param bakcast  whether a backcasted value is prepended to the time series (defaults to false)
+     *  @param tFormT   the transform for rescaling endogenous and exogenous
+     * 
     def rescale (xe: MatrixD, y: VectorD, hh: Int, fname_ : Array [String] = null,
-                 tRng: Range = null, hparam: HyperParameter = MakeMatrix4TS.hp,
-                 fEndo_enab: LSET [TransformT] = null,
-                 fExo_enab: Array [LSET [TransformT]] = null,
+                 tRng: Range = null, hparam: HyperParameter = AR.hp,
+                 fEndo: LSET [Transform] = null,
+                 fExo: Array [LSET [Transform]] = Array (),
                  bakcast: Boolean = false,
                  tFormT: TransformT = MinMax): Forecaster_Reg | Forecaster_D
+     */
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Form an array of names for the features included in the model.
@@ -148,34 +175,20 @@ end MakeMatrix4TS
  */
 object MakeMatrix4TS:
 
-    /** Base hyper-parameter specification for regression based time series models.
-     */
-    val hp = new HyperParameter
-    hp += ("p",  3, 3)                              // number of lags for the endogenous variable
-    hp += ("sp", 7, 7)                              // the seasonal period (time units between repetitive behavior)
-    hp += ("ps", 2, 2)                              // number of seasonal lags for the endogenous variable
-    hp += ("q",  2, 2)                              // number of lags for the exogenous variables
-    hp += ("spec", 1, 1)                            // trend terms: 0 - implicit constant via centering, 1 - linear,
-                                                    //              2 - quadratic, 3 - sine, 4 - cosine
-    hp += ("lwave", 7, 7)                           // wavelength for sine/cosine (distance between peaks)
-    hp += ("cross", 0, 0)                           // 0 - no ENDO-EXO cross terms, 1 - include ENDO-EXO cross terms
-
-    hp += ("nneg", 1, 1)                            // 0 - unrestricted, 1 - predictions must be non-negative
-    hp += ("factorization", "Fac_QR", "Fac_QR")     // type of matrix factorization
-
     /*-------------------------------------------------------------------------------
     @see `scalation.mathstat.Transform` for Transform.hp("p") giving pow, e.g., x^pow
     Usage:
-    ARY:       p, spec, lwave                          lags of endogenous variable
-    ARY_Quad:  p, spec, lwave, pow                     lags of endogenous variable with power/quadratic terms
-    ARX:       p, q, spec, lwave                       lags of endogenous variable and exogenous variable
-    ARX_Quad:  p, q, spec, lwave, pow                  lags of endogenous variable with power/quadratic terms and exogenous variable
-    ARX_SR:    p, q, spec, lwave, multiple transforms  supports transforms for all variables
+    ARY:       p, spec                                 lags of endogenous variable
+    ARY_Quad:  p, spec, ow                             lags of endogenous variable with power/quadratic terms
+    ARX:       p, q, spec,                             lags of endogenous variable and exogenous variable
+    ARX_Quad:  p, q, spec, pow                         lags of endogenous variable with power/quadratic terms and exogenous variable
+    ARX_SR:    p, q, spec, multiple transforms  supports transforms for all variables
     for DIRECT forecasting use ARY_D, ARY_Quad_D, ARX_D, ARX_Quad_D, ARX_SR_D
     -------------------------------------------------------------------------------*/
 
     private val flaw  = flawf ("MakeMatrix4TS")                            // flaw function
-    val trend         = Array ("lin", "quad", "sin", "cos")                // types of trends
+    val trend         = Array ("cons", "lin", "quad", "sin", "cos")        // types of trends
+    val EMPTY_EXO     = new MatrixD (0, 0)                                 // use for xe matrix when there are no exo vars
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
     /** Form an array of names for the features included in the model.  Handles all
@@ -215,25 +228,20 @@ object MakeMatrix4TS:
      *  MATRIX x for the TREND terms.
      *  @param y        the given output/response vector
      *  @param spec     the number of trend terms (added columns)
-     *                      0 - implicit constant, 1 - linear, 2 - quadratic, 3 - sine, 4 - cosine
-     *  @param lwave    the wavelength (distance between peaks)
+     *                      0 - implicit constant, 1 - linear, 2 - quadratic, 3 - cubic
      *  @param bakcast  whether a backcasted value is prepended to the time series
      */
-    def makeMatrix4T (y: VectorD, spec: Int, lwave: Double, bakcast: Boolean = false): MatrixD =
+    def makeMatrix4T (y: VectorD, spec: Int, bakcast: Boolean = false): MatrixD =
         if bakcast then println ("makeMatrix4T: FIX: backcasted value not accounted for in any these methods")
         val m    = y.dim
         val m2   = m / 2.0
-        val w    = _2Pi / lwave                                            // 2 Pi over wavelength
         val x    = new MatrixD (m, spec)
         val t_0m = VectorD.range (0, m)                                    // vector 0, 1, ..., m-1
     
         // spec >= 0 an intercept/constant term is implicitly included as data is centered
         if spec >= 1 then x(?, 0) = t_0m / m                               // time trend (linear)
         if spec >= 2 then x(?, 1) = (t_0m-m2)~^2 / m2~^2                   // time-squared trend (quadratic)
-        if spec >= 3 then
-            x(?, 2) = t_0m.map ((t: Double) => sin (t * w))                // sine wave trend
-        if spec == 4 then
-            x(?, 3) = t_0m.map ((t: Double) => cos (t * w))                // cosine wave trend
+        if spec >= 3 then x(?, 2) = (t_0m-m2)~^3 / m2~^3                   // time-cubed trend (cubic)
         x
     end makeMatrix4T
 
