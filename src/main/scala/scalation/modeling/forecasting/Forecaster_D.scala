@@ -365,7 +365,10 @@ abstract class Forecaster_D (x: MatrixD, y: MatrixD, hh: Int, fname: Array [Stri
 //       `selectFeaturesPerH` -- one column set PER HORIZON (renamed).
 //       Every candidate set is scored on the FS rows in ORIGINAL space with the skip rows
 //       dropped (@see `Forecaster_Reg.correctQoF`); the algorithms are `SubsetSearch`'s; with
-//       qk = smapeC and h = 0 the criterion is the selection score J of the `llmsr` structure
+// YousefChange --------- Start
+// Note: wording only -- a base file does not name the sub-package built on it
+//       qk = smapeC and h = 0 the criterion is the selection score J of a formula/structure
+// YousefChange --------- end
 //       search (the FPE-form sMAPE of the companion object, mean over horizons), so the base's
 //       models and the search select on the same criterion through the same algorithms.
 
@@ -438,6 +441,7 @@ abstract class Forecaster_D (x: MatrixD, y: MatrixD, hh: Int, fname: Array [Stri
     //       `selectFeatures` selects one column-set for all of them
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    // YousefChange --------- Note: comment only -- the scaladoc below no longer names the sub-package built on it
     /** Perform feature selection for this multi-horizon model, returning the columns
      *  selected and the QoF measures for all steps, as `selectFeatures` of a
      *  `Forecaster_Reg` does (@see `FeatureSelection.selectFeatures`) -- as ARRAYS of
@@ -451,7 +455,7 @@ abstract class Forecaster_D (x: MatrixD, y: MatrixD, hh: Int, fname: Array [Stri
      *            QoF in original space with the skip rows dropped) and scored by `agg` over
      *            the horizons (default `Forecaster_D.aggFPE`: the mean of every measure, the
      *            sMAPE-IC slot holding the mean FPE-form sMAPE, so with qk = smapeC the
-     *            criterion is the selection score J of the `llmsr` search).
+     *            criterion is the selection score J of a structure search over the terms).
      *            The trace `rSq` holds the best-so-far per step (aggregated measures); no
      *            cross-validation column (the candidates are forecasters, not the regressions
      *            `updateQoF`'s validation expects); a set whose fit fails is skipped.
@@ -514,6 +518,7 @@ abstract class Forecaster_D (x: MatrixD, y: MatrixD, hh: Int, fname: Array [Stri
     end selectFeatures
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    // YousefChange --------- Note: comment only -- the scaladoc below no longer names the sub-package built on it
     /** Perform feature selection for this multi-horizon model, returning the columns
      *  selected and the QoF measures for all steps, as `selectFeatures` of a
      *  `Forecaster_Reg` does (@see `FeatureSelection.selectFeatures`); the selected
@@ -525,7 +530,7 @@ abstract class Forecaster_D (x: MatrixD, y: MatrixD, hh: Int, fname: Array [Stri
      *            QoF in original space with the skip rows dropped) and scored by `agg` over
      *            the horizons (default `Forecaster_D.aggFPE`: the mean of every measure, the
      *            sMAPE-IC slot holding the mean FPE-form sMAPE, so with qk = smapeC the
-     *            criterion is the selection score J of the `llmsr` search).
+     *            criterion is the selection score J of a structure search over the terms).
      *            The trace `rSq` holds the best-so-far per step (aggregated measures); no
      *            cross-validation column (the candidates are forecasters, not the regressions
      *            `updateQoF`'s validation expects); a set whose fit fails is skipped.
@@ -827,9 +832,10 @@ end Forecaster_D
 
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+// YousefChange --------- Note: comment only -- the scaladoc below no longer names the sub-package built on it
 /** The `Forecaster_D` companion object holds the parsimony-adjusted sMAPE in the
  *  form of Akaike's Final Prediction Error, the selection criterion of the
- *  all-horizons feature selection and of the `llmsr` structure search.
+ *  all-horizons feature selection and of structure searches built on this class.
  */
 object Forecaster_D:
 
@@ -850,9 +856,10 @@ object Forecaster_D:
     end smapeFPE
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    // YousefChange --------- Note: comment only -- the scaladoc below no longer names the sub-package built on it
     /** Aggregate a QoF matrix over the horizons for `selectFeatures` (h = 0): the
      *  mean of every measure, with the sMAPE-IC slot holding the mean FPE-form
-     *  sMAPE over the horizons (`smapeFPE`), the selection score J of the `llmsr`
+     *  sMAPE over the horizons (`smapeFPE`), the selection score J of a structure
      *  search; with qk = smapeC the joint selection therefore minimizes J.
      *  @param qof  the QoF matrix, one row per horizon
      */

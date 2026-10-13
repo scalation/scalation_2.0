@@ -1,5 +1,6 @@
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+// YousefChange --------- Note: comment only -- the scaladoc below no longer names the sub-package built on it
 /** @author  Yousef Fekri Dabanloo
  *  @version 2.0
  *  @date    Sat Aug 01 15:00:00 EDT 2026
@@ -8,7 +9,7 @@
  *  @note    Model Support: Parser for `ARX_Formula` Specification Strings
  *
  *  Turns formula STRINGS (proposed by an LLM or written by hand) into `ARX_Formula`
- *  objects, so `llmsr.LLMSR4TS` can run  propose (string) -> parse -> fit -> score.
+ *  objects, so a structure search can run  propose (string) -> parse -> fit -> score.
  *  The grammar is the one `ARX_Formula` prints (@see `Term.label`, `ARX_Formula.formulaStr`),
  *  so parseFormula (f.formulaStr) rebuilds f:
  *

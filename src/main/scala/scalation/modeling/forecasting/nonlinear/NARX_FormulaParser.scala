@@ -1,5 +1,6 @@
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+// YousefChange --------- Note: comment only -- the scaladoc below no longer names the sub-package built on it
 /** @author  Yousef Fekri Dabanloo
  *  @version 2.0
  *  @date    Sun Oct 04 15:00:00 EDT 2026
@@ -8,7 +9,7 @@
  *  @note    Model Support: Parser for `NARX_Formula` Specification Strings (free parameters)
  *
  *  Turns formula strings with FREE NONLINEAR PARAMETERS into `NARX_Formula` objects,
- *  so that a search (`llmsr`) can propose, parse, fit (`NARX_SR_D.fromTerms`) and score
+ *  so that a structure search can propose, parse, fit (`NARX_SR_D.fromTerms`) and score
  *  nonlinear terms as it does linear ones.  The grammar is `FormulaParser`'s plus the
  *  slot ? (optionally with a start value, ?w0), which `NARX_Formula` prints
  *  (@see `Par.label`, `NARX_Formula.formulaStr`), so parseFormula (f.formulaStr) rebuilds f:

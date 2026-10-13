@@ -415,8 +415,11 @@ end aRX_DTest4
 //       tests, false for the TnT tests (select on the training rows, test on the rest).  Tests 5
 //       and 6 keep the setting (p = 10, px = 5, spec = 2, a rescaled model); tests 7 to 10
 //       use p = 6, px = 6, spec = 1 (19 columns), so their tables compare with one another.
-//       Nothing here imports the `llmsr` sub-package: its tests depend on this package, never the
-//       reverse.
+// YousefChange --------- Start
+// Note: wording only -- a base file does not name the sub-package built on it
+//       Nothing here imports any sub-package built on it (formula searches): they depend on this
+//       package, never the reverse.
+// YousefChange --------- end
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 /** The `aRX_DTest5` main function tests the `ARX_D` class on real data:
@@ -515,13 +518,14 @@ end aRX_DTest6
 
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+// YousefChange --------- Note: comment only -- the scaladoc below no longer names the sub-package built on it
 /** The `aRX_DTest7` main function tests the `ARX_D` class on real data:
  *  Forecasting COVID-19 using In-Sample Testing (In-ST).
  *  Test forecasts (h = 1 to hh steps ahead forecasts).
  *  This version performs Feature Selection over ALL HORIZONS JOINTLY
  *  (`selectFeatures`, h = 0): every candidate column set is fit as ONE multi-horizon
  *  model and scored by J, the mean FPE-form sMAPE over the horizons
- *  (`Forecaster_D.aggFPE`, the selection score of the `llmsr` search).  The selected
+ *  (`Forecaster_D.aggFPE`, also the selection score of structure searches).  The selected
  *  multi-horizon model is then tested in-sample against the full model above.
  *  > runMain scalation.modeling.forecasting.aRX_DTest7
  */

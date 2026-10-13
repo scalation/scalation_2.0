@@ -1,6 +1,6 @@
 {
-    "javaSemanticDBVersion": "0.11.2",
-    "semanticDBVersion": "4.15.2",
+    "javaSemanticDBVersion": "0.12.3",
+    "semanticDBVersion": "4.17.4",
     "supportedScalaVersions": [
         "2.13.18",
         "2.12.21",
@@ -9,8 +9,7 @@
         "2.12.18",
         "2.13.15",
         "2.13.16",
-        "2.13.17",
-        "2.11.12"
+        "2.13.17"
     ],
     "enableBestEffortMode": false
 }

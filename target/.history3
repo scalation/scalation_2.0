@@ -1,2 +1,5 @@
 1778091936422:compile
 1778091952050:runMain scalation.modeling.forecasting.aRX_SR_DTest5
+1791911942154:runMain scalation.modeling.forecasting.nonlinear.nARX_FormulaTest5
+1791911970579:sbt compile doc
+1791911974800:exit

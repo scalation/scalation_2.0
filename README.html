@@ -1,323 +1,349 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<LINK href="style.css" rel="stylesheet" type="text/css">
-<title> ScalaTion </title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="style.css" rel="stylesheet" type="text/css">
+<title>ScalaTion</title>
 </head>
+<!-- Generated from README.md (pandoc -f gfm -t html5 README.md); edit README.md, then regenerate. -->
 <body>
 
-<center>
-<h1> SCALAble SimulaTION - ScalaTion </h1>
-<p>
-<a href = "#papers">Papers</a> 
+<h1 align="center">ScalaTion</h1>
 
-<!--
-| <a href = "#scaladoc">Scaladoc</a> | <a href = "#source-code"> Source Code</a>
--->
-</center>
+<p align="center"><b>SCALAble SimulaTION</b> &mdash; a Scala-based system for Simulation, Optimization and Analytics</p>
 
-<p>
-<b> Welcome to ScalaTion, the Scala-based system for Simulation, Optimization and Analytics. </b>
+<p align="center">
+  <a href="https://scalation.github.io/scalation_2.0/"><img alt="Scaladoc" src="https://img.shields.io/badge/docs-Scaladoc-blue"></a>
+  <a href="https://www.scala-lang.org/download/"><img alt="Scala 3.8.3" src="https://img.shields.io/badge/Scala-3.8.3-DC322F?logo=scala&logoColor=white"></a>
+  <a href="https://jdk.java.net/archive/"><img alt="Java 21" src="https://img.shields.io/badge/Java-21-007396"></a>
+  <a href="LICENSE.html"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green"></a>
+</p>
 
-<p>
-This system, coded in Scala, supports multi-paradigm simulation modeling including
-'tableau', 'event', 'process', 'dynamics', 'dynamics_pde', 'activity' and 'state' oriented models.
+<p align="center">
+  <a href="#quick-start">Quick start</a> &middot;
+  <a href="#source-packages">Packages</a> &middot;
+  <a href="https://scalation.github.io/scalation_2.0/">Scaladoc</a> &middot;
+  <a href="#papers">Papers</a> &middot;
+  <a href="#license">License</a>
+</p>
 
-<p>
-<a href = "http://www.scala-lang.org">Scala</a> is a modern object-oriented, functional programming language
-that is well-suited for developing simulation engines.
-It is in the Java family of languages and can call Java code.
-The inclusion of advanced and functional programming capabilities,
-makes the code much more concise than Java.
-ScalaTion also supports optimization and analytics as they nowadays go hand-in-hand with simulation modeling.
-Some of the algorithms come in both sequential and parallel versions.
-
-<p>
-The <b>ScalaTion 2.0</b> version defines multiple .par subpackages that contain parallel versions of sequential algorithms.
-Future directions include completing the 'scala3d' and 'physics' packages.
-
-<p>
-Please read the <a href = LICENSE.html> LICENSE </a> file (an MIT style license).
-
-<p><hr><p>
-<h3> Installation Instructions </h3>
-
-Version 2.0 Requires:
-<a href = "https://www.scala-lang.org/download">Scala 3.8.3</a> and
-<a href = "https://www.oracle.com/java/technologies/javase-downloads.html">Java 21</a>
-(or from <a href = "https://jdk.java.net/archive">Open JDK Archive</a>)
-<br>
-https://www.scala-sbt.org/1.x/docs/Hello.html
-Recommended:
-SBT: <a href = "https://www.scala-sbt.org/">sbt</a>
-<br>
-Getting started: <a href = "https://www.scala-sbt.org/1.x/docs/Hello.html">sbt Hello, World</a>
-<br>
-
-
-<!--
-<h4>1. Download the scalation_2.0.zip file</h4>
-<a href = "../scalation_2.0.tar.gz"> scalation_2.0.tar.gz </a> <br> <b>OR</b> <br>
-<a href = "../scalation_2.0.zip"> scalation_2.0.zip </a>
--->
-
-
-<p>
-<h4>1. Git clone the repository</h4>
-
-<pre><code>
-$ git clone https://github.com/scalation/scalation_2.0.git
-</code></pre>
-
-
-<h4>2. To build all the modules, change into the ScalaTion base directory and run sbt</h4>
-
-<pre><code>
-$ cd scalation_2.0
-$ sbt compile
-</code></pre>
-
-<h4>3. To compile code or run apps, enter sbt and type compile, runMain or exit </h4>
-
-<pre><code>
-$ sbt
-> compile
-> runMain scalation.modeling.simpleRegressionTest
-> runMain scalation.modeling.regressionTest
-> exit
-</code></pre>
-
-<p>
-The compile command is optional, since runMain will automatically compile if need be.
-
-<p>
-ScalaTion is set up to use the Simple Build Tool <a href = "http://www.scala-sbt.org">sbt</a>.
-ScalaTion 2.0 uses the following build specification file:
-
-<ol>
-<li>
-Build Specification: <a href = "build.sbt">build.sbt</a>,
-</ol>
-
-Source packages are in the <b>src/main/scala</b> directory, and
-documentation files are in the <b>docs/api</b> directory.
-Unmanaged jar files are stored in a common library <b>lib</b> directory, <a href = "where_is_jar.txt">where_is_jar.txt</a>.
-Data file input, output or analytics are stored in subdirectories of <b>data</b>,
-while database files are stored in <b>store</b>.
-
-<h4>4.  To develop projects that use ScalaTion that are outside ScalaTion do the following </h4>
-
-<pre><code>
-$ cd your_project_dir
-$ sbt new sbt/scala-seed.g8
-$ cd hello
-$ mkdir lib
-copy jar files from lib
-$ cd src/main/scala/example
-$ vim Hello.scala
-</code></pre>
-
-The second time you do this, you will want to use a more appropriate name than hello.
-
-<p><hr><p>
-
-<!--
-<h4>6. Alternatively, you may use my_scalation_2.0</h4>
-
-Downloading and (unzip/tar xvfz) either
-<a href = "../my_scalation_2.0.zip">my_scalation_2.0.zip</a> <b>or</b>
-<a href = "../my_scalation_2.0.tar.gz">my_scalation_2.0.tar.gz</a> and then
-
-<pre><code>
-$ cd my_scalation_2.0
-$ ls -l lib
-$ sbt
-> run
-</code></pre>
-
-Check to make sure the ScalaTion .jar file is in the lib directory (ls -l lib).
-The location of ScalaTion's .jar file may be found in
-<a href = "where_is_jar.txt">where_is_jar.txt</a>.
-The sbt run command will allow you to choose any main method to run (or you may use runMain).
--->
-
-<p><hr><p>
-
-To develop using an Integrated Development Environment (IDE) [IntelliJ]:
-<ol>
-<li>
-<a href = "https://www.jetbrains.com/idea/download">IntelliJ IDEA</a>
-<li>
-<a href = "https://www.jetbrains.com/help/idea/discover-intellij-idea-for-scala.html">Scala Plugin</a>
-</ol>
-
-<A name = "papers">
-
-<p><hr><p>
-<h3> Papers/Documentation </h3>
-<p>
-
-<ol>
-<li>
-John A. Miller, Jun Han and Maria Hybinette,
-<a href = "http://informs-sim.org/wsc10papers/067.pdf">
-"Using Domain Specific Languages for Modeling and Simulation: ScalaTion as a Case Study,"</a>
-Proceedings of the 2010 ACM/IEEE Winter Simulation Conference (WSC'10),
-Baltimore, Maryland (December 2010) pp. 741-752.
-
-<p>
-<li>
-Michael E. Cotterell, John A. Miller, Tom Horton,
-<a href = "http://arxiv.org/abs/1112.1751">
-"Unicode in Domain-Specific Programming Languages for Modeling & Simulation:
-ScalaTion as a Case Study,"</a>
-Arxiv preprint arXiv:1112.175
-(December 2011) pp. 1-10.
-
-<p>
-<li>
-Michael E. Cotterell, John A. Miller, Jun Han and Tom Horton,
-<a href = "../scalation_papers/alasim/alasim_extended_abstract.pdf">
-"Extending ScalaTion, a Domain-Specific Language for Modeling & Simulation, for Simulation Optimization,"</a>
-Proceedings of the AlaSim International Modeling and Simulation Conference & Exhibition (AlaSim'12),
-Huntsville, Alabama (May 2012) pp. 1-1.
-
-<p>
-<li>
-Yung Long Li,
-<a href = "../home/theses/li_thesis/thesis/TR_Yung_Long_Li.pdf">
-"Evaluation of Parallel Implementations of Dense and Sparse
-Matrices for the ScalaTion Library," </a>
-Technical Report,
-University of Georgia (December 2012) pp. 1-60.
-
-<p>
-<li>
-John A. Miller, Michael E. Cotterell and Stephen J. Buckley,
-<a href = "http://informs-sim.org/wsc13papers/includes/files/104.pdf">
-"Supporting a Modeling Continuum in ScalaTion: From Predictive Analytics to Simulation Modeling,"</a>
-Proceedings of the 2013 ACM/IEEE Winter Simulation Conference (WSC'13),
-Washington, DC (December 2013) pp. 1191-1202.
-
-<p>
-<li>
-Matthew Saltz, Ayushi Jain, Abhishek Kothari, Arash Fard, John A. Miller, and Lakshmish Ramaswamy,
-<a href = "http://www.thecloudcomputing.org/2014/AdvanceProgram-ICWS-SCC-CLOUD-MS-BigDataCongress-SERVICES-2014.pdf">
-"DualIso: An Algorithm for Subgraph Pattern Matching on Very Large Labeled Graphs,"</a>
-<I> Proceedings of the 3rd IEEE International Congress on Big Data </I>
-(<a href = "http://www.ieeebigdata.org/2014">BigData'14</a>),
-Anchorage, Alaska (June-July 2014) pp. 498-505.
-<br>
-Online <a href = "../home/theses/jain_thesis/bigdata_2014/BigDataCong2014_DualIso_Supplement.pdf">supplement</a>
-
-</ol>
-
-<!--
-<A name = "scaladoc">
-
-<p><hr><p>
-<h3> Source Packages (doc) </h3>
-<p>
-
-<blockquote>
-<table border = 3>
-<tr>
-<td> <b>Package</b>
-<td> <b>Description</b>
-<tr>
-<tr>
-<tr>
-<td> <a href = "doc/api/index.html"><b>scalation</b></a>
-<td> <b>The scalation foundational packages.</b>
-<tr>
-<tr>
-<tr>
-<td> <a href = "doc/api/scalation/animation.html"> animation </a>
-<td> The `animation` package supports the animation of models.
-<tr>
-<td> <a href = "doc/api/scalation/calculus.html"> calculus </a>
-<td> The `calculus` package supports numerical differentiation and integration. 
-<tr>
-<td> <a href = "doc/api/scalation/database.html"> database </a>
-<td> The `database` package supports relational and graph databases.
-<tr>
-<td> <a href = "doc/api/scalation/dynamics.html"> dynamics </a>
-<td> The `dynamics` package supports the development of ODE models.
-<tr>
-<td> <a href = "doc/api/scalation/mathstat.html"> mathstat </a>
-<td> The `mathstat` package supports basic math and statistics.
-<tr>
-<td> <a href = "doc/api/scalation/modeling.html"> modeling </a>
-<td> The `modeling` package supports the development of several type of data science models.
-<tr>
-<td> <a href = "doc/api/scalation/optimization.html"> optimization </a>
-<td> The `optimization` package supports linear and nonlinear optimization.
-<tr>
-<td> <a href = "doc/api/scalation/random.html"> random </a>
-<td> The `random` package supports random variate generation.
-<tr>
-<td> <a href = "doc/api/scalation/scala2d.html"> scala2d </a>
-<td> The `scala2d` package supports simple 2D graphics in scala, based upon `java.swing`, `java.awt` and `java_awt_geom`. 
-<tr>
-<td> <a href = "doc/api/scalation/simulation.html"> simulation </a>
-<td> The `simulation` package supports the development of simulation models.
-<tr>
+<hr />
+<p><strong>Welcome to ScalaTion, the Scala-based system for Simulation,
+Optimization and Analytics.</strong></p>
+<p>This system, coded in Scala, supports multi-paradigm simulation
+modeling including <em>tableau</em>, <em>event</em>, <em>process</em>,
+<em>dynamics</em>, <em>dynamics_pde</em>, <em>activity</em> and
+<em>state</em> oriented models.</p>
+<p><a href="https://www.scala-lang.org">Scala</a> is a modern
+object-oriented, functional programming language that is well-suited for
+developing simulation engines. It is in the Java family of languages and
+can call Java code. The inclusion of advanced and functional programming
+capabilities makes the code much more concise than Java. ScalaTion also
+supports optimization and analytics, as they nowadays go hand-in-hand
+with simulation modeling. Some of the algorithms come in both sequential
+and parallel versions.</p>
+<p><strong>ScalaTion 2.0</strong> defines multiple <code>.par</code>
+subpackages that contain parallel versions of sequential algorithms.
+Future directions include completing the <code>scala3d</code> and
+<code>physics</code> packages.</p>
+<h2 id="requirements">Requirements</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Tool</th>
+<th>Version</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a
+href="https://www.oracle.com/java/technologies/downloads/">Java</a></td>
+<td>21</td>
+<td>or an OpenJDK 21 from the <a
+href="https://jdk.java.net/archive/">OpenJDK archive</a></td>
+</tr>
+<tr class="even">
+<td><a href="https://www.scala-sbt.org/">sbt</a></td>
+<td>1.x</td>
+<td>recommended build tool; the version used is pinned in
+<code>project/build.properties</code> and fetched by sbt</td>
+</tr>
+<tr class="odd">
+<td><a href="https://www.scala-lang.org/download/">Scala</a></td>
+<td>3.8.3</td>
+<td>set in <code>build.sbt</code>; sbt downloads the compiler, so a
+separate install is optional</td>
+</tr>
+</tbody>
 </table>
-</blockquote>
-
-<A name = "source-code">
-
-<p>
-<h3> Source Packages (src) </h3>
-<p>
-
+<p>New to sbt? See <a
+href="https://www.scala-sbt.org/1.x/docs/Hello.html">sbt: Hello,
+World</a>.</p>
+<h2 id="quick-start">Quick start</h2>
+<p><strong>1. Clone the repository</strong></p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone https://github.com/scalation/scalation_2.0.git</span></code></pre></div>
+<p><strong>2. Build all the modules</strong> — change into the ScalaTion
+base directory and run sbt</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> scalation_2.0</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">sbt</span> compile</span></code></pre></div>
+<p><strong>3. Compile code or run apps</strong> — enter sbt and type
+<code>compile</code>, <code>runMain</code> or <code>exit</code></p>
+<pre class="console"><code>$ sbt
+sbt:scalation&gt; compile
+sbt:scalation&gt; runMain scalation.modeling.simpleRegressionTest
+sbt:scalation&gt; runMain scalation.modeling.regressionTest
+sbt:scalation&gt; exit</code></pre>
+<p>The <code>compile</code> command is optional, since
+<code>runMain</code> compiles first if need be. A single app can also be
+run straight from the shell:</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">sbt</span> <span class="st">&quot;runMain scalation.modeling.regressionTest&quot;</span></span></code></pre></div>
+<p>The demo and test apps are <code>@main</code> methods named after
+their class with a lower-case first letter and the suffix
+<code>Test</code> (<code>Regression</code> →
+<code>regressionTest</code>, <code>regressionTest2</code>, …).</p>
 <blockquote>
-<table border = 3>
-<tr>
-<td> <b>Package</b>
-<td> <b>Description</b>
-<tr>
-<tr>
-<tr>
-<td> <a href = "src/main/scala/scalation"><b>scalation</b></a>
-<td> <b>Scalation Foundational Packages.</b>
-<tr>
-<tr>
-<tr>
-<td> <a href = "src/main/scala/scalation/animation/"> animation </a>
-<td> The `animation` package supports the animation of models.
-<tr>
-<td> <a href = "src/main/scala/scalation/calculus/"> calculus </a>
-<td> The `calculus` package supports numerical differentiation and integration. 
-<tr>
-<td> <a href = "src/main/scala/scalation/database/"> database </a>
-<td> The `database` package supports relational and graph databases.
-<tr>
-<td> <a href = "src/main/scala/scalation/dynamics/"> dynamics </a>
-<td> The `dynamics` package supports development of ODE models.
-<tr>
-<td> <a href = "src/main/scala/scalation/mathstat/"> mathstat </a>
-<td> The `mathstat` package supports basic math and statistics.
-<tr>
-<td> <a href = "src/main/scala/scalation/modeling"> modeling </a>
-<td> The `modeling` package supports the development of several type of data science models.
-<tr>
-<td> <a href = "src/main/scala/scalation/optimization/"> optimization </a>
-<td> The `optimization` package supports linear and nonlinear optimization.
-<tr>
-<td> <a href = "src/main/scala/scalation/random/"> random </a>
-<td> The `random` package supports random variate generation.
-<tr>
-<td> <a href = "src/main/scala/scalation/scala2d/"> scala2d </a>
-<td> The `scala2d` package supports simple 2D graphics in scala, based upon `java.swing`, `java.awt` and `java_awt_geom`. 
-<tr>
-<td> <a href = "src/main/scala/scalation/simulation/"> simulation </a>
-<td> The `simulation` package supports the development of simulation models.
-<tr>
+<p><b>Note:</b> <code>build.sbt</code> compiles with <code>-Werror</code>, so
+any compiler warning (for example, an unused import) fails the
+build.</p>
 </blockquote>
-<p>
--->
-
+<h2 id="repository-layout">Repository layout</h2>
+<p>ScalaTion is set up to use the Simple Build Tool <a
+href="https://www.scala-sbt.org">sbt</a>, with the build specification
+<a href="build.sbt"><code>build.sbt</code></a>.</p>
+<table>
+<thead>
+<tr class="header">
+<th>Path</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a
+href="src/main/scala/scalation"><code>src/main/scala/scalation</code></a></td>
+<td>the source packages</td>
+</tr>
+<tr class="even">
+<td><a href="docs"><code>docs</code></a></td>
+<td>the generated Scaladoc, published at <a
+href="https://scalation.github.io/scalation_2.0/">https://scalation.github.io/scalation_2.0/</a></td>
+</tr>
+<tr class="odd">
+<td><a href="data"><code>data</code></a></td>
+<td>data files for input, output and analytics (in subdirectories)</td>
+</tr>
+<tr class="even">
+<td><a href="store"><code>store</code></a></td>
+<td>database files</td>
+</tr>
+<tr class="odd">
+<td><code>lib</code></td>
+<td>unmanaged jar files, if any (sbt puts every jar in <code>lib</code>
+on the classpath); see <a
+href="where_is_jar.txt"><code>where_is_jar.txt</code></a></td>
+</tr>
+<tr class="even">
+<td><a href="build.sbt"><code>build.sbt</code></a>, <a
+href="project"><code>project</code></a></td>
+<td>the sbt build</td>
+</tr>
+</tbody>
+</table>
+<p>To regenerate the Scaladoc in <code>docs</code>:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">sbt</span> clean compile doc</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="fu">rm</span> <span class="at">-rf</span> docs <span class="kw">&amp;&amp;</span> <span class="fu">cp</span> <span class="at">-r</span> target/scala-3.8.3/api docs</span></code></pre></div>
+<h2 id="using-scalation-from-your-own-project">Using ScalaTion from your
+own project</h2>
+<p>To develop projects that use ScalaTion but live outside
+ScalaTion:</p>
+<p><strong>1. Build the ScalaTion jar</strong></p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> scalation_2.0</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="ex">sbt</span> package          <span class="co"># writes target/scala-3.8.3/scalation_3-0.1.0-SNAPSHOT.jar</span></span></code></pre></div>
+<p><strong>2. Create your project and copy the jar into its
+<code>lib</code> directory</strong></p>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> your_project_dir</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="ex">sbt</span> new scala/scala3.g8          <span class="co"># enter a project name when prompted, e.g. hello</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> hello</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> lib</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="fu">cp</span> <span class="op">&lt;</span>dir<span class="op">&gt;</span>/scalation_2.0/target/scala-3.8.3/scalation_3-0.1.0-SNAPSHOT.jar lib/</span></code></pre></div>
+<p>where <code>&lt;dir&gt;</code> is the directory you placed
+<code>scalation_2.0</code> in.</p>
+<p><strong>3. Match ScalaTion's Scala version and dependency in your
+<code>build.sbt</code></strong></p>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode scala"><code class="sourceCode scala"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>scalaVersion <span class="op">:=</span> <span class="st">&quot;3.8.3&quot;</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>libraryDependencies <span class="op">+=</span> <span class="st">&quot;org.scala-lang.modules&quot;</span> <span class="op">%%</span> <span class="st">&quot;scala-parallel-collections&quot;</span> <span class="op">%</span> <span class="st">&quot;1.2.0&quot;</span></span></code></pre></div>
+<p>(An unmanaged jar does not bring its own dependencies.) Then write
+your code under <code>src/main/scala</code> and start it with
+<code>sbt run</code>.</p>
+<h2 id="ide-support">IDE support</h2>
+<ul>
+<li><a href="https://www.jetbrains.com/idea/download">IntelliJ IDEA</a>
+with the <a
+href="https://www.jetbrains.com/help/idea/discover-intellij-idea-for-scala.html">Scala
+plugin</a>: open the <code>scalation_2.0</code> folder and import it as
+an sbt project.</li>
+<li><a href="https://code.visualstudio.com/">VS Code</a> with <a
+href="https://scalameta.org/metals/">Metals</a>: open the folder and
+import the build when prompted.</li>
+</ul>
+<h2 id="source-packages">Source packages</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Package</th>
+<th>Description</th>
+<th>Docs</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a
+href="src/main/scala/scalation"><strong>scalation</strong></a></td>
+<td><strong>The ScalaTion foundational packages.</strong></td>
+<td><a
+href="https://scalation.github.io/scalation_2.0/scalation.html">Scaladoc</a></td>
+</tr>
+<tr class="even">
+<td><a href="src/main/scala/scalation/animation">animation</a></td>
+<td>The <code>animation</code> package supports the animation of
+models.</td>
+<td><a
+href="https://scalation.github.io/scalation_2.0/scalation/animation.html">Scaladoc</a></td>
+</tr>
+<tr class="odd">
+<td><a href="src/main/scala/scalation/calculus">calculus</a></td>
+<td>The <code>calculus</code> package supports numerical differentiation
+and integration.</td>
+<td><a
+href="https://scalation.github.io/scalation_2.0/scalation/calculus.html">Scaladoc</a></td>
+</tr>
+<tr class="even">
+<td><a href="src/main/scala/scalation/database">database</a></td>
+<td>The <code>database</code> package supports relational and graph
+databases.</td>
+<td><a
+href="https://scalation.github.io/scalation_2.0/scalation/database.html">Scaladoc</a></td>
+</tr>
+<tr class="odd">
+<td><a href="src/main/scala/scalation/dynamics">dynamics</a></td>
+<td>The <code>dynamics</code> package supports the development of ODE
+models.</td>
+<td><a
+href="https://scalation.github.io/scalation_2.0/scalation/dynamics.html">Scaladoc</a></td>
+</tr>
+<tr class="even">
+<td><a href="src/main/scala/scalation/mathstat">mathstat</a></td>
+<td>The <code>mathstat</code> package supports basic math and
+statistics.</td>
+<td><a
+href="https://scalation.github.io/scalation_2.0/scalation/mathstat.html">Scaladoc</a></td>
+</tr>
+<tr class="odd">
+<td><a href="src/main/scala/scalation/modeling">modeling</a></td>
+<td>The <code>modeling</code> package supports the development of
+several types of data science models.</td>
+<td><a
+href="https://scalation.github.io/scalation_2.0/scalation/modeling.html">Scaladoc</a></td>
+</tr>
+<tr class="even">
+<td><a
+href="src/main/scala/scalation/optimization">optimization</a></td>
+<td>The <code>optimization</code> package supports linear and nonlinear
+optimization.</td>
+<td><a
+href="https://scalation.github.io/scalation_2.0/scalation/optimization.html">Scaladoc</a></td>
+</tr>
+<tr class="odd">
+<td><a href="src/main/scala/scalation/random">random</a></td>
+<td>The <code>random</code> package supports random variate
+generation.</td>
+<td><a
+href="https://scalation.github.io/scalation_2.0/scalation/random.html">Scaladoc</a></td>
+</tr>
+<tr class="even">
+<td><a href="src/main/scala/scalation/scala2d">scala2d</a></td>
+<td>The <code>scala2d</code> package supports simple 2D graphics in
+Scala, based upon <code>java.swing</code>, <code>java.awt</code> and
+<code>java.awt.geom</code>.</td>
+<td><a
+href="https://scalation.github.io/scalation_2.0/scalation/scala2d.html">Scaladoc</a></td>
+</tr>
+<tr class="odd">
+<td><a href="src/main/scala/scalation/scala3d">scala3d</a></td>
+<td>The <code>scala3d</code> package (under development) explores
+JavaFX/ScalaFX as a lightweight 3D solution.</td>
+<td>—</td>
+</tr>
+<tr class="even">
+<td><a href="src/main/scala/scalation/simulation">simulation</a></td>
+<td>The <code>simulation</code> package supports the development of
+simulation models.</td>
+<td><a
+href="https://scalation.github.io/scalation_2.0/scalation/simulation.html">Scaladoc</a></td>
+</tr>
+<tr class="odd">
+<td><a href="src/main/scala/scalation/theory">theory</a></td>
+<td>The <code>theory</code> package (under development) brings together
+the elements of modeling and theory.</td>
+<td><a
+href="https://scalation.github.io/scalation_2.0/scalation/theory.html">Scaladoc</a></td>
+</tr>
+</tbody>
+</table>
+<h2 id="papers">Papers</h2>
+<ol type="1">
+<li><p>John A. Miller, Jun Han and Maria Hybinette, <a
+href="https://informs-sim.org/wsc10papers/067.pdf"><strong>"Using Domain
+Specific Languages for Modeling and Simulation: ScalaTion as a Case
+Study,"</strong></a> <em>Proceedings of the 2010 ACM/IEEE Winter
+Simulation Conference (WSC'10)</em>, Baltimore, Maryland (December 2010)
+pp. 741-752.</p></li>
+<li><p>Michael E. Cotterell, John A. Miller and Tom Horton, <a
+href="https://arxiv.org/abs/1112.1751"><strong>"Unicode in
+Domain-Specific Programming Languages for Modeling &amp; Simulation:
+ScalaTion as a Case Study,"</strong></a> arXiv preprint arXiv:1112.1751
+(December 2011) pp. 1-10.</p></li>
+<li><p>Michael E. Cotterell, John A. Miller, Jun Han and Tom Horton, <a
+href="https://cobweb.cs.uga.edu/~jam/scalation_papers/alasim/alasim_extended_abstract.pdf"><strong>"Extending
+ScalaTion, a Domain-Specific Language for Modeling &amp; Simulation, for
+Simulation Optimization,"</strong></a> <em>Proceedings of the AlaSim
+International Modeling and Simulation Conference &amp; Exhibition
+(AlaSim'12)</em>, Huntsville, Alabama (May 2012) pp. 1-1.</p></li>
+<li><p>Yung Long Li, <a
+href="https://cobweb.cs.uga.edu/~jam/home/theses/li_thesis/thesis/TR_Yung_Long_Li.pdf"><strong>"Evaluation
+of Parallel Implementations of Dense and Sparse Matrices for the
+ScalaTion Library,"</strong></a> Technical Report, University of Georgia
+(December 2012) pp. 1-60.</p></li>
+<li><p>John A. Miller, Michael E. Cotterell and Stephen J. Buckley, <a
+href="https://informs-sim.org/wsc13papers/includes/files/104.pdf"><strong>"Supporting
+a Modeling Continuum in ScalaTion: From Predictive Analytics to
+Simulation Modeling,"</strong></a> <em>Proceedings of the 2013 ACM/IEEE
+Winter Simulation Conference (WSC'13)</em>, Washington, DC (December
+2013) pp. 1191-1202.</p></li>
+<li><p>Matthew Saltz, Ayushi Jain, Abhishek Kothari, Arash Fard, John A.
+Miller and Lakshmish Ramaswamy, <a
+href="http://www.thecloudcomputing.org/2014/AdvanceProgram-ICWS-SCC-CLOUD-MS-BigDataCongress-SERVICES-2014.pdf"><strong>"DualIso:
+An Algorithm for Subgraph Pattern Matching on Very Large Labeled
+Graphs,"</strong></a> <em>Proceedings of the 3rd IEEE International
+Congress on Big Data</em> (<a
+href="http://www.ieeebigdata.org/2014">BigData'14</a>), Anchorage,
+Alaska (June-July 2014) pp. 498-505. Online <a
+href="https://cobweb.cs.uga.edu/~jam/home/theses/jain_thesis/bigdata_2014/BigDataCong2014_DualIso_Supplement.pdf">supplement</a>.</p></li>
+</ol>
+<h2 id="license">License</h2>
+<p>ScalaTion is released under the MIT License — see <a
+href="LICENSE.html">LICENSE</a>.</p>
+<p>Copyright © 2009-2021, John A. Miller and the University of
+Georgia.</p>
 
 </body>
 </html>
-

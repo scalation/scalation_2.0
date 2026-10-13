@@ -123,8 +123,9 @@ object Example_Covid:
     end loadData_yy
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    // YousefChange --------- Note: comment only -- the scaladoc below no longer names the sub-package built on it
     /** Build the named-column dataset map used by the formula layer (`ARX_Formula`,
-     *  `ARX_D.fromTerms`, `llmsr.FormulaScorer`, the search arms): the response under
+     *  `ARX_D.fromTerms`, a formula search built on them): the response under
      *  the key "y" and each exogenous column under its short name, all clipped
      *  to the given time range.  Usage:  given dataset: Map [String, VectorD] =
      *  context (BEST2_EXO, Array ("icu", "pRate")).

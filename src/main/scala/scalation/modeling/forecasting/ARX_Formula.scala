@@ -737,7 +737,7 @@ end aRX_FormulaTest
 
     import Example_Covid._
 
-    val exoColumns = Array ("icu_patients", "hosp_patients")
+    val exoColumns = Array ("icu_patients", "hosp_patients", "positive_rate")   // YousefChange
     val (xe, y_)   = clip (loadData (exoColumns))
 
     given dataContext: Map [String, VectorD] = Map (
