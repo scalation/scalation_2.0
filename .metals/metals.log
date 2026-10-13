@@ -525,3 +525,8 @@ exception caught when loading module class module-info$: java.lang.AssertionErro
 2026.10.13 12:55:51 INFO  time: compiled scalation in 1m
 2026.10.13 13:10:16 INFO  time: code lens generation in 1.62s
 exception caught when loading module class module-info$: java.lang.AssertionError: assertion failed: attempt to parse java.lang.Object from classfile
+2026.10.13 13:35:53 INFO  Shutting down server
+2026.10.13 13:35:53 INFO  Memory monitor stopped
+2026.10.13 13:35:53 INFO  shutting down Metals
+2026.10.13 13:35:54 INFO  Shut down connection with build server.
+2026.10.13 13:35:54 INFO  Shut down connection with build server.
