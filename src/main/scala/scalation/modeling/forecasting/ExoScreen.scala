@@ -1,5 +1,6 @@
 
 //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+// YousefChange --------- Note: comment only -- the scaladoc below no longer names the sub-package built on it
 /** @author  Yousef Fekri Dabanloo
  *  @version 2.0
  *  @date    Tue Sep 15 09:00:00 EDT 2026
@@ -33,7 +34,7 @@
  *  measurement of the response (e.g., excess mortality next to Covid-19 deaths:
  *  ccf 0.86 at lag 1, the reporting delay), or whether a column is comparable
  *  over the whole period (case counts under changing testing regimes); that is
- *  domain knowledge, given through `exclude` (or, in `llmsr`, asked of the LLM).
+ *  domain knowledge, given through `exclude` (or, in an LLM-guided search, asked of the LLM).
  *  With those two excluded, the screen finds `Example_Covid.BEST2_EXO` (hospital
  *  load and the positivity rate) on its own -- the choice made explicit and
  *  repeatable for any dataset.

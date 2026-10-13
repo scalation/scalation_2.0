@@ -632,9 +632,10 @@ class NARX_Formula (resp_ : FormulaVar, preds_ : VEC [Term],
     def nParams: Int = params.size
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    // YousefChange --------- Note: comment only -- the scaladoc below no longer names the sub-package built on it
     /** Return the number of distinct FREE parameters (the ones a fit searches; a
      *  parameter with equal bounds is a constant).
-     *  @note:  `nFree` -- the count the DF penalty of `NARX_SR_D` and the `llmsr` scorer use.
+     *  @note:  `nFree` -- the count the DF penalty of `NARX_SR_D` (and of a structure search) uses.
      */
     def nFree: Int = params.count (_.free)
 

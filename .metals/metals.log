@@ -493,3 +493,35 @@ exception caught when loading module class module-info$: java.lang.AssertionErro
 2026.05.06 15:06:05 INFO  Shut down connection with build server.
 2026.05.06 15:06:05 INFO  Shut down connection with build server.
 2026.05.06 15:06:07 INFO  Exiting server
+2026.10.13 12:51:29 INFO  Started: Metals version 1.6.9 in folders 'C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0' for client Visual Studio Code 1.141.0.
+2026.10.13 12:51:29 INFO  Memory monitor started
+2026.10.13 12:51:30 WARN  Using H2 2.5.250 which is newer than the version Flyway has been verified with. The latest verified version of H2 is 2.3.232.
+2026.10.13 12:51:30 INFO  no build target found for C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0\src\main\scala\scalation\modeling\forecasting\nonlinear\NARX_FormulaParser.scala. Using presentation compiler with project's scala-library version: 3.3.8
+2026.10.13 12:51:31 INFO  no build target found for C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0\src\main\scala\scalation\modeling\forecasting\nonlinear\NARX_FormulaParser.scala. Using presentation compiler with project's scala-library version: 3.3.8
+2026.10.13 12:51:33 INFO  Attempting to connect to the build server...
+2026.10.13 12:51:33 INFO  Found a Bloop server running
+2026.10.13 12:51:35 INFO  Tracing is disabled for protocol BSP. To enable tracing of incoming and outgoing JSON messages, create an empty file at C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0\.metals\bsp.trace.json or C:\Users\youse\AppData\Local\scalameta\metals\cache\bsp.trace.json
+2026.10.13 12:51:36 INFO  Attempting to connect to the build server...
+2026.10.13 12:51:36 INFO  Found a Bloop server running
+2026.10.13 12:51:37 INFO  Tracing is disabled for protocol BSP. To enable tracing of incoming and outgoing JSON messages, create an empty file at C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0\project\.metals\bsp.trace.json or C:\Users\youse\AppData\Local\scalameta\metals\cache\bsp.trace.json
+2026.10.13 12:51:37 INFO  no build target found for C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0\src\main\scala\scalation\modeling\forecasting\nonlinear\NARX_FormulaParser.scala. Using presentation compiler with project's scala-library version: 3.3.8
+2026.10.13 12:51:37 INFO  time: Connected to build server in 4.87s
+2026.10.13 12:51:37 INFO  Connected to Build server: Bloop v2.1.2
+2026.10.13 12:51:38 INFO  no build target found for C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0\build.sbt. Using presentation compiler with project's scala-library version: 3.3.8
+2026.10.13 12:51:38 WARN  no build target for: C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0\build.sbt
+2026.10.13 12:51:38 WARN  no build target for: C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0\build.sbt
+2026.10.13 12:51:38 WARN  no build target for: C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0\project\metals.sbt
+2026.10.13 12:51:39 INFO  time: Imported build in 0.55s
+2026.10.13 12:51:47 INFO  no build target found for C:\Users\youse\OneDrive\Documents\GitHub\scalation_2.0\project\metals.sbt. Using presentation compiler with project's scala-library version: 3.3.8
+2026.10.13 12:52:29 INFO  compiling scalation (635 scala sources)
+2026.10.13 12:52:36 WARN  Using H2 2.5.250 which is newer than the version Flyway has been verified with. The latest verified version of H2 is 2.3.232.
+2026.10.13 12:52:49 INFO  time: indexed workspace in 1m9s
+2026.10.13 12:52:50 INFO  Deduplicating compilation of scalation from bsp client 'Metals 1.6.9' (since 1m 14.731s)
+2026.10.13 12:52:50 INFO  compiling scalation (635 scala sources)
+exception caught when loading module class module-info$: java.lang.AssertionError: assertion failed: attempt to parse java.lang.Object from classfile
+2026.10.13 12:54:50 INFO  time: compiled scalation in 1m59s
+2026.10.13 12:54:50 INFO  compiling scalation (635 scala sources)
+exception caught when loading module class module-info$: java.lang.AssertionError: assertion failed: attempt to parse java.lang.Object from classfile
+2026.10.13 12:55:51 INFO  time: compiled scalation in 1m
+2026.10.13 13:10:16 INFO  time: code lens generation in 1.62s
+exception caught when loading module class module-info$: java.lang.AssertionError: assertion failed: attempt to parse java.lang.Object from classfile

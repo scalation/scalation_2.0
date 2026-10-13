@@ -30,8 +30,8 @@ object Example_ILI:
     import scala.collection.mutable.HashMap
 
 //  val fileName = "national_illness.csv"               // commonly used ILI dataset
-    val fileName = "national_illness_clip.csv"          // more recent data + 2 years of Covid clipped out
-
+    // val fileName = "national_illness_clip.csv"          // more recent data + 2 years of Covid clipped out
+    val fileName = "ILINetNov25.csv"
     val header = Array ("%WEIGHTED ILI",                // percent per state weighted by population
                         "%UNWEIGHTED ILI",              // aggregated without weighting
                         "AGE 0-4",                      // count in age group 0 to 4
@@ -86,8 +86,9 @@ object Example_ILI:
     end loadData_yy
 
     //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    // YousefChange --------- Note: comment only -- the scaladoc below no longer names the sub-package built on it
     /** Build the named-column dataset map used by the formula layer (`ARX_Formula`,
-     *  `ARX_D.fromTerms`, `llmsr.FormulaScorer`, the search arms): the response under
+     *  `ARX_D.fromTerms`, a formula search built on them): the response under
      *  the key "y" and each exogenous column under its short name.  Usage:
      *  given dataset: Map [String, VectorD] = context (Array ("%WEIGHTED ILI", "OT"), Array ("wili", "ot")).
      *  @param x_strs  the column names for the exogenous variables x
