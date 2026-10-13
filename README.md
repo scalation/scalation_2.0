@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://scalation.github.io/scalation_2.0/"><img alt="Scaladoc" src="https://img.shields.io/badge/docs-Scaladoc-blue"></a>
-  <a href="https://www.scala-lang.org/download/"><img alt="Scala 3.8.3" src="https://img.shields.io/badge/Scala-3.8.3-DC322F?logo=scala&logoColor=white"></a>
+  <a href="https://www.scala-lang.org/download/"><img alt="Scala 3.9.0" src="https://img.shields.io/badge/Scala-3.9.0-DC322F?logo=scala&logoColor=white"></a>
   <a href="https://jdk.java.net/archive/"><img alt="Java 21" src="https://img.shields.io/badge/Java-21-007396"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green"></a>
 </p>
@@ -41,7 +41,7 @@ Future directions include completing the `scala3d` and `physics` packages.
 |---|---|---|
 | [Java](https://www.oracle.com/java/technologies/downloads/) | 21 | or an OpenJDK 21 from the [OpenJDK archive](https://jdk.java.net/archive/) |
 | [sbt](https://www.scala-sbt.org/) | 1.x | recommended build tool; the version used is pinned in `project/build.properties` and fetched by sbt |
-| [Scala](https://www.scala-lang.org/download/) | 3.8.3 | set in `build.sbt`; sbt downloads the compiler, so a separate install is optional |
+| [Scala](https://www.scala-lang.org/download/) | 3.9.0 | set in `build.sbt`; sbt downloads the compiler, so a separate install is optional |
 
 New to sbt? See [sbt: Hello, World](https://www.scala-sbt.org/1.x/docs/Hello.html).
 
@@ -101,7 +101,7 @@ To regenerate the Scaladoc in `docs`:
 
 ```bash
 sbt clean compile doc
-rm -rf docs && cp -r target/scala-3.8.3/api docs
+rm -rf docs && cp -r target/scala-3.9.0/api docs
 ```
 
 ## Using ScalaTion from your own project
@@ -112,7 +112,7 @@ To develop projects that use ScalaTion but live outside ScalaTion:
 
 ```bash
 cd scalation_2.0
-sbt package          # writes target/scala-3.8.3/scalation_3-0.1.0-SNAPSHOT.jar
+sbt package          # writes target/scala-3.9.0/scalation_3-0.1.0-SNAPSHOT.jar
 ```
 
 **2. Create your project and copy the jar into its `lib` directory**
@@ -122,7 +122,7 @@ cd your_project_dir
 sbt new scala/scala3.g8          # enter a project name when prompted, e.g. hello
 cd hello
 mkdir lib
-cp <dir>/scalation_2.0/target/scala-3.8.3/scalation_3-0.1.0-SNAPSHOT.jar lib/
+cp <dir>/scalation_2.0/target/scala-3.9.0/scalation_3-0.1.0-SNAPSHOT.jar lib/
 ```
 
 where `<dir>` is the directory you placed `scalation_2.0` in.
@@ -130,7 +130,7 @@ where `<dir>` is the directory you placed `scalation_2.0` in.
 **3. Match ScalaTion's Scala version and dependency in your `build.sbt`**
 
 ```scala
-scalaVersion := "3.8.3"
+scalaVersion := "3.9.0"
 libraryDependencies += "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0"
 ```
 
